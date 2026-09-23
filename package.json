@@ -13,7 +13,6 @@
     "react-dom": "^19.1.0",
     "three": "^0.180.0",
     "lucide-react": "^0.468.0",
-    "idb-keyval": "^6.2.1",
     "zod": "^3.24.0"
   },
   "devDependencies": {

@@ -139,7 +139,7 @@ export default function Table3D({
         chip.position.set(
           (stack - 2) * 0.23,
           0.2 + h * 0.046,
-          1.55 + (stack % 2) * 0.12,
+          1.9 + (stack % 2) * 0.12,
         );
         chip.castShadow = true;
         chips.add(chip);

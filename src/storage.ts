@@ -1,7 +1,34 @@
-import { get, set } from "idb-keyval";
 import { z } from "zod";
 import type { Game, Character } from "./engine";
 import type { ChampionshipSimulationCheckpoint } from "./tournament";
+
+const SAVE_STORAGE_KEY = "river-save";
+const SAVE_LOCK_NAME = "river-save-write";
+const SAVE_CHANNEL_NAME = "river-save-sync";
+
+type StoredSave = {
+  revision: number;
+  save: Save;
+};
+
+type SaveChangeMessage = {
+  type: "save-changed";
+  revision: number;
+};
+
+let localRevision = 0;
+let saveChannel: BroadcastChannel | null = null;
+
+export class SaveConflictError extends Error {
+  constructor() {
+    super("本地存档已被另一个标签页更新");
+    this.name = "SaveConflictError";
+  }
+}
+
+export function isSaveConflictError(error: unknown): error is SaveConflictError {
+  return error instanceof SaveConflictError;
+}
 const money = z.number().int().min(0).max(1e9);
 const card = z.number().int().min(0).max(51);
 const playerProfileSchema = z.object({
@@ -81,6 +108,7 @@ export type Tournament = {
   playoff?: { original: Game; locked: Character[]; slots: number };
   round: number;
   field: Character[];
+  stacks?: Record<string, number>;
   entrants?: number;
   finalists?: Character[];
   finalStandings?: Character[];
@@ -152,6 +180,7 @@ const tournamentSchema = z.object({
         })
         .optional(),
       field: z.array(characterSchema).max(256),
+      stacks: z.record(money).optional(),
       seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
       pace: z.number().int().min(5).max(30).default(10),
       out: z.boolean(),
@@ -366,12 +395,134 @@ export function parseSave(value: unknown): Save {
   if(raw.settings?.soundConfigured!==true)data.settings.sound=true;
   return data;
 }
+const storedSaveSchema = z.object({
+  revision: z.number().int().nonnegative(),
+  save: z.unknown(),
+});
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "undefined";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableSerialize).join(",")}]`;
+  }
+
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
+    .join(",")}}`;
+}
+
+function saveFingerprint(save: Save) {
+  const { savedAt: _savedAt, ...content } = save;
+  return stableSerialize(content);
+}
+
+function readStoredSave(): StoredSave {
+  const raw = localStorage.getItem(SAVE_STORAGE_KEY);
+  if (!raw) return { revision: 0, save: blank };
+
+  const parsed: unknown = JSON.parse(raw);
+  const envelope = storedSaveSchema.safeParse(parsed);
+  if (envelope.success) {
+    return {
+      revision: envelope.data.revision,
+      save: parseSave(envelope.data.save),
+    };
+  }
+
+  // Accept a plain Save once so data written by an earlier localStorage build
+  // can be upgraded without forcing the user to import a backup.
+  return { revision: 0, save: parseSave(parsed) };
+}
+
+function getSaveChannel(): BroadcastChannel | null {
+  if (typeof BroadcastChannel === "undefined") return null;
+  if (!saveChannel) saveChannel = new BroadcastChannel(SAVE_CHANNEL_NAME);
+  return saveChannel;
+}
+
+function notifySaveChanged(revision: number) {
+  getSaveChannel()?.postMessage({
+    type: "save-changed",
+    revision,
+  } satisfies SaveChangeMessage);
+}
+
+async function withSaveLock<T>(task: () => T | Promise<T>): Promise<T> {
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    return navigator.locks.request(SAVE_LOCK_NAME, task);
+  }
+  return task();
+}
+
+export function getSaveRevision() {
+  return localRevision;
+}
+
 export const loadSave = async () => {
-  const data = await get("river-save");
-  return data ? parseSave(data) : blank;
+  const stored = readStoredSave();
+  localRevision = stored.revision;
+  return stored.save;
 };
-export const saveData = (data: Save) =>
-  set("river-save", { ...data, savedAt: new Date().toISOString() });
+
+export const saveData = async (data: Save) => {
+  return withSaveLock(() => {
+    const current = readStoredSave();
+    if (current.revision !== localRevision) {
+      throw new SaveConflictError();
+    }
+
+    if (saveFingerprint(current.save) === saveFingerprint(data)) {
+      return current.revision;
+    }
+
+    const revision = current.revision + 1;
+    const save = { ...data, savedAt: new Date().toISOString() };
+    localStorage.setItem(
+      SAVE_STORAGE_KEY,
+      JSON.stringify({ revision, save }),
+    );
+    localRevision = revision;
+    notifySaveChanged(revision);
+    return revision;
+  });
+};
+
+export function subscribeToSaveChanges(listener: (revision: number) => void) {
+  if (typeof window === "undefined") return () => undefined;
+
+  const channel = getSaveChannel();
+  const onMessage = (event: MessageEvent<SaveChangeMessage>) => {
+    if (event.data?.type === "save-changed") {
+      listener(event.data.revision);
+    }
+  };
+  const onStorage = (event: StorageEvent) => {
+    if (event.key !== SAVE_STORAGE_KEY || !event.newValue) return;
+    try {
+      const envelope = storedSaveSchema.safeParse(JSON.parse(event.newValue));
+      if (envelope.success) listener(envelope.data.revision);
+    } catch {
+      // The next focus check will surface a malformed or unavailable save.
+    }
+  };
+
+  channel?.addEventListener("message", onMessage);
+  window.addEventListener("storage", onStorage);
+
+  return () => {
+    channel?.removeEventListener("message", onMessage);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+
+export function checkSaveRevision() {
+  return readStoredSave().revision;
+}
+
 export function downloadSave(data: Save) {
   const blob = new Blob(
     [JSON.stringify({ ...data, savedAt: new Date().toISOString() }, null, 2)],

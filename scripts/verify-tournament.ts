@@ -3,11 +3,11 @@ import { simulateTable } from "../src/tournament";
 import { hero, type Character } from "../src/engine";
 let field: Character[] = [
   hero,
-  ...JSON.parse(readFileSync("public/characters.json", "utf8")).slice(0, 255),
+  ...JSON.parse(readFileSync("public/characters.json", "utf8")).slice(0, 63),
 ];
 const stages: number[] = [field.length];
 const start = Date.now();
-for (let round = 0; round < 5; round++) {
+for (let round = 0; round < 3; round++) {
   const next: Character[] = [];
   for (let i = 0; i < field.length; i += 8)
     next.push(...simulateTable(field.slice(i, i + 8), 4, 5));
@@ -20,7 +20,7 @@ for (const slots of [6, 4, 2, 1]) {
   stages.push(field.length);
   console.log(`Final stage: ${field.length} qualified`);
 }
-if (stages.join(",") !== "256,128,64,32,16,8,6,4,2,1")
+if (stages.join(",") !== "64,32,16,8,6,4,2,1")
   throw new Error("Incorrect bracket");
 writeFileSync(
   "scripts/tournament-verification.json",

@@ -89,7 +89,7 @@ const colors = [
   "#8b7c96",
   "#83948b",
 ];
-const roles = Array.from({ length: 300 }, (_, i) => {
+const roles = Array.from({ length: 63 }, (_, i) => {
   const c = colors[i % 6];
   const hair = ["#292821", "#403127", "#d0c6b0", "#1e2729"][i % 4];
   const skin = ["#d8ae8e", "#c28d6e", "#e5c8aa", "#ac795e"][

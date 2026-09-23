@@ -22,6 +22,10 @@ export type SimulatedTablePerformance = {
   handsWon: Record<string, number>;
   highestChips: Record<string, number>;
 };
+export type SimulatedTableResult = {
+  qualified: Character[];
+  stacks: Record<string, number>;
+};
 export type SimulationPlayerStats = {
   handsWon: number;
   highestChips: number;
@@ -111,10 +115,19 @@ export function simulateTable(
   pace: number,
   onProgress?: (progress: TableSimulationProgress) => void,
 ): Character[] {
+  return simulateTableWithStacks(profiles, slots, pace, onProgress).qualified;
+}
+export function simulateTableWithStacks(
+  profiles: Character[],
+  slots: number,
+  pace: number,
+  onProgress?: (progress: TableSimulationProgress) => void,
+  startingStacks?: number[],
+): SimulatedTableResult {
   return simulateTableInternal(profiles, slots, pace, onProgress, {
     handsWon: {},
     highestChips: {},
-  });
+  }, startingStacks);
 }
 function simulateTableInternal(
   profiles: Character[],
@@ -122,8 +135,9 @@ function simulateTableInternal(
   pace: number,
   onProgress: ((progress: TableSimulationProgress) => void) | undefined,
   performance: SimulatedTablePerformance,
-): Character[] {
-  let game = newGame(profiles);
+  startingStacks?: number[],
+): SimulatedTableResult {
+  let game = newGame(profiles, 100, startingStacks);
   let actions = 0;
   let lastRecordedHand = 0;
   const recordStackPeaks = () => {
@@ -174,12 +188,26 @@ function simulateTableInternal(
     }
   }
   const result = qualification(game, slots);
-  return [
-    ...result.locked,
-    ...(result.tied.length
-      ? simulateTableInternal(result.tied, result.slots, pace, onProgress, performance)
-      : []),
-  ];
+  const lockedStacks = Object.fromEntries(
+    result.locked.map((profile) => [
+      String(profile.id),
+      game.players.find((player) => player.profile.id === profile.id)?.chips ?? 0,
+    ]),
+  );
+  if (!result.tied.length) {
+    return { qualified: result.locked, stacks: lockedStacks };
+  }
+  const tieResult = simulateTableInternal(
+    result.tied,
+    result.slots,
+    pace,
+    onProgress,
+    performance,
+  );
+  return {
+    qualified: [...result.locked, ...tieResult.qualified],
+    stacks: { ...lockedStacks, ...tieResult.stacks },
+  };
 }
 
 function simulatedMove(observation: Observation) {

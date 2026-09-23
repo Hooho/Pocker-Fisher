@@ -6,7 +6,7 @@ import {
   type SimulationPlayerStatsMap,
   type SimulatedTablePerformance,
 } from "./tournament";
-import { useEffect, useRef, useState, lazy, Suspense, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback, memo, lazy, Suspense, type CSSProperties } from "react";
 import {
   ArrowUpRight,
   ChevronRight,
@@ -14,7 +14,6 @@ import {
   Users,
   Trophy,
   Spade,
-  LayoutDashboard,
   Download,
   Upload,
   Play,
@@ -24,17 +23,19 @@ import {
   X,
   ArrowLeft,
   Sparkles,
-  Search,
   RotateCcw,
   Check,
-  ShieldCheck,
   Flag,
   BookOpen,
   Medal,
   UserRound,
   LocateFixed,
-  ChevronDown,
   Crown,
+  Clock,
+  MoreHorizontal,
+  ArrowUp,
+  Info,
+  Home,
 } from "lucide-react";
 import {
   act,
@@ -56,9 +57,13 @@ import {
   blank,
   loadSave,
   saveData,
+  checkSaveRevision,
   parseSave,
   downloadSave,
+  getSaveRevision,
+  isSaveConflictError,
   summarizeSaveRecords,
+  subscribeToSaveChanges,
   type Save,
   type Tournament,
   type ChampionshipRecord,
@@ -66,20 +71,22 @@ import {
 } from "./storage";
 import { aiMove, reshape, requestAI } from "./ai";
 const Table3D = lazy(() => import("./Table3D"));
-import {playGameSound} from "./sound";
+import { playGameSound } from "./sound";
 const levels = ["入门", "普通", "进阶", "专家", "大师"];
 const rounds = [
-  "海选赛",
-  "晋级赛",
-  "六十四强",
-  "三十二强",
-  "十六强",
-  "冠军桌 · 八强",
-  "冠军桌 · 六强",
-  "冠军桌 · 四强",
-  "冠军单挑",
+  "首轮",
+  "次轮",
+  "半决赛",
+  "总决赛",
 ];
-const counts = [256, 128, 64, 32, 16, 8, 6, 4, 2];
+const counts = [64, 32, 16, 8, 6, 4, 2];
+const roundLabel = (round: number) => rounds[Math.min(round, rounds.length - 1)];
+const championshipQualifyingStages = [
+  { round: "首轮", players: "64 人", tables: "8 桌" },
+  { round: "次轮", players: "32 人", tables: "4 桌" },
+  { round: "半决赛", players: "16 人", tables: "2 桌" },
+  { round: "总决赛", players: "8 强", tables: "冠军桌" },
+] as const;
 // One concrete five-card example per hand ranking, highest to lowest, used to
 // illustrate the rules with real cards instead of just naming them.
 const handRankExamples = [
@@ -154,7 +161,7 @@ function makeTournamentRoster(
       ...p,
       level: Math.max(1, Math.min(5, difficulty + Math.round((p.level - 3) / 2))),
     }))
-    .slice(0, 255);
+    .slice(0, 63);
 }
 function createChampionshipRecord(
   players: Character[],
@@ -391,6 +398,11 @@ function recordAdvancement(save: Save, players: Character[], place: number): Sav
   }
   return { ...save, playerStats };
 }
+function stacksFromGame(game: Game | null): Record<string, number> {
+  return Object.fromEntries(
+    (game?.players || []).map((player) => [String(player.profile.id), player.chips]),
+  );
+}
 function recordPlacements(save: Save, players: Character[]): Save {
   const playerStats = { ...save.playerStats };
   players.forEach((player, index) => {
@@ -404,22 +416,89 @@ function recordPlacements(save: Save, players: Character[]): Save {
   });
   return { ...save, playerStats };
 }
+const TABLE_TIMER_STORAGE_KEY = "moyu-dezhou-table-timer";
+type TableTimerState = { accumulatedMs: number; runningSinceMs: number | null };
+function loadTableTimer(): TableTimerState {
+  try {
+    const raw = localStorage.getItem(TABLE_TIMER_STORAGE_KEY);
+    if (!raw) return { accumulatedMs: 0, runningSinceMs: null };
+    const parsed = JSON.parse(raw);
+    return {
+      accumulatedMs: typeof parsed.accumulatedMs === "number" ? parsed.accumulatedMs : 0,
+      runningSinceMs: typeof parsed.runningSinceMs === "number" ? parsed.runningSinceMs : null,
+    };
+  } catch {
+    return { accumulatedMs: 0, runningSinceMs: null };
+  }
+}
+function saveTableTimer(state: TableTimerState) {
+  try {
+    localStorage.setItem(TABLE_TIMER_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // best-effort only; the timer just won't survive a refresh if storage is unavailable
+  }
+}
+function elapsedTableMs(state: TableTimerState) {
+  return state.accumulatedMs + (state.runningSinceMs ? Date.now() - state.runningSinceMs : 0);
+}
+function formatTableDuration(totalSeconds: number) {
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const sec = totalSeconds % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(sec).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+type TableStageSize = { width: number; height: number };
+
+function clampNumber(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function getTableSeatPosition(
+  playerCount: number,
+  seatIndex: number,
+  stageSize: TableStageSize,
+) {
+  const angle = Math.PI / 2 + (seatIndex * Math.PI * 2) / Math.max(1, playerCount);
+  if (!stageSize.width || !stageSize.height) {
+    return {
+      left: `${50 + 43 * Math.cos(angle)}%`,
+      top: `${50 + (seatIndex === 0 ? 35 : 30) * Math.sin(angle)}%`,
+    };
+  }
+
+  const compact = stageSize.width <= 600;
+  const centerX = stageSize.width / 2;
+  const centerY = stageSize.height * (compact ? 0.54 : 0.55);
+  const tableRadiusX = stageSize.width * (compact ? 0.47 : 0.43);
+  const tableRadiusY = stageSize.height * (compact ? 0.18 : 0.2);
+  const seatHalfWidth = compact ? 45 : 62;
+  const seatHalfHeight = compact ? 38 : 58;
+  const gap = compact ? 8 : 14;
+  const edgePadding = compact ? 4 : 8;
+  const xRadius = tableRadiusX + seatHalfWidth + gap;
+  const yRadius = tableRadiusY + seatHalfHeight + gap;
+
+  const x = clampNumber(
+    centerX + xRadius * Math.cos(angle),
+    seatHalfWidth + edgePadding,
+    stageSize.width - seatHalfWidth - edgePadding,
+  );
+  const y = clampNumber(
+    centerY + yRadius * Math.sin(angle),
+    seatHalfHeight + edgePadding,
+    stageSize.height - seatHalfHeight - edgePadding,
+  );
+  return { left: `${x}px`, top: `${y}px` };
+}
 function bestResultLabel(place: number) {
   if (!place) return "—";
   if (place === 1) return "冠军";
   if (place === 2) return "亚军";
   if (place === 6) return "六强";
-  const bracket = [4, 8, 16, 32, 64, 128, 256].find((size) => place <= size) || place;
+  const bracket = [4, 8, 16, 32, 64].find((size) => place <= size) || place;
   return `${bracket} 强`;
-}
-function logLineKind(line: string): string {
-  if (line.includes("弃牌")) return "fold";
-  if (line.includes("全下")) return "allin";
-  if (line.includes("加注")) return "raise";
-  if (line.includes("跟注")) return "call";
-  if (line.includes("过牌")) return "check";
-  if (line.includes("盲")) return "blind";
-  return "info";
 }
 function championshipWinCount(records: ChampionshipRecord[], id: number) {
   // Standings only ever record the top 8 finishers of a championship, so counting
@@ -452,14 +531,15 @@ function placementCounts(records: ChampionshipRecord[], id: number) {
 }
 function placementSummary(counts: { champion: number; runnerUp: number; third: number; top8: number }) {
   if (!counts.top8) return null;
-  return [
-    counts.champion ? `${counts.champion}冠` : null,
-    counts.runnerUp ? `${counts.runnerUp}亚` : null,
-    counts.third ? `${counts.third}季` : null,
-    counts.top8 ? `${counts.top8}强` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
+  // Podium finishes read as one run-together group ("1冠2亚3季"); the overall
+  // top-8 tally is spelled out in full ("3八强") rather than the bare "3强",
+  // which read ambiguously next to the single-character 冠/亚/季 labels.
+  const podium = [
+    counts.champion ? `${counts.champion}冠` : "",
+    counts.runnerUp ? `${counts.runnerUp}亚` : "",
+    counts.third ? `${counts.third}季` : "",
+  ].join("");
+  return [podium, `${counts.top8}八强`].filter(Boolean).join(" ");
 }
 function startNextTournamentRound(save: Save, localQualified: Character[]): Save {
   const tournament = save.tournament;
@@ -472,10 +552,19 @@ function startNextTournamentRound(save: Save, localQualified: Character[]): Save
   if (!field.some((p) => p.id === -1)) return save;
   const round = tournament.round + 1;
   const table = [field.find((p) => p.id === -1)!, ...field.filter((p) => p.id !== -1).slice(0, 7)];
-  const heroStack = save.game?.players.find((p) => p.profile.id === -1)?.chips ?? 10000;
-  const game = newGame(table, 100, table.map((p) => p.id === -1 ? heroStack : 10000));
+  const knownStacks = tournament.stacks || {};
+  const heroStack = save.game?.players.find((p) => p.profile.id === -1)?.chips
+    ?? knownStacks["-1"]
+    ?? 10000;
+  const fieldStacks = Object.fromEntries(
+    field.map((player) => [
+      String(player.id),
+      player.id === -1 ? heroStack : knownStacks[String(player.id)] ?? 10000,
+    ]),
+  );
+  const game = newGame(table, 100, table.map((p) => fieldStacks[String(p.id)]));
   const tableIds = new Set(table.map((p) => p.id));
-  const background = round < 5
+  const background = round < 3
     ? { remaining: field.filter((p) => !tableIds.has(p.id)), qualified: [], done: false }
     : undefined;
   const nextSave: Save = {
@@ -485,17 +574,18 @@ function startNextTournamentRound(save: Save, localQualified: Character[]): Save
       ...tournament,
       round,
       field,
+      stacks: fieldStacks,
       background,
       pendingLocal: undefined,
       playoff: undefined,
-      finalists: round === 5 ? field : tournament.finalists,
+      finalists: round === 3 ? field : tournament.finalists,
       qualificationOut: [],
       out: false,
       paused: false,
       autoSimulating: false,
       simulationComplete: false,
       simulationCheckpoint: undefined,
-      results: [...tournament.results, `${rounds[tournament.round]} · 晋级`],
+      results: [...tournament.results, `${roundLabel(tournament.round)} · 晋级`],
     },
   };
   return recordAdvancement(nextSave, field, field.length);
@@ -522,8 +612,8 @@ function Card({
         <span>♠</span>
       ) : value !== undefined ? (
         <span className="card-face">
-          <b>{["","","2","3","4","5","6","7","8","9","10","J","Q","K","A"][rank(value)]}</b>
-          <i>{["♠","♥","♦","♣"][suit(value)]}</i>
+          <b>{["", "", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A"][rank(value)]}</b>
+          <i>{["♠", "♥", "♦", "♣"][suit(value)]}</i>
         </span>
       ) : (
         <span className="empty-card">·</span>
@@ -538,6 +628,106 @@ function Avatar({ p, playerAvatar }: { p: Character; playerAvatar?: string | nul
     </div>
   ) : (
     <img src={`/avatars/${p.id % 300}.svg`} alt={p.name} loading="lazy" />
+  );
+}
+type LeaderboardEntry = PlayerCareerStats & {
+  player: Character;
+  placement: { champion: number; runnerUp: number; third: number; top8: number };
+};
+// App() is one large component, so any unrelated state change anywhere (opening
+// a modal, toggling the header's "更多" menu, the table timer ticking once a
+// second) re-runs its whole render — and an inline `leaderboard.map(...)` over
+// ~63 rows would rebuild every row's element tree each time, even though the
+// underlying data hadn't changed. That rebuild-and-reconcile cost is what showed
+// up as clicks feeling laggy. Pulling the rows into their own memoized component
+// lets React bail out of that work entirely whenever its props are unchanged.
+const LeaderboardRows = memo(function LeaderboardRows({
+  rows,
+  playerAvatar,
+  userPlayerName,
+  localRowRef,
+  onSelect,
+}: {
+  rows: LeaderboardEntry[];
+  playerAvatar?: string | null;
+  userPlayerName: string;
+  localRowRef: { current: HTMLButtonElement | null };
+  onSelect: (id: number) => void;
+}) {
+  return (
+    <>
+      {rows.map((row, index) => (
+        <button
+          type="button"
+          className={`leaderboard-row ${index < 3 ? "podium" : ""} ${row.player.id === -1 ? "local-player" : ""}`}
+          key={row.player.id}
+          ref={row.player.id === -1 ? localRowRef : undefined}
+          onClick={() => onSelect(row.player.id)}
+        >
+          <span className="leaderboard-player">
+            <b className="leaderboard-rank">{String(index + 1).padStart(2, "0")}</b>
+            <Avatar p={row.player} playerAvatar={playerAvatar} />
+            <span><strong>{row.player.id === -1 ? userPlayerName : row.player.name}</strong><small>{row.player.style}</small></span>
+          </span>
+          <strong className="leaderboard-points">{(row.pointsTenths / 10).toFixed(1)}</strong>
+          <span className="leaderboard-best">
+            <strong>{bestResultLabel(row.bestPlace)}</strong>
+            {placementSummary(row.placement) ? <small>{placementSummary(row.placement)}</small> : null}
+          </span>
+          <span>{row.matches}</span>
+          <span>{row.advances}</span>
+          <span>{row.handsWon}</span>
+          <span>{row.highestChips ? row.highestChips.toLocaleString() : "—"}</span>
+        </button>
+      ))}
+    </>
+  );
+});
+function Fireworks({ active }: { active: boolean }) {
+  const bursts = useMemo(() => {
+    if (!active) return [];
+    const colors = ["#f4d67f", "#ff7a6b", "#6bc8ff", "#7ee787", "#ffb86b", "#d68bff", "#ff9ecf"];
+    return Array.from({ length: 8 }, (_, i) => {
+      const particles = 22 + Math.floor(Math.random() * 10);
+      return {
+        id: i,
+        left: 12 + Math.random() * 76,
+        top: 8 + Math.random() * 50,
+        delay: i * 0.5 + Math.random() * 0.25,
+        color: colors[i % colors.length],
+        particles,
+      };
+    });
+  }, [active]);
+  if (!active) return null;
+  return (
+    <div className="fireworks-overlay" aria-hidden="true">
+      {bursts.map((burst) => (
+        <div
+          key={burst.id}
+          className="firework-burst"
+          style={{
+            left: `${burst.left}%`,
+            top: `${burst.top}%`,
+            animationDelay: `${burst.delay}s`,
+          }}
+        >
+          {Array.from({ length: burst.particles }, (_, p) => (
+            <span
+              key={p}
+              className="firework-particle"
+              style={
+                {
+                  "--angle": `${(360 / burst.particles) * p}deg`,
+                  "--color": burst.color,
+                  animationDelay: `${burst.delay}s`,
+                } as CSSProperties
+              }
+            />
+          ))}
+        </div>
+      ))}
+    </div>
   );
 }
 function SimulationProgressPanel({
@@ -568,7 +758,7 @@ function SimulationProgressPanel({
           <span className="simulation-live-label">{label}</span>
         </div>
         <span className="simulation-round-name">
-          第 {round} 阶段 · {rounds[Math.min(round - 1, rounds.length - 1)]}
+          第 {round} 阶段 · {roundLabel(Math.max(0, round - 1))}
         </span>
       </div>
       <div className="simulation-progress-stats">
@@ -614,18 +804,23 @@ export default function App() {
   const [characters, setCharacters] = useState<Character[]>([]);
   const [page, setPage] = useState("lobby");
   const [settingsSection, setSettingsSection] = useState<"ai" | "players" | "profile">("ai");
-  const [modal, setModal] = useState<"new" | "rules" | null>(null);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
+  const [modal, setModal] = useState<
+    "new" | "rules" | "points" | "cash-details" | "tournament-details" | null
+  >(null);
   const [newMode, setNewMode] = useState<"cash" | "tournament">("cash");
   const [seatCount, setSeatCount] = useState(6);
   const [paused, setPaused] = useState(false);
+  const [tableSeconds, setTableSeconds] = useState(() => Math.floor(elapsedTableMs(loadTableTimer()) / 1000));
+  const [pageVisible, setPageVisible] = useState(
+    () => typeof document === "undefined" || document.visibilityState === "visible",
+  );
   const [key, setKey] = useState("");
   const [profileNameDraft, setProfileNameDraft] = useState("本地玩家");
   const [profileAvatarDraft, setProfileAvatarDraft] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [toast, setToast] = useState("");
   const [raise, setRaise] = useState(200);
-  const [query, setQuery] = useState("");
-  const [directoryLimit, setDirectoryLimit] = useState(60);
   const [selected, setSelected] = useState<Character | null>(null);
   const [statsOnly, setStatsOnly] = useState(false);
   const [instruction, setInstruction] = useState("");
@@ -640,19 +835,49 @@ export default function App() {
   const [eliminatedProgress, setEliminatedProgress] = useState<ChampionshipSimulationProgress | null>(null);
   const [imported, setImported] = useState<Save | null>(null);
   const [saveError, setSaveError] = useState(false);
+  const [saveStale, setSaveStale] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
     message: string;
     confirmLabel?: string;
     onConfirm: () => void;
   } | null>(null);
-  const [lastAction,setLastAction]=useState<{id:number;player:number}|null>(null);
+  const [lastAction, setLastAction] = useState<{ id: number; player: number } | null>(null);
   const [chipToss, setChipToss] = useState<{ seat: number; token: number } | null>(null);
-  const [celebrationDone,setCelebrationDone]=useState(false);
-  const [logExpanded, setLogExpanded] = useState(false);
-  const actionId=useRef(0);
+  const [celebrationDone, setCelebrationDone] = useState(false);
+  const tableStageRef = useRef<HTMLDivElement>(null);
+  const [tableStageSize, setTableStageSize] = useState<TableStageSize>({ width: 0, height: 0 });
+  const actionId = useRef(0);
   const file = useRef<HTMLInputElement>(null);
   const localLeaderboardRow = useRef<HTMLButtonElement>(null);
+  const leaderboardScrollRef = useRef<HTMLElement>(null);
+  const [leaderboardScrolled, setLeaderboardScrolled] = useState(false);
+  // The raw onScroll event can fire far more often than once per frame (especially
+  // with trackpad inertia), and calling setState synchronously on every single one
+  // was itself the stutter: each call is main-thread work competing with the
+  // browser's own scroll/compositing work. Coalescing to at most one state check
+  // per animation frame, and only calling setState when the threshold actually
+  // flips, removes that overhead.
+  const leaderboardScrollFrame = useRef<number | null>(null);
+  const leaderboardScrolledRef = useRef(false);
+  const markSaveStale = useCallback(() => {
+    setSaveStale(true);
+    setPaused(true);
+    setMoreMenuOpen(false);
+    setModal(null);
+    setImported(null);
+    setConfirmDialog(null);
+    setSelected(null);
+    setBatchOpen(false);
+    backgroundWorker.current?.postMessage({ type: "pause" });
+    eliminatedWorker.current?.terminate();
+    eliminatedWorker.current = null;
+  }, []);
+  useEffect(() => {
+    return () => {
+      if (leaderboardScrollFrame.current != null) cancelAnimationFrame(leaderboardScrollFrame.current);
+    };
+  }, []);
   const avatarFile = useRef<HTMLInputElement>(null);
   const generation = useRef(0);
   const rulesPausedByModal = useRef(false);
@@ -661,6 +886,116 @@ export default function App() {
   const eliminatedWorker = useRef<Worker | null>(null);
   const g = data.game;
   const t = data.tournament;
+  // Lets openPlayerProfile stay a stable useCallback (see below) while still
+  // reading up-to-date page/paused/tournament state at click time.
+  const openPlayerProfileState = useRef({ page, paused, t });
+  const tableEliminated = !!t?.out;
+  const tableTimerRunning = page === "table" && !tableEliminated && pageVisible;
+  const tableTimerState = useRef(loadTableTimer());
+  useEffect(() => {
+    if (page !== "table") {
+      setTableStageSize({ width: 0, height: 0 });
+      return;
+    }
+    const stage = tableStageRef.current;
+    if (!stage) return;
+    const updateSize = () => {
+      const rect = stage.getBoundingClientRect();
+      const next = { width: Math.round(rect.width), height: Math.round(rect.height) };
+      setTableStageSize((current) =>
+        current.width === next.width && current.height === next.height ? current : next,
+      );
+    };
+    updateSize();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateSize);
+      return () => window.removeEventListener("resize", updateSize);
+    }
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [page]);
+  const resetTableTimer = () => {
+    tableTimerState.current = { accumulatedMs: 0, runningSinceMs: null };
+    saveTableTimer(tableTimerState.current);
+    setTableSeconds(0);
+  };
+  const prevTableEliminated = useRef(tableEliminated);
+  useEffect(() => {
+    const handleVisibility = () =>
+      setPageVisible(document.visibilityState === "visible");
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener("pagehide", handleVisibility);
+    window.addEventListener("pageshow", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener("pagehide", handleVisibility);
+      window.removeEventListener("pageshow", handleVisibility);
+    };
+  }, []);
+  useEffect(() => {
+    setMoreMenuOpen(false);
+  }, [page]);
+  // Only elimination resets the clock here; a fresh new game/tournament resets it
+  // explicitly in start() instead. That way merely returning to an in-progress
+  // table (e.g. after a page refresh, which always lands back on the lobby first)
+  // resumes the accumulated time rather than zeroing it.
+  useEffect(() => {
+    if (tableEliminated && !prevTableEliminated.current) resetTableTimer();
+    prevTableEliminated.current = tableEliminated;
+  }, [tableEliminated]);
+  useEffect(() => {
+    const st = tableTimerState.current;
+    if (tableTimerRunning) {
+      if (st.runningSinceMs == null) {
+        tableTimerState.current = { ...st, runningSinceMs: Date.now() };
+        saveTableTimer(tableTimerState.current);
+      }
+    } else if (st.runningSinceMs != null) {
+      const accumulatedMs = st.accumulatedMs + (Date.now() - st.runningSinceMs);
+      tableTimerState.current = { accumulatedMs, runningSinceMs: null };
+      saveTableTimer(tableTimerState.current);
+      setTableSeconds(Math.floor(accumulatedMs / 1000));
+    }
+  }, [tableTimerRunning]);
+  useEffect(() => {
+    if (!tableTimerRunning) return;
+    const id = setInterval(() => {
+      setTableSeconds(Math.floor(elapsedTableMs(tableTimerState.current) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [tableTimerRunning]);
+  const [showFireworks, setShowFireworks] = useState(false);
+  const fireworksTimer = useRef<number | null>(null);
+  const prevTournamentRound = useRef(t?.round);
+  const localPlayerInTournament = t?.field.some((player) => player.id === -1) ?? false;
+  const triggerFireworks = (durationMs: number) => {
+    setShowFireworks(true);
+    if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
+    fireworksTimer.current = window.setTimeout(() => setShowFireworks(false), durationMs);
+  };
+  // Watch the resulting round state so synchronous advancement, background-table
+  // completion, and tie-breaks share one trigger. Completion by itself is not an
+  // advancement, and should not launch fireworks.
+  useEffect(() => {
+    const prevRound = prevTournamentRound.current;
+    if (
+      t &&
+      !t.out &&
+      !t.complete &&
+      localPlayerInTournament &&
+      typeof prevRound === "number" &&
+      t.round > prevRound
+    ) {
+      triggerFireworks(5000);
+    }
+    prevTournamentRound.current = t?.round;
+  }, [t?.round, t?.out, t?.complete, localPlayerInTournament]);
+  useEffect(() => {
+    return () => {
+      if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
+    };
+  }, []);
   const completedStandings = getCompletedStandings(t, data.tournamentRecords);
   const currentSaveSummary = summarizeSaveRecords(data);
   const localBest =
@@ -668,6 +1003,8 @@ export default function App() {
       ? evaluate([...g.players[0].cards, ...g.board]).best
       : [];
   const userPlayer = { ...hero, name: data.playerProfile.name.trim() || "本地玩家" };
+  const userPlayerRef = useRef(userPlayer);
+  userPlayerRef.current = userPlayer;
   useEffect(() => {
     Promise.all([loadSave(), fetch("/characters.json").then((r) => r.json())])
       .then(([saved, chars]) => {
@@ -690,37 +1027,63 @@ export default function App() {
       });
   }, []);
   useEffect(() => {
-    if (!ready || saveError) return;
-    saveData(data).catch(() => {
-      setSaveError(true);
-      setToast("自动保存失败，请导出存档备份");
+    if (!ready) return;
+
+    const checkForNewerSave = () => {
+      if (checkSaveRevision() !== getSaveRevision()) {
+        markSaveStale();
+      }
+    };
+    const unsubscribe = subscribeToSaveChanges((revision) => {
+      if (revision !== getSaveRevision()) {
+        markSaveStale();
+      }
     });
-  }, [data, ready, saveError]);
+    window.addEventListener("focus", checkForNewerSave);
+    document.addEventListener("visibilitychange", checkForNewerSave);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("focus", checkForNewerSave);
+      document.removeEventListener("visibilitychange", checkForNewerSave);
+    };
+  }, [ready, markSaveStale]);
+  useEffect(() => {
+    if (!ready || saveError || saveStale) return;
+    saveData(data)
+      .catch((error) => {
+        if (isSaveConflictError(error)) {
+          markSaveStale();
+          return;
+        }
+        setSaveError(true);
+        setToast("自动保存失败，请导出存档备份");
+      });
+  }, [data, ready, saveError, saveStale, markSaveStale]);
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(""), 5000);
     return () => clearTimeout(id);
   }, [toast]);
   const commit = (next: Game) => {
-    const top=next.log[0]||"";
-    const previous=g?.log[0]||"";
-    if(top!==previous&&!top.startsWith("第 ")&&!top.includes("赢得")){
-      const player=next.players.find(p=>top.startsWith(`${p.profile.name} · `));
-      if(player){const label=player.last;const type=label.includes("弃牌")?"fold":label.includes("全下")?"allin":label.includes("加注")?"raise":label.includes("跟注")?"call":"check";actionId.current++;setLastAction({id:actionId.current,player:player.profile.id});if(["raise","allin","call"].includes(type)){const seatIndex=next.players.indexOf(player);if(seatIndex>=0)setChipToss({seat:seatIndex,token:actionId.current})}playGameSound(type,data.settings.sound)}
+    const top = next.log[0] || "";
+    const previous = g?.log[0] || "";
+    if (top !== previous && !top.startsWith("第 ") && !top.includes("赢得")) {
+      const player = next.players.find(p => top.startsWith(`${p.profile.name} · `));
+      if (player) { const label = player.last; const type = label.includes("弃牌") ? "fold" : label.includes("全下") ? "allin" : label.includes("加注") ? "raise" : label.includes("跟注") ? "call" : "check"; actionId.current++; setLastAction({ id: actionId.current, player: player.profile.id }); if (["raise", "allin", "call"].includes(type)) { const seatIndex = next.players.indexOf(player); if (seatIndex >= 0) setChipToss({ seat: seatIndex, token: actionId.current }) } playGameSound(type, data.settings.sound) }
     }
-    if(top.startsWith("第 "))setLastAction(null);
-    if(next.board.length>(g?.board.length||0))playGameSound("deal",data.settings.sound);
-    const handEnded=next.done&&!g?.done;
-    if(handEnded&&next.winners.length){setCelebrationDone(false);playGameSound("win",data.settings.sound)}
+    if (top.startsWith("第 ")) setLastAction(null);
+    if (next.board.length > (g?.board.length || 0)) playGameSound("deal", data.settings.sound);
+    const handEnded = next.done && !g?.done;
+    if (handEnded && next.winners.length) { setCelebrationDone(false); playGameSound("win", data.settings.sound) }
     setData((old) => {
       const ended = next.done && !old.game?.done;
       const memories = { ...old.memories };
       if (ended) {
-        const handLog = next.log.slice(0,next.log.findIndex((x)=>x.startsWith("第 "))+1);
-        next.players.filter((p)=>p.cards.length===2&&p.profile.id!==-1).forEach((p)=>{memories[p.profile.id]=[...handLog,...(memories[p.profile.id]||[])].slice(0,60)});
+        const handLog = next.log.slice(0, next.log.findIndex((x) => x.startsWith("第 ")) + 1);
+        next.players.filter((p) => p.cards.length === 2 && p.profile.id !== -1).forEach((p) => { memories[p.profile.id] = [...handLog, ...(memories[p.profile.id] || [])].slice(0, 60) });
       }
       let tournament = old.tournament;
-      if (ended && tournament && tournament.round >= 4 && old.game) {
+      if (ended && tournament && tournament.round >= 2 && old.game) {
         const newlyEliminated = next.players
           .map((player, index) => ({
             player,
@@ -730,12 +1093,12 @@ export default function App() {
           .filter(({ player, startStack }) => startStack > 0 && player.chips === 0)
           .sort((a, b) => a.startStack - b.startStack || a.index - b.index)
           .map(({ player }) => player.profile);
-        if (tournament.round === 4)
+        if (tournament.round === 2)
           tournament = {
             ...tournament,
             qualificationOut: [...(tournament.qualificationOut || []), ...newlyEliminated].slice(-8),
           };
-        else if (tournament.round >= 5)
+        else if (tournament.round >= 3)
           tournament = {
             ...tournament,
             finalEliminated: [...(tournament.finalEliminated || []), ...newlyEliminated].slice(-8),
@@ -752,9 +1115,9 @@ export default function App() {
       };
       return ended ? recordHandResult(updated, next, !!tournament) : updated;
     });
-    if(handEnded&&next.winners.length){const timer=window.setTimeout(()=>setCelebrationDone(true),3200);return()=>window.clearTimeout(timer)}
+    if (handEnded && next.winners.length) { const timer = window.setTimeout(() => setCelebrationDone(true), 3200); return () => window.clearTimeout(timer) }
   };
-  useEffect(()=>{if(!g?.done||!g.winners.length){setCelebrationDone(false);return}setCelebrationDone(false);const timer=window.setTimeout(()=>setCelebrationDone(true),3300);return()=>window.clearTimeout(timer)},[g?.done,g?.hand,g?.result]);
+  useEffect(() => { if (!g?.done || !g.winners.length) { setCelebrationDone(false); return } setCelebrationDone(false); const timer = window.setTimeout(() => setCelebrationDone(true), 3300); return () => window.clearTimeout(timer) }, [g?.done, g?.hand, g?.result]);
   useEffect(() => {
     if (!g || g.done || g.turn === 0 || paused || page !== "table") return;
     const controller = new AbortController();
@@ -765,7 +1128,7 @@ export default function App() {
         0,
         o.profile.level * 10,
       );
-      if (t) o.qualify = t.round < 5 ? 4 : 1;
+      if (t) o.qualify = t.round < 3 ? 4 : 1;
       const fallback = () => {
         worker = new Worker(new URL("./bot.worker.ts", import.meta.url), {
           type: "module",
@@ -805,7 +1168,7 @@ export default function App() {
   }, [g, paused, page, data.settings, key]);
   useEffect(() => {
     const background = t?.background;
-    if (ready && page === "table" && t && !t.out && !t.complete && t.round < 5 && !background && g) {
+    if (ready && page === "table" && t && !t.out && !t.complete && t.round < 3 && !background && g) {
       const currentTable = t.playoff?.original || g;
       const localIds = new Set(currentTable.players.map((p) => p.profile.id));
       const remaining = t.field.filter((p) => !localIds.has(p.id));
@@ -817,7 +1180,7 @@ export default function App() {
     }
     const shouldRun = !!(
       ready && page === "table" && !paused && t && !t.out && !t.complete &&
-      t.round < 5 && background && !background.done && background.remaining.length
+      t.round < 3 && background && !background.done && background.remaining.length
     );
     if (!shouldRun) {
       backgroundWorker.current?.postMessage({ type: "pause" });
@@ -830,13 +1193,18 @@ export default function App() {
     const worker = new Worker(new URL("./tournament.worker.ts", import.meta.url), { type: "module" });
     backgroundWorker.current = worker;
     worker.onmessage = (event: MessageEvent<{
-      table?: { entrants: Character[]; qualified: Character[]; performance?: SimulatedTablePerformance };
+      table?: {
+        entrants: Character[];
+        qualified: Character[];
+        qualifiedStacks?: Record<string, number>;
+        performance?: SimulatedTablePerformance;
+      };
       progress?: number;
       total?: number;
       done?: boolean;
     }>) => {
       if (event.data.table) {
-        const { entrants, qualified, performance } = event.data.table;
+        const { entrants, qualified, qualifiedStacks, performance } = event.data.table;
         const ids = new Set(entrants.map((p) => p.id));
         setData((old) => {
           const current = old.tournament;
@@ -849,7 +1217,14 @@ export default function App() {
             done: remaining.length === 0,
           };
           const updated = applyTablePerformance(
-            { ...old, tournament: { ...current, background: bg } },
+            {
+              ...old,
+              tournament: {
+                ...current,
+                background: bg,
+                stacks: { ...(current.stacks || {}), ...(qualifiedStacks || {}) },
+              },
+            },
             performance || { handsWon: {}, highestChips: {} },
           );
           return bg.done && current.pendingLocal
@@ -887,7 +1262,14 @@ export default function App() {
       worker.terminate();
       setToast("其他牌桌模拟中断；回到冠军赛时会从已完成进度继续");
     };
-    worker.postMessage({ type: "start", field: background!.remaining, size: 8, qualify: 4, pace: 5 });
+    worker.postMessage({
+      type: "start",
+      field: background!.remaining,
+      stacks: t?.stacks || {},
+      size: 8,
+      qualify: 4,
+      pace: 5,
+    });
   }, [ready, page, paused, t?.round, t?.out, t?.complete, t?.background?.done]);
   useEffect(() => {
     if (!ready || !t?.autoSimulating || t.simulationComplete || eliminatedWorker.current) return;
@@ -896,7 +1278,7 @@ export default function App() {
       ...(t.playoff?.original.players || []).map((p) => p.profile.id),
     ]);
     const liveLocal = (g?.players || []).filter((p) => p.chips > 0 && p.profile.id !== -1).map((p) => p.profile);
-    const simulatedEntrants = t.round >= 5
+    const simulatedEntrants = t.round >= 3
       ? liveLocal
       : [...t.field.filter((p) => p.id !== -1 && !localIds.has(p.id)), ...(t.playoff?.locked || []), ...liveLocal]
         .filter((p, index, all) => all.findIndex((other) => other.id === p.id) === index);
@@ -936,7 +1318,7 @@ export default function App() {
         }
       }
       if (event.data.standings) {
-        const past = t.round >= 5
+        const past = t.round >= 3
           ? [...(t.finalEliminated || []).slice().reverse(), ...(t.topTwoOuts || [])]
           : [];
         const fullOrder = [...event.data.standings, ...past]
@@ -992,9 +1374,6 @@ export default function App() {
   useEffect(() => {
     if (g && !g.done) setRaise(legal(g).min);
   }, [g?.turn, g?.current, g?.hand]);
-  useEffect(() => {
-    setDirectoryLimit(60);
-  }, [query]);
   const profile = (p: Character) => data.overrides[p.id] || p;
   const start = () => {
     generation.current++;
@@ -1002,7 +1381,7 @@ export default function App() {
       eliminatedWorker.current?.terminate();
       eliminatedWorker.current = null;
     }
-    playGameSound("deal",data.settings.sound);
+    playGameSound("deal", data.settings.sound);
     const roster = makeTournamentRoster(characters, data.overrides, data.settings.difficulty);
     const game = newGame([
       userPlayer,
@@ -1011,19 +1390,23 @@ export default function App() {
     const tournament: Tournament | null =
       newMode === "tournament"
         ? {
-            round: 0,
-            field: [userPlayer, ...roster],
-            background: { remaining: roster.slice(7), qualified: [], done: false },
-            entrants: roster.length + 1,
-            seed: Date.now(),
-            pace: data.settings.pace,
-            out: false,
-            paused: false,
-            autoSimulating: false,
-            simulationComplete: false,
-            complete: false,
-            results: [],
-          }
+          round: 0,
+          field: [userPlayer, ...roster],
+          stacks: Object.fromEntries([
+            userPlayer,
+            ...roster,
+          ].map((player) => [String(player.id), 10000])),
+          background: { remaining: roster.slice(7), qualified: [], done: false },
+          entrants: roster.length + 1,
+          seed: Date.now(),
+          pace: data.settings.pace,
+          out: false,
+          paused: false,
+          autoSimulating: false,
+          simulationComplete: false,
+          complete: false,
+          results: [],
+        }
         : null;
     const entrants = tournament ? [userPlayer, ...roster] : game.players.map((player) => player.profile);
     const pausedTournament = newMode === "cash" && data.tournament && data.game && !data.tournament.complete
@@ -1042,6 +1425,7 @@ export default function App() {
         },
       };
     });
+    resetTableTimer();
     setPaused(false);
     setPage("table");
     setModal(null);
@@ -1051,7 +1435,7 @@ export default function App() {
     if (!g) return;
     const alive = g.players.filter((p) => p.chips > 0);
     const target = t
-      ? (t.playoff?.slots ?? (t.round < 5 ? 4 : [6, 4, 2, 1][t.round - 5]))
+      ? (t.playoff?.slots ?? (t.round < 3 ? 4 : [6, 4, 2, 1][t.round - 3]))
       : 1;
     if (t && alive.length <= target) {
       advanceTournament();
@@ -1062,7 +1446,7 @@ export default function App() {
       if (t) setData((d) => d.tournament ? ({ ...d, tournament: { ...d.tournament, out: true, autoSimulating: true, simulationComplete: false, simulationCheckpoint: undefined } }) : d);
       return;
     }
-    playGameSound("deal",data.settings.sound);
+    playGameSound("deal", data.settings.sound);
     commit(
       startHand(
         g,
@@ -1075,9 +1459,22 @@ export default function App() {
   const advanceTournament = () => {
     if (!g || !t) return;
     const alivePlayers = g.players.filter((p) => p.chips > 0);
-    if (t.round >= 5) {
+    const currentGameStacks = stacksFromGame(g);
+    if (t.round >= 3) {
       if (g.players[0].chips === 0) {
-        setData((d) => ({ ...d, tournament: d.tournament ? { ...d.tournament, out: true, autoSimulating: true, simulationComplete: false, simulationCheckpoint: undefined } : null }));
+        setData((d) => ({
+          ...d,
+          tournament: d.tournament
+            ? {
+              ...d.tournament,
+              stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
+              out: true,
+              autoSimulating: true,
+              simulationComplete: false,
+              simulationCheckpoint: undefined,
+            }
+            : null,
+        }));
         return;
       }
       if (alivePlayers.length === 1) {
@@ -1086,14 +1483,15 @@ export default function App() {
           ...(t.finalEliminated || []).slice().reverse(),
           ...(t.topTwoOuts || []),
         ].filter((player, index, players) => players.findIndex((other) => other.id === player.id) === index);
-        const record = createChampionshipRecord(actualPlacements, "played", t.entrants || 256);
+        const record = createChampionshipRecord(actualPlacements, "played", t.entrants || 64);
         setData((d) => {
           if (!d.tournament || d.tournament.complete) return d;
           const updated: Save = {
             ...d,
             tournament: {
               ...d.tournament,
-              round: 8,
+              stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
+              round: 6,
               field: [userPlayer],
               finalStandings: actualPlacements.slice(0, 8),
               complete: true,
@@ -1109,15 +1507,16 @@ export default function App() {
         return;
       }
       let round = t.round + 1;
-      while (round < 8 && alivePlayers.length <= [6, 4, 2, 1][round - 5]) round++;
+      while (round < 6 && alivePlayers.length <= [6, 4, 2, 1][round - 3]) round++;
       const advancingPlayers = alivePlayers.map((player) => player.profile);
       setData((d) => recordAdvancement({
         ...d,
         tournament: d.tournament ? {
           ...d.tournament,
+          stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
           round,
           field: advancingPlayers,
-          results: [...d.tournament.results, `${rounds[t.round]} · 晋级`],
+          results: [...d.tournament.results, `${roundLabel(t.round)} · 晋级`],
         } : null,
         game: startHand(g, Math.min(102400, 100 * 2 ** Math.floor(g.hand / t.pace))),
       }, advancingPlayers, counts[round] || advancingPlayers.length));
@@ -1129,7 +1528,11 @@ export default function App() {
       const remaining = t.field.filter((p) => !localIds.has(p.id));
       setData((d) => d.tournament ? ({
         ...d,
-        tournament: { ...d.tournament, background: { remaining, qualified: [], done: remaining.length === 0 } },
+        tournament: {
+          ...d.tournament,
+          stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
+          background: { remaining, qualified: [], done: remaining.length === 0 },
+        },
       }) : d);
       return;
     }
@@ -1140,7 +1543,13 @@ export default function App() {
     if (userTied) {
       setData((d) => ({
         ...d,
-        tournament: d.tournament ? { ...d.tournament, playoff: { original, locked, slots: q.slots } } : null,
+        tournament: d.tournament
+          ? {
+            ...d.tournament,
+            stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
+            playoff: { original, locked, slots: q.slots },
+          }
+          : null,
         game: newGame([userPlayer, ...q.tied.filter((p) => p.id !== -1)]),
       }));
       setToast("晋级边界出现同筹码平局，进入附加赛");
@@ -1150,16 +1559,32 @@ export default function App() {
       setData((d) => ({
         ...d,
         tournament: d.tournament
-          ? { ...d.tournament, out: true, autoSimulating: true, simulationComplete: false, simulationCheckpoint: undefined }
+          ? {
+            ...d.tournament,
+            stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
+            out: true,
+            autoSimulating: true,
+            simulationComplete: false,
+            simulationCheckpoint: undefined,
+          }
           : null,
       }));
       return;
     }
-    const queueLocalAdvancers = (localQualified: Character[]) => {
+    const queueLocalAdvancers = (
+      localQualified: Character[],
+      qualifiedStacks: Record<string, number> = {},
+    ) => {
+      const localStacks = { ...currentGameStacks, ...qualifiedStacks };
       if (t.background?.done) {
         setBusy(false);
         setProgress("");
-        setData((d) => startNextTournamentRound(d, localQualified));
+        setData((d) => startNextTournamentRound({
+          ...d,
+          tournament: d.tournament
+            ? { ...d.tournament, stacks: { ...(d.tournament.stacks || {}), ...localStacks } }
+            : null,
+        }, localQualified));
         return;
       }
       setBusy(true);
@@ -1167,17 +1592,27 @@ export default function App() {
       setData((d) => {
         const current = d.tournament;
         if (!current) return d;
-        return { ...d, tournament: { ...current, pendingLocal: localQualified } };
+        return {
+          ...d,
+          tournament: {
+            ...current,
+            stacks: { ...(current.stacks || {}), ...localStacks },
+            pendingLocal: localQualified,
+          },
+        };
       });
     };
     if (q.tied.length) {
       const worker = new Worker(new URL("./tournament.worker.ts", import.meta.url), { type: "module" });
       worker.onmessage = (event: MessageEvent<{
         tieQualified?: Character[];
+        qualifiedStacks?: Record<string, number>;
         performance?: SimulatedTablePerformance;
       }>) => {
         if (event.data.performance) setData((d) => applyTablePerformance(d, event.data.performance!));
-        if (event.data.tieQualified) queueLocalAdvancers([...locked, ...event.data.tieQualified]);
+        if (event.data.tieQualified) {
+          queueLocalAdvancers([...locked, ...event.data.tieQualified], event.data.qualifiedStacks);
+        }
         worker.terminate();
       };
       worker.onerror = () => { worker.terminate(); setToast("附加赛模拟失败，请重试晋级"); };
@@ -1226,6 +1661,9 @@ export default function App() {
     setNewMode(mode);
     setModal("new");
   };
+  const openModeDetails = (mode: "cash" | "tournament") => {
+    setModal(mode === "cash" ? "cash-details" : "tournament-details");
+  };
   const openRules = () => {
     if (page === "table" && !paused) {
       rulesPausedByModal.current = true;
@@ -1242,16 +1680,26 @@ export default function App() {
     }
     setModal(null);
   };
-  const openPlayerProfile = (raw: Character, onlyStats = false) => {
-    if (page === "table" && !paused) {
+  openPlayerProfileState.current = { page, paused, t };
+  const openPlayerProfile = useCallback((raw: Character, onlyStats = false) => {
+    const { page: curPage, paused: curPaused, t: curT } = openPlayerProfileState.current;
+    if (curPage === "table" && !curPaused) {
       selectedPausedByModal.current = true;
       setPaused(true);
-      if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: true } } : old);
+      if (curT) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: true } } : old);
     }
     setStatsOnly(onlyStats);
     setSelected(raw);
     setPreview(null);
-  };
+  }, []);
+  const selectLeaderboardPlayer = useCallback(
+    (id: number) => {
+      const raw = id === -1 ? userPlayerRef.current : characters.find((c) => c.id === id);
+      if (!raw) return;
+      openPlayerProfile(raw);
+    },
+    [openPlayerProfile, characters],
+  );
   const closePlayerProfile = () => {
     if (selectedPausedByModal.current) {
       selectedPausedByModal.current = false;
@@ -1312,7 +1760,7 @@ export default function App() {
     openNew("tournament");
   };
   const updateSettings = (patch: Partial<Save["settings"]>) =>
-    setData((d) => ({ ...d, settings: { ...d.settings, ...patch, ...(typeof patch.sound === "boolean" ? {soundConfigured:true} : {}) } }));
+    setData((d) => ({ ...d, settings: { ...d.settings, ...patch, ...(typeof patch.sound === "boolean" ? { soundConfigured: true } : {}) } }));
   const profileName = profileNameDraft.trim().slice(0, 24) || "本地玩家";
   const profileChanged =
     profileName !== data.playerProfile.name ||
@@ -1332,7 +1780,11 @@ export default function App() {
       setProfileNameDraft(profileName);
       setSaveError(false);
       setToast("个人资料已保存");
-    } catch {
+    } catch (error) {
+      if (isSaveConflictError(error)) {
+        markSaveStale();
+        return;
+      }
       setSaveError(true);
       setToast("个人资料保存失败，请导出存档备份后重试");
     } finally {
@@ -1362,7 +1814,7 @@ export default function App() {
     }
     commit(act(g, { type: "raise", amount: raise }));
   };
-  const overlayOpen = !!(modal || selected || batchOpen || imported || confirmDialog);
+  const overlayOpen = !!(modal || selected || batchOpen || imported || confirmDialog || saveStale);
   useEffect(() => {
     if (!active || !g || overlayOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1388,7 +1840,7 @@ export default function App() {
   }, [active, g, overlayOpen, limits, raise]);
   const alive = g?.players.filter((p) => p.chips > 0).length || 0;
   const threshold = t
-    ? (t.playoff?.slots ?? (t.round < 5 ? 4 : [6, 4, 2, 1][t.round - 5]))
+    ? (t.playoff?.slots ?? (t.round < 3 ? 4 : [6, 4, 2, 1][t.round - 3]))
     : 1;
   const backgroundQualified = t?.background?.qualified.length || 0;
   const backgroundTotal = backgroundQualified + (t?.background?.remaining.length || 0);
@@ -1404,11 +1856,33 @@ export default function App() {
   const selectedChampionshipsWon = selectedCurrent
     ? championshipWinCount(data.tournamentRecords, selectedCurrent.id)
     : 0;
-  const championshipBonuses = championshipCareerBonuses(data.tournamentRecords);
-  const leaderboard = (() => {
+  // Recomputing a 63-player leaderboard (map + per-player standings scan + sort)
+  // on every render of this component was the source of the scroll stutter on the
+  // points page: any unrelated state change anywhere in the app (timers, toasts,
+  // animations) re-ran this synchronously and re-rendered all 63 rows. Memoized
+  // so it only recomputes when the underlying data actually changes, and the
+  // per-player placement lookup is now a single pass over records instead of one
+  // records-scan per player.
+  const localPlayerName = data.playerProfile.name.trim() || "本地玩家";
+  const leaderboard = useMemo(() => {
+    const localPlayer: Character = { ...hero, name: localPlayerName };
+    const championshipBonuses = championshipCareerBonuses(data.tournamentRecords);
+    const placementById = new Map<number, { champion: number; runnerUp: number; third: number; top8: number }>();
+    for (const record of data.tournamentRecords) {
+      if (record.mode !== "played") continue;
+      for (const standing of record.standings) {
+        if (!standing.place) continue;
+        const counts = placementById.get(standing.player.id) || { champion: 0, runnerUp: 0, third: 0, top8: 0 };
+        counts.top8 += 1;
+        if (standing.place === 1) counts.champion += 1;
+        else if (standing.place === 2) counts.runnerUp += 1;
+        else if (standing.place === 3) counts.third += 1;
+        placementById.set(standing.player.id, counts);
+      }
+    }
     const profiles = new Map<number, Character>();
     characters.forEach((player) => profiles.set(player.id, profile(player)));
-    profiles.set(-1, userPlayer);
+    profiles.set(-1, localPlayer);
     return [...profiles.values()]
       .map((player) => {
         const stats = data.playerStats[String(player.id)] || blankCareerStats;
@@ -1422,7 +1896,7 @@ export default function App() {
               ? Math.min(stats.bestPlace, championship.bestPlace)
               : championship.bestPlace
             : stats.bestPlace,
-          placement: placementCounts(data.tournamentRecords, player.id),
+          placement: placementById.get(player.id) || { champion: 0, runnerUp: 0, third: 0, top8: 0 },
         };
       })
       .sort((a, b) =>
@@ -1432,7 +1906,7 @@ export default function App() {
         b.matches - a.matches ||
         a.player.name.localeCompare(b.player.name),
       );
-  })();
+  }, [characters, data.playerStats, data.tournamentRecords, data.overrides, localPlayerName]);
   const localRank = leaderboard.findIndex((row) => row.player.id === -1) + 1;
   useEffect(() => {
     if (page !== "leaderboard" || !ready) return;
@@ -1441,45 +1915,34 @@ export default function App() {
     });
     return () => cancelAnimationFrame(frame);
   }, [page, ready]);
+  const tableRoundLabel = t
+    ? t.playoff
+      ? `${roundLabel(t.round)} · 附加赛`
+      : roundLabel(t.round)
+    : "单次赛";
   const renderPlayerDirectory = () => {
-    const filtered = characters.filter((p) =>
-      (profile(p).name + profile(p).style).includes(query),
-    );
-    const visible = filtered.slice(0, directoryLimit);
-    const remaining = filtered.length - visible.length;
     return (
       <>
-        <div className="page-heading">
-          <div>
-            <h1>{page === "settings" ? "电脑选手列表" : "每个人，都有自己的底牌。"}</h1>
-            <p className="muted">
-              {page === "settings"
-                ? "浏览选手资料，或使用 AI 调整人物性格。"
-                : "300 位固定选手，不同的性格，相同的公平规则。"}
-            </p>
+        {page === "settings" ? null : (
+          <div className="page-heading">
+            <div>
+              <h1>每个人，都有自己的底牌。</h1>
+              <p className="muted">63 位固定选手，不同的性格，相同的公平规则。</p>
+            </div>
+            <span className="pill">
+              <Sparkles size={14} /> 支持 AI 人物塑造
+            </span>
           </div>
-          <span className="pill">
-            <Sparkles size={14} /> 支持 AI 人物塑造
-          </span>
-        </div>
-        <div className="search">
-          <Search size={18} />
-          <input
-            placeholder="搜索姓名、性格…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <span>{filtered.length} 位选手</span>
-        </div>
+        )}
         <div className="batch-bar">
-          <span>支持逐个塑造，也可以批量更新当前搜索结果。</span>
+          <span>支持逐个塑造，也可以批量更新选手列表。</span>
           <button onClick={() => setBatchOpen(true)}>
             <Sparkles size={15} />
             批量 AI 塑造
           </button>
         </div>
         <div className="character-grid">
-          {visible.map((raw) => {
+          {characters.map((raw) => {
             const p = profile(raw);
             return (
               <button
@@ -1499,29 +1962,11 @@ export default function App() {
             );
           })}
         </div>
-        {remaining > 0 ? (
-          <button
-            className="load-more-button"
-            onClick={() => setDirectoryLimit((n) => n + 60)}
-          >
-            加载更多（还有 {remaining} 位）
-          </button>
-        ) : null}
-        <p className="muted">
-          已展示 {visible.length} / {filtered.length} 位选手
-          {remaining > 0 ? "；点击上方按钮继续加载" : "；输入姓名或性格可缩小范围"}。
-        </p>
       </>
     );
   };
   const aiSettingsContent = (
     <>
-      <div className="page-heading settings-section-heading">
-        <div>
-          <h1>AI 设置</h1>
-          <p className="muted">调整电脑行动速度与 AI 服务连接。</p>
-        </div>
-      </div>
       <div className="settings-form">
         <label>
           行动速度
@@ -1650,12 +2095,6 @@ export default function App() {
   );
   const profileSettingsContent = (
     <>
-      <div className="page-heading settings-section-heading">
-        <div>
-          <h1>个人资料</h1>
-          <p className="muted">设置头像和牌桌显示名称，修改后点击保存资料。</p>
-        </div>
-      </div>
       <form
         className="profile-settings"
         onSubmit={(event) => {
@@ -1753,65 +2192,77 @@ export default function App() {
         </a>
         <div className="side-label">THE POKER ROOM</div>
         <nav>
-          {[
-            ["lobby", LayoutDashboard, "游戏大厅"],
-            ["leaderboard", Medal, "积分榜"],
-          ].map(([id, Icon, label]) => {
-            const Component = Icon as typeof Spade;
-            return (
-              <button
-                key={id as string}
-                className={page === id ? "active" : ""}
-                onClick={() => {
-                  if (page === "table") {
-                    setPaused(true);
-                    if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: true } } : old);
-                  }
-                  setPage(id as string);
-                  if (id === "leaderboard" && page === "leaderboard") {
-                    requestAnimationFrame(() => {
-                      localLeaderboardRow.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-                    });
-                  }
-                }}
-              >
-                <Component size={18} />
-                {label as string}
-              </button>
-            );
-          })}
+          {page !== "lobby" ? (
+            <button
+              className="home-nav-button"
+              aria-label="大厅"
+              title="大厅"
+              onClick={() => {
+                if (page === "table") {
+                  setPaused(true);
+                  if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: true } } : old);
+                }
+                setPage("lobby");
+              }}
+            >
+              <Home size={18} />
+              大厅
+            </button>
+          ) : null}
         </nav>
-        <div className="header-right nav-tools">
-          <span className="save-status">
-            <i className="live-dot" />
-            {saveError ? "存档待备份" : "本地自动保存"}
-          </span>
-          <button
-            className="icon-btn"
-            aria-label="导出存档"
-            title="导出存档"
-            onClick={() => downloadSave(data)}
-          >
-            <Download size={17} />
-          </button>
-          <button
-            className="icon-btn"
-            aria-label="导入存档"
-            title="导入存档"
-            onClick={() => file.current?.click()}
-          >
-            <Upload size={17} />
-          </button>
-        </div>
-        <div className="side-bottom">
-          <div className="local-note">
-            <ShieldCheck size={18} />
-            <span>
-              你的牌局，只属于你<small>本地存档 · 无需注册</small>
+        {moreMenuOpen ? (
+          <div className="more-menu-backdrop" onMouseDown={() => setMoreMenuOpen(false)} />
+        ) : null}
+        <div className={`header-right nav-tools${moreMenuOpen ? " open" : ""}`}>
+          <div className="nav-tools-actions">
+            <span className="save-status">
+              <i className="live-dot" />
+              {saveError ? "存档待备份" : "本地自动保存"}
             </span>
+            <button
+              className="icon-btn"
+              aria-label="导出存档"
+              title="导出存档"
+              onClick={() => {
+                downloadSave(data);
+                setMoreMenuOpen(false);
+              }}
+            >
+              <Download size={17} />
+              <span className="tool-label">导出存档</span>
+            </button>
+            <button
+              className="icon-btn"
+              aria-label="导入存档"
+              title="导入存档"
+              onClick={() => {
+                file.current?.click();
+                setMoreMenuOpen(false);
+              }}
+            >
+              <Upload size={17} />
+              <span className="tool-label">导入存档</span>
+            </button>
+            <button
+              className={`settings-btn ${page === "settings" ? "active" : ""}`}
+              aria-label="设置"
+              title="设置"
+              onClick={() => {
+                if (page === "table") {
+                  setPaused(true);
+                  if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: true } } : old);
+                }
+                setSettingsSection("ai");
+                setPage("settings");
+                setMoreMenuOpen(false);
+              }}
+            >
+              <Settings2 size={18} />
+              设置
+            </button>
           </div>
           <button
-            className={page === "leaderboard" ? "active" : ""}
+            className={`leaderboard-nav-button ${page === "leaderboard" ? "active" : ""}`}
             aria-label="积分榜"
             title="积分榜"
             onClick={() => {
@@ -1832,28 +2283,25 @@ export default function App() {
             积分榜
           </button>
           <button
-            className={page === "settings" ? "active" : ""}
-            aria-label="设置"
-            title="设置"
-            onClick={() => {
-              if (page === "table") {
-                setPaused(true);
-                if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: true } } : old);
-              }
-              setSettingsSection("ai");
-              setPage("settings");
-            }}
-          >
-            <Settings2 size={18} />
-            设置
-          </button>
-          <button
-            aria-label="游戏规则"
-            title="游戏规则"
+            className="rules-btn"
+            aria-label="德州规则"
+            title="德州规则"
             onClick={openRules}
           >
             <BookOpen size={18} />
-            游戏规则
+            <span className="btn-label-full">德州规则</span>
+            <span className="btn-label-short">德州规则</span>
+          </button>
+          <button
+            className={`more-btn ${moreMenuOpen ? "active" : ""}`}
+            aria-label="更多"
+            title="更多"
+            aria-haspopup="true"
+            aria-expanded={moreMenuOpen}
+            onClick={() => setMoreMenuOpen((v) => !v)}
+          >
+            <MoreHorizontal size={18} />
+            更多
           </button>
         </div>
       </aside>
@@ -1868,9 +2316,10 @@ export default function App() {
                 <span className="lobby-table-mark">摸鱼德州</span>
               </div>
               <div className="lobby-playing-cards">
-                <div className="ambient-playing-card"><b>A</b><span>♠</span></div>
+                <div className="ambient-playing-card"><b>A</b><span>♣</span></div>
                 <div className="ambient-playing-card red"><b>K</b><span>♦</span></div>
-                <div className="ambient-playing-card red"><b>Q</b><span>♥</span></div>
+                <div className="ambient-playing-card"><b>Q</b><span>♠</span></div>
+                <div className="ambient-playing-card red"><b>J</b><span>♥</span></div>
                 <div className="ambient-playing-card"><b>10</b><span>♣</span></div>
               </div>
               <div className="ambient-card-back"><span>♠</span><i>摸鱼德州</i></div>
@@ -1879,43 +2328,81 @@ export default function App() {
               <div className="ambient-loose-chip chip-gold">500</div>
               <div className="ambient-loose-chip chip-red">100</div>
             </div>
-            <div className="page-heading">
-              <div>
-                <h1>选择比赛模式</h1>
-                <p className="muted">挑一场比赛，坐下来开始发牌。</p>
-              </div>
+            <div className="lobby-save-note">
+              <div>随时退出！随时关闭！实时保存！</div>
+              <div>只保存本地，可下载存档，上传恢复</div>
             </div>
             <div className="mode-grid">
-              <button className="mode-card home-mode-card" onClick={() => openNew("cash")}>
-                <div className="mode-icon"><Spade size={25} /></div>
-                <div className="mode-topline"><span>即刻开赛</span></div>
-                <h3>单次赛</h3>
-                <p>开启一场独立牌局，与电脑选手对战。</p>
-                <div className="mode-footer"><span>2–8 人牌桌 · 难度自选</span><ArrowUpRight size={20} /></div>
-              </button>
-              <button className="mode-card competition home-mode-card" onClick={enterChampionship}>
-                <div className="mode-icon"><Trophy size={25} /></div>
-                <div className="mode-topline"><span>256 人竞逐</span></div>
-                <h3>冠军赛</h3>
-                <p>{(t || data.pausedTournament?.tournament) && !(t || data.pausedTournament?.tournament)?.complete ? (t || data.pausedTournament?.tournament)?.out ? "你已出局，剩余选手正在自动模拟。" : `继续你的比赛 · ${rounds[(t || data.pausedTournament?.tournament)!.round]}` : "多桌同时开赛，逐轮晋级，争夺最终冠军。"}</p>
-                <div className="mode-footer"><span>{(t || data.pausedTournament?.tournament)?.complete ? "查看本届结果" : (t || data.pausedTournament?.tournament)?.out ? "查看实时模拟进度" : (t || data.pausedTournament?.tournament) ? "冠军赛已暂停 · 点击继续" : "同时模拟其他牌桌 · 逐轮晋级"}</span><ArrowUpRight size={20} /></div>
-              </button>
+              <div className="mode-card-wrap">
+                <div
+                  className="mode-card home-mode-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => openNew("cash")}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      openNew("cash");
+                    }
+                  }}
+                >
+                  <div className="mode-title-row">
+                    <h3>单次赛</h3>
+                    <button
+                      type="button"
+                      className="mode-details-button"
+                      aria-label="查看单次赛说明"
+                      title="查看单次赛说明"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openModeDetails("cash");
+                      }}
+                    >
+                      <Info size={15} />
+                    </button>
+                  </div>
+                  <p>开启一场独立牌局，与电脑选手对战。</p>
+                  <div className="mode-footer"><span>2–8 人牌桌 · 难度自选</span><ArrowUpRight size={20} /></div>
+                </div>
+              </div>
+              <div className="mode-card-wrap">
+                <div
+                  className="mode-card competition home-mode-card"
+                  role="button"
+                  tabIndex={0}
+                  onClick={enterChampionship}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      enterChampionship();
+                    }
+                  }}
+                >
+                  <div className="mode-title-row">
+                    <h3>冠军之路</h3>
+                    <button
+                      type="button"
+                      className="mode-details-button"
+                      aria-label="查看冠军赛说明"
+                      title="查看冠军赛说明"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        openModeDetails("tournament");
+                      }}
+                    >
+                      <Info size={15} />
+                    </button>
+                  </div>
+                  <p>{(t || data.pausedTournament?.tournament) && !(t || data.pausedTournament?.tournament)?.complete ? (t || data.pausedTournament?.tournament)?.out ? "你已出局，剩余选手正在自动模拟。" : `继续你的比赛 · ${roundLabel((t || data.pausedTournament?.tournament)!.round)}` : "多桌同时开赛，依次经过首轮、次轮、半决赛和总决赛。"}</p>
+                  <div className="mode-footer"><span>{(t || data.pausedTournament?.tournament)?.complete ? "查看本届结果" : (t || data.pausedTournament?.tournament)?.out ? "查看实时模拟进度" : (t || data.pausedTournament?.tournament) ? "冠军赛已暂停 · 点击继续" : "同时模拟其他牌桌 · 逐轮晋级"}</span><ArrowUpRight size={20} /></div>
+                </div>
+              </div>
             </div>
           </div>
         ) : page === "table" && g ? (
           <div className="table-page">
             <div className="table-heading">
-              <div>
-                <h1>
-                  {t
-                    ? t.playoff
-                      ? rounds[t.round] + " · 附加赛"
-                      : rounds[t.round]
-                    : "单次赛"}{" "}
-                  <span>第 {g.hand} 手</span>
-                </h1>
-              </div>
-              <div className="table-tools">
+              <div className="table-heading-title table-heading-left">
                 <button
                   className="exit-table-button"
                   title="退出牌桌，牌局已自动保存"
@@ -1928,6 +2415,12 @@ export default function App() {
                   <ArrowLeft size={16} />
                   <span>退出牌桌</span>
                 </button>
+                <span className="table-timer" title="本局用时">
+                  <Clock size={13} />
+                  {formatTableDuration(tableSeconds)}
+                </span>
+              </div>
+              <div className="table-tools">
                 <span>
                   盲注{" "}
                   <b>
@@ -1937,11 +2430,11 @@ export default function App() {
                 <button
                   className="icon-btn"
                   aria-label={paused ? "继续" : "暂停"}
-                    onClick={() => {
-                      const nextPaused = !paused;
-                      setPaused(nextPaused);
-                      if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: nextPaused } } : old);
-                    }}
+                  onClick={() => {
+                    const nextPaused = !paused;
+                    setPaused(nextPaused);
+                    if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: nextPaused } } : old);
+                  }}
                 >
                   {paused ? <Play size={18} /> : <Pause size={18} />}
                 </button>
@@ -1960,15 +2453,19 @@ export default function App() {
                 </button>
                 <button
                   className="icon-btn"
-                  aria-label="游戏规则"
-                  title="游戏规则"
+                  aria-label="德州规则"
+                  title="德州规则"
                   onClick={openRules}
                 >
                   <BookOpen size={18} />
                 </button>
               </div>
             </div>
-            <div className="table-stage">
+            <div className="table-stage" ref={tableStageRef}>
+              <div className="table-context-watermark">
+                <strong>{tableRoundLabel}</strong>
+                <span>第 {g.hand} 手</span>
+              </div>
               <Suspense fallback={null}>
                 <Table3D potValue={pot(g)} done={g.done} winnerIndices={g.winners} playerCount={g.players.length} chipToss={chipToss} />
               </Suspense>
@@ -2002,13 +2499,7 @@ export default function App() {
                 </div>
               </div>
               {g.players.map((p, i) => {
-                const angle =
-                  Math.PI / 2 + (i * Math.PI * 2) / g.players.length;
-                // The local seat (i === 0) sits at the very front of the oval (sin = 1),
-                // so it gets a larger radius than the rest to push it further out/down
-                // toward y = 85%, away from the table rather than close in with the rest.
-                const x = 50 + 43 * Math.cos(angle),
-                  y = 50 + (i === 0 ? 35 : 30) * Math.sin(angle);
+                const seatPosition = getTableSeatPosition(g.players.length, i, tableStageSize);
                 const show =
                   p.profile.id === -1 ||
                   (g.done && !p.folded && g.board.length === 5);
@@ -2031,7 +2522,7 @@ export default function App() {
                   <div
                     key={p.profile.id}
                     className={`seat ${i === 0 ? "you" : ""} ${!g.done && g.turn === i ? "acting" : ""} ${p.folded ? "folded" : ""} ${g.winners.includes(i) && g.done ? "winner" : ""} ${p.last ? `action-${actionType}` : ""}`}
-                    style={{ left: `${x}%`, top: `${y}%` }}
+                    style={seatPosition}
                     onClick={() => {
                       const raw =
                         p.profile.id === -1
@@ -2054,8 +2545,8 @@ export default function App() {
                         />
                       ))}
                     </div>
-                    {p.last ? <div className={`seat-action-callout ${actionType} ${lastAction?.player === p.profile.id ? "new-action" : ""}`} key={`${g.hand}-${p.profile.id}-${p.last}`}><b>{actionText}</b>{["raise", "allin", "call"].includes(actionType) ? <span className="action-chips"><i/><i/><i/></span> : null}</div> : null}
-                    {g.done&&g.winners.includes(i)?<div className="winner-chip-stack arrive" key={`${g.hand}-${p.profile.id}-${g.result}`} aria-label={`${p.profile.name} 获得筹码`}><span/><span/><span/><span/><b>+{Math.max(0,p.chips-p.start+p.total).toLocaleString()}</b></div>:null}
+                    {p.last ? <div className={`seat-action-callout ${actionType} ${lastAction?.player === p.profile.id ? "new-action" : ""}`} key={`${g.hand}-${p.profile.id}-${p.last}`}><b>{actionText}</b>{["raise", "allin", "call"].includes(actionType) ? <span className="action-chips"><i /><i /><i /></span> : null}</div> : null}
+                    {g.done && g.winners.includes(i) ? <div className="winner-chip-stack arrive" key={`${g.hand}-${p.profile.id}-${g.result}`} aria-label={`${p.profile.name} 获得筹码`}><span /><span /><span /><span /><b>+{Math.max(0, p.chips - p.start + p.total).toLocaleString()}</b></div> : null}
                     {g.done && !celebrationDone && g.winners.includes(i) ? (
                       <span className="winner-confetti" aria-hidden="true">
                         {winnerPetals.map((petal, index) => (
@@ -2116,7 +2607,7 @@ export default function App() {
                   </div>
                 );
               })}
-              {g.done&&g.winners.length&&!celebrationDone?<><div className="victory-flash"/><div className="winner-banner"><small>{g.winners.length>1?"POT SPLIT · 底池平分":"POT AWARDED · 底池归属"}</small><strong>{g.winners.map(i=>g.players[i].profile.name).join(" & ")}{g.winners.length===1?" 赢下底池":""}</strong><span>{g.winners.map(i=>Math.max(0,g.players[i].chips-g.players[i].start+g.players[i].total).toLocaleString()).join(" / ")} 筹码到账</span></div></>:null}
+              {g.done && g.winners.length && !celebrationDone ? <><div className="victory-flash" /><div className="winner-banner"><small>{g.winners.length > 1 ? "POT SPLIT · 底池平分" : "POT AWARDED · 底池归属"}</small><strong>{g.winners.map(i => g.players[i].profile.name).join(" & ")}{g.winners.length === 1 ? " 赢下底池" : ""}</strong><span>{g.winners.map(i => Math.max(0, g.players[i].chips - g.players[i].start + g.players[i].total).toLocaleString()).join(" / ")} 筹码到账</span></div></> : null}
               {paused ? (
                 <div className="pause-overlay">
                   <Pause size={26} />
@@ -2133,53 +2624,54 @@ export default function App() {
                 </div>
               ) : null}
             </div>
-            <div className={`action-panel ${g.done ? "hand-complete" : ""}`}>
-              {g.done ? (
-                <>
-                  <div className="hand-result">
-                    <span className="eyebrow">{t?.complete ? "CHAMPION" : t?.out ? "TOURNAMENT ENDED" : "本手赢家 · HAND WINNER"}</span>
-                    {t?.complete ? <strong>{t.out ? "冠军赛模拟完成，最终冠军已产生" : "恭喜，你赢得了本届冠军！"}</strong> : t?.out ? <strong>你已出局，正在模拟其余比赛…</strong> : <div className="hand-winners">{g.winners.map(i=>{const winner=g.players[i];const amount=Math.max(0,winner.chips-winner.start+winner.total);return <div className="hand-winner" key={winner.profile.id}><Avatar p={winner.profile} playerAvatar={data.playerProfile.avatar}/><span><small>{g.winners.length>1?"底池赢家":"本手赢家"}</small><b>{winner.profile.name}</b></span><strong>+{amount.toLocaleString()}</strong>{g.board.length===5?<em>{evaluate([...winner.cards,...g.board]).name}</em>:null}</div>})}</div>}
-                    {waitingOnOtherTables ? (
-                      <div className="advance-wait" aria-live="polite">
-                        <span>{progress || "正在等待其他牌桌结束…"}</span>
-                        <div
-                          className="simulation-progress-track"
-                          role="progressbar"
-                          aria-label="其他牌桌结算进度"
-                          aria-valuemin={0}
-                          aria-valuemax={100}
-                          aria-valuenow={backgroundPercent}
-                        >
-                          <i style={{ width: `${backgroundPercent}%` }} />
+            <div className="action-slot">
+              <div className={`action-panel ${g.done ? "hand-complete" : ""}`}>
+                {g.done ? (
+                  <>
+                    <div className="hand-result">
+                      <span className={`eyebrow ${!t?.complete && !t?.out ? "hand-winner-eyebrow" : ""}`}>{t?.complete ? "CHAMPION" : t?.out ? "TOURNAMENT ENDED" : "本手赢家"}</span>
+                      {t?.complete ? <strong>{t.out ? "冠军赛模拟完成，最终冠军已产生" : "恭喜，你赢得了本届冠军！"}</strong> : t?.out ? <strong>你已出局，正在模拟其余比赛…</strong> : <div className="hand-winners">{g.winners.map(i => { const winner = g.players[i]; const amount = Math.max(0, winner.chips - winner.start + winner.total); return <div className="hand-winner" key={winner.profile.id}><Avatar p={winner.profile} playerAvatar={data.playerProfile.avatar} /><span><small>{g.winners.length > 1 ? "底池赢家" : "本手赢家"}</small><b>{winner.profile.name}</b></span><strong>+{amount.toLocaleString()}</strong>{g.board.length === 5 ? <em>{evaluate([...winner.cards, ...g.board]).name}</em> : null}</div> })}</div>}
+                      {waitingOnOtherTables ? (
+                        <div className="advance-wait" aria-live="polite">
+                          <span>{progress || "正在等待其他牌桌结束…"}</span>
+                          <div
+                            className="simulation-progress-track"
+                            role="progressbar"
+                            aria-label="其他牌桌结算进度"
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={backgroundPercent}
+                          >
+                            <i style={{ width: `${backgroundPercent}%` }} />
+                          </div>
                         </div>
-                      </div>
-                    ) : null}
-                  </div>
-                  {!t?.out && !t?.complete ? (
-                    <button
-                      className="gold-button"
-                      disabled={busy || (alive <= 1 && !t)}
-                      onClick={nextHand}
-                    >
-                      {busy
-                        ? "请稍候…"
-                        : canAdvance && t
-                          ? "确认晋级"
-                          : g.players[0].chips === 0
-                            ? "结算比赛"
-                            : "下一手"}
-                      <ChevronRight size={17} />
-                    </button>
-                  ) : (
-                    <button onClick={() => setPage("lobby")}>返回大厅</button>
-                  )}
-                </>
-              ) : (
-                <>
-                  <div className="bet-controls">
-                    <div className="quick-bets">
-                      {(limits
-                        ? [
+                      ) : null}
+                    </div>
+                    {!t?.out && !t?.complete ? (
+                      <button
+                        className="gold-button"
+                        disabled={busy || (alive <= 1 && !t)}
+                        onClick={nextHand}
+                      >
+                        {busy
+                          ? "请稍候…"
+                          : canAdvance && t
+                            ? "确认晋级"
+                            : g.players[0].chips === 0
+                              ? "结算比赛"
+                              : "下一手"}
+                        <ChevronRight size={17} />
+                      </button>
+                    ) : (
+                      <button onClick={() => setPage("lobby")}>返回大厅</button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <div className="bet-controls">
+                      <div className="quick-bets">
+                        {(limits
+                          ? [
                             {
                               label: "最小",
                               value: limits.min,
@@ -2191,151 +2683,127 @@ export default function App() {
                             { label: "¾ 池", value: presetValue({ fraction: 0.75 }), title: "四分之三底池" },
                             { label: "满池", value: presetValue({ fraction: 1 }), title: "加注一个底池" },
                           ]
-                        : []
-                      ).map((option) => (
+                          : []
+                        ).map((option) => (
+                          <button
+                            key={option.label}
+                            title={option.title}
+                            aria-label={option.title}
+                            className={active && raise === option.value ? "active" : ""}
+                            disabled={!active || !limits?.canRaise}
+                            onClick={() => setRaise(option.value)}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
                         <button
-                          key={option.label}
-                          title={option.title}
-                          aria-label={option.title}
-                          className={active && raise === option.value ? "active" : ""}
+                          className={`allin-btn ${active && limits && raise === limits.max ? "active" : ""}`}
+                          title="全下"
+                          aria-label="全下"
                           disabled={!active || !limits?.canRaise}
-                          onClick={() => setRaise(option.value)}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                      <button
-                        className={`allin-btn ${active && limits && raise === limits.max ? "active" : ""}`}
-                        title="全下"
-                        aria-label="全下"
-                        disabled={!active || !limits?.canRaise}
-                        onClick={() => limits && setRaise(limits.max)}
-                      >全下</button>
-                    </div>
-                    <div className="raise-range">
-                      <div className="raise-range-head">
-                        <span>加注至</span>
+                          onClick={() => limits && setRaise(limits.max)}
+                        >全下</button>
+                      </div>
+                      <div className="raise-range">
+                        <div className="raise-range-head">
+                          <span>加注至</span>
+                          <input
+                            type="number"
+                            className="raise-amount-input"
+                            aria-label="加注金额"
+                            min={limits?.min || 0}
+                            max={limits?.max || 0}
+                            value={raise}
+                            disabled={!active || !limits?.canRaise}
+                            onChange={(e) => {
+                              const v = Number(e.target.value);
+                              if (!Number.isNaN(v)) setRaise(v);
+                            }}
+                            onBlur={() => {
+                              if (!limits) return;
+                              setRaise(Math.max(limits.min, Math.min(limits.max, raise)));
+                            }}
+                          />
+                        </div>
                         <input
-                          type="number"
-                          className="raise-amount-input"
-                          aria-label="加注金额"
+                          aria-label="加注金额滑块"
+                          type="range"
                           min={limits?.min || 0}
                           max={limits?.max || 0}
+                          step={g?.bb || 1}
                           value={raise}
                           disabled={!active || !limits?.canRaise}
-                          onChange={(e) => {
-                            const v = Number(e.target.value);
-                            if (!Number.isNaN(v)) setRaise(v);
-                          }}
-                          onBlur={() => {
-                            if (!limits) return;
-                            setRaise(Math.max(limits.min, Math.min(limits.max, raise)));
-                          }}
+                          onChange={(e) => setRaise(Number(e.target.value))}
                         />
                       </div>
-                      <input
-                        aria-label="加注金额滑块"
-                        type="range"
-                        min={limits?.min || 0}
-                        max={limits?.max || 0}
-                        step={g?.bb || 1}
-                        value={raise}
-                        disabled={!active || !limits?.canRaise}
-                        onChange={(e) => setRaise(Number(e.target.value))}
-                      />
                     </div>
-                  </div>
-                  <div className="action-buttons">
-                    <button
-                      className="fold-button"
-                      title="弃牌（快捷键 F）"
-                      disabled={!active}
-                      onClick={() => commit(act(g, { type: "fold" }))}
-                    >
-                      弃牌<span className="key-hint">F</span>
-                    </button>
-                    <button
-                      className="call-button"
-                      title={`${limits?.toCall ? "跟注" : "过牌"}（快捷键 C）`}
-                      disabled={!active}
-                      onClick={() => commit(act(g, { type: "call" }))}
-                    >
-                      {limits?.toCall ? "跟注" : "过牌"}<span className="key-hint">C</span>
-                    </button>
-                    <button
-                      className="gold-button"
-                      title="加注（快捷键 R）"
-                      disabled={!active || !limits?.canRaise}
-                      onClick={submitRaise}
-                    >
-                      加注<span className="key-hint">R</span> <ArrowUpRight size={16} />
-                    </button>
-                    {confirmDialog ? (
-                      <>
-                        <div
-                          className="allin-confirm-backdrop"
-                          onMouseDown={() => setConfirmDialog(null)}
-                        />
-                        <div
-                          className="allin-confirm-popover"
-                          role="alertdialog"
-                          aria-modal="true"
-                          aria-label={confirmDialog.title}
-                        >
-                          <strong>{confirmDialog.title}</strong>
-                          <p>{confirmDialog.message}</p>
-                          <div className="allin-confirm-actions">
-                            <button onClick={() => setConfirmDialog(null)}>取消</button>
-                            <button
-                              className="gold-button"
-                              onClick={() => {
-                                const run = confirmDialog.onConfirm;
-                                setConfirmDialog(null);
-                                run();
-                              }}
-                            >
-                              {confirmDialog.confirmLabel || "确认"}
-                            </button>
+                    <div className="action-buttons">
+                      <button
+                        className="fold-button"
+                        title="弃牌（快捷键 F）"
+                        disabled={!active}
+                        onClick={() => commit(act(g, { type: "fold" }))}
+                      >
+                        弃牌<span className="key-hint">F</span>
+                      </button>
+                      <button
+                        className="call-button"
+                        title={`${limits?.toCall ? `跟注 ${limits.toCall}` : "过牌"}（快捷键 C）`}
+                        disabled={!active}
+                        onClick={() => commit(act(g, { type: "call" }))}
+                      >
+                        {limits?.toCall ? (
+                          <>
+                            <span>跟注</span>
+                            <small className="action-amount">{limits.toCall}</small>
+                          </>
+                        ) : "过牌"}
+                        <span className="key-hint">C</span>
+                      </button>
+                      <button
+                        className="gold-button"
+                        title={`加注 ${raise}（快捷键 R）`}
+                        disabled={!active || !limits?.canRaise}
+                        onClick={submitRaise}
+                      >
+                        <span>加注</span>
+                        <small className="action-amount">{raise}</small>
+                        <span className="key-hint">R</span>
+                      </button>
+                      {confirmDialog ? (
+                        <>
+                          <div
+                            className="allin-confirm-backdrop"
+                            onMouseDown={() => setConfirmDialog(null)}
+                          />
+                          <div
+                            className="allin-confirm-popover"
+                            role="alertdialog"
+                            aria-modal="true"
+                            aria-label={confirmDialog.title}
+                          >
+                            <strong>{confirmDialog.title}</strong>
+                            <p>{confirmDialog.message}</p>
+                            <div className="allin-confirm-actions">
+                              <button onClick={() => setConfirmDialog(null)}>取消</button>
+                              <button
+                                className="gold-button"
+                                onClick={() => {
+                                  const run = confirmDialog.onConfirm;
+                                  setConfirmDialog(null);
+                                  run();
+                                }}
+                              >
+                                {confirmDialog.confirmLabel || "确认"}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
-                </>
-              )}
-            </div>
-            <div className={`table-log ${logExpanded ? "expanded" : ""}`}>
-              <button
-                type="button"
-                className="table-log-toggle"
-                onClick={() => setLogExpanded((v) => !v)}
-                aria-expanded={logExpanded}
-                aria-label={logExpanded ? "收起牌局动态" : "展开牌局动态"}
-              >
-                <span>牌局动态</span>
-                <ChevronDown size={12} className="table-log-chevron" />
-              </button>
-              {logExpanded ? (
-                <div className="table-log-feed">
-                  {g.log.slice(0, 30).map((line, i) => {
-                    const kind = logLineKind(line);
-                    return (
-                      <div className={`table-log-entry ${kind}`} key={i}>
-                        {kind === "fold" ? (
-                          <X size={12} />
-                        ) : kind === "raise" || kind === "allin" ? (
-                          <ArrowUpRight size={12} />
-                        ) : kind === "call" || kind === "check" ? (
-                          <Check size={12} />
-                        ) : null}
-                        <span>{line}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                g.log.slice(0, 3).map((line, i) => <span key={i}>{line}</span>)
-              )}
+                        </>
+                      ) : null}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         ) : page === "settings" ? (
@@ -2354,7 +2822,7 @@ export default function App() {
                 aria-current={settingsSection === "players" ? "page" : undefined}
                 onClick={() => setSettingsSection("players")}
               >
-                <Users size={17} /> 电脑选手列表
+                <Users size={17} /> 电脑选手
               </button>
               <button
                 className={settingsSection === "profile" ? "active" : ""}
@@ -2378,13 +2846,13 @@ export default function App() {
           </div>
         ) : page === "tournament" ? (
           <div className={`content-page${t?.complete ? " championship-complete-page" : ""}`}>
-            <div className="page-heading">
+            <div className="page-heading championship-heading">
               <div>
                 <h1>冠军赛</h1>
                 <p className="muted">
                   {t?.complete
                     ? "本届赛事已结束，以下为最终名次。"
-                    : "256 位选手同时分桌比赛，晋级选手带着当前筹码进入下一轮。"}
+                    : "64 位选手同时分桌比赛，晋级选手带着当前筹码进入下一轮。"}
                 </p>
               </div>
               <div className="championship-actions">
@@ -2409,7 +2877,7 @@ export default function App() {
                         <small>FINAL RESULTS</small>
                         <h2 id="championship-results-title">本届最终名次</h2>
                       </div>
-                      <span>冠军桌 · 八强</span>
+                      <span>总决赛</span>
                     </div>
                     <div className="championship-podium" aria-label="前三名颁奖台">
                       {[1, 0, 2].map((index) => {
@@ -2467,16 +2935,16 @@ export default function App() {
                       {t
                         ? t.out
                           ? "你已出局 · 正在模拟剩余赛事"
-                          : rounds[t.round]
-                        : "九个阶段，一场属于你的征程"}
+                          : roundLabel(t.round)
+                        : "四轮比赛，一场属于你的征程"}
                     </h2>
                     <p>
                       {t
                         ? `${t.field.length} 位本轮选手 · ${t.results.length} 次晋级${t.background && !t.background.done ? ` · 其他桌剩余 ${t.background.remaining.length} 人` : ""}`
-                        : "前五轮每桌半数晋级，最后八人进入连续冠军桌。"}
+                        : "首轮、次轮和半决赛分桌晋级，最后八人进入总决赛。"}
                     </p>
                   </div>
-                  <b>256 <span>→ 1</span></b>
+                  <b>64 <span>→ 1</span></b>
                 </div>
                 {t?.out && !t.simulationComplete ? (
                   <SimulationProgressPanel
@@ -2489,14 +2957,14 @@ export default function App() {
                 <div className="rounds">
                   {rounds.map((name, i) => (
                     <div
-                      className={`round ${t?.round === i ? "current" : ""} ${t && t.round > i ? "passed" : ""}`}
+                      className={`round ${t && Math.min(t.round, rounds.length - 1) === i ? "current" : ""} ${t && t.round > i ? "passed" : ""}`}
                       key={name}
                     >
                       <div className="round-number">
                         {t && t.round > i ? <Check size={20} /> : String(i + 1).padStart(2, "0")}
                       </div>
                       <div>
-                        <small>{i < 5 ? "分组晋级" : "冠军桌"}</small>
+                        <small>{i < 3 ? "分组晋级" : "冠军桌"}</small>
                         <h3>{name}</h3>
                       </div>
                       <span>{counts[i]} 人</span>
@@ -2524,61 +2992,74 @@ export default function App() {
             </div>
             <div className="leaderboard-summary career-summary">
               <div><small>我的排名</small><strong>第 {localRank} 名 / {leaderboard.length} 位</strong></div>
-              <div><small>计分规则</small><strong>赢手 +0.1 · 冠军 +20</strong></div>
+              <button
+                type="button"
+                className="career-summary-rule"
+                onClick={() => setModal("points")}
+                aria-label="计分规则 · 点击查看详细说明"
+              >
+                <span className="career-summary-rule-label">
+                  <small>计分规则</small>
+                  <Info size={13} aria-hidden="true" />
+                </span>
+                <strong>赢手 +0.1 · 冠军 +20</strong>
+              </button>
             </div>
-            <section className="leaderboard-card" aria-label="所有选手积分与战绩">
+            <section
+              className="leaderboard-card"
+              aria-label="所有选手积分与战绩"
+              ref={leaderboardScrollRef}
+              onScroll={() => {
+                if (leaderboardScrollFrame.current != null) return;
+                leaderboardScrollFrame.current = requestAnimationFrame(() => {
+                  leaderboardScrollFrame.current = null;
+                  const next = (leaderboardScrollRef.current?.scrollTop ?? 0) > 0;
+                  if (next === leaderboardScrolledRef.current) return;
+                  leaderboardScrolledRef.current = next;
+                  setLeaderboardScrolled(next);
+                });
+              }}
+            >
               <div className="leaderboard-head">
-                <span>排名 · 选手</span><span>积分</span><span>比赛</span><span>晋级</span>
-                <span>赢手</span><span>最高筹码</span><span>最佳成绩</span>
+                <span>排名 · 选手</span><span>积分</span><span>最佳成绩</span><span>比赛</span>
+                <span>晋级</span><span>赢手</span><span>最高筹码</span>
               </div>
               <div className="leaderboard-body">
-                {leaderboard.map((row, index) => (
-                  <button
-                    type="button"
-                    className={`leaderboard-row ${index < 3 ? "podium" : ""} ${row.player.id === -1 ? "local-player" : ""}`}
-                    key={row.player.id}
-                    ref={row.player.id === -1 ? localLeaderboardRow : undefined}
-                    onClick={() => {
-                      const raw =
-                        row.player.id === -1
-                          ? userPlayer
-                          : characters.find((c) => c.id === row.player.id);
-                      if (!raw) return;
-                      openPlayerProfile(raw);
-                    }}
-                  >
-                    <span className="leaderboard-player">
-                      <b className="leaderboard-rank">{String(index + 1).padStart(2, "0")}</b>
-                      <Avatar p={row.player} playerAvatar={data.playerProfile.avatar} />
-                      <span><strong>{row.player.id === -1 ? userPlayer.name : row.player.name}</strong><small>{row.player.style}</small></span>
-                    </span>
-                    <strong className="leaderboard-points">{(row.pointsTenths / 10).toFixed(1)}</strong>
-                    <span>{row.matches}</span>
-                    <span>{row.advances}</span>
-                    <span>{row.handsWon}</span>
-                    <span>{row.highestChips ? row.highestChips.toLocaleString() : "—"}</span>
-                    <span className="leaderboard-best">
-                      <strong>{bestResultLabel(row.bestPlace)}</strong>
-                      {placementSummary(row.placement) ? <small>{placementSummary(row.placement)}</small> : null}
-                    </span>
-                  </button>
-                ))}
+                <LeaderboardRows
+                  rows={leaderboard}
+                  playerAvatar={data.playerProfile.avatar}
+                  userPlayerName={userPlayer.name}
+                  localRowRef={localLeaderboardRow}
+                  onSelect={selectLeaderboardPlayer}
+                />
               </div>
             </section>
-            <button
-              type="button"
-              className="leaderboard-locate-self"
-              aria-label={`定位到我的排名，第 ${localRank} 名`}
-              onClick={() => localLeaderboardRow.current?.scrollIntoView({
-                behavior: "smooth",
-                block: "center",
-                inline: "nearest",
-              })}
-            >
-              <LocateFixed size={17} />
-              <span>定位自己</span>
-              <b>第 {localRank} 名</b>
-            </button>
+            <div className="leaderboard-floating-actions">
+              {leaderboardScrolled ? (
+                <button
+                  type="button"
+                  className="leaderboard-scroll-top"
+                  aria-label="滚动到顶部"
+                  onClick={() => leaderboardScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+                >
+                  <ArrowUp size={17} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="leaderboard-locate-self"
+                aria-label={`定位到我的排名，第 ${localRank} 名`}
+                onClick={() => localLeaderboardRow.current?.scrollIntoView({
+                  behavior: "smooth",
+                  block: "center",
+                  inline: "nearest",
+                })}
+              >
+                <LocateFixed size={17} />
+                <span>定位自己</span>
+                <b>第 {localRank} 名</b>
+              </button>
+            </div>
           </div>
         )}
       </main>
@@ -2602,11 +3083,19 @@ export default function App() {
           }}
         >
           <section
-            className={`modal ${modal === "rules" ? "rules-modal" : ""}`}
+            className={`modal ${modal === "rules" ? "rules-modal" : ""} ${modal === "cash-details" || modal === "tournament-details" ? "mode-details-modal" : ""} ${modal === "tournament-details" ? "championship-details-modal" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-label={
-              modal === "new" ? "创建牌局" : "游戏规则"
+              modal === "new"
+                ? "创建牌局"
+                : modal === "cash-details"
+                  ? "单次赛说明"
+                  : modal === "tournament-details"
+                    ? "冠军赛说明"
+                    : modal === "points"
+                      ? "计分规则"
+                      : "游戏规则"
             }
           >
             <button
@@ -2624,8 +3113,8 @@ export default function App() {
                   {g && t
                     ? "开始单次赛会暂停并保存当前冠军赛，之后可继续。"
                     : g
-                    ? "新比赛会替换当前牌局，你可以先导出存档。"
-                    : "10,000 起始筹码 · 50 / 100 初始盲注"}
+                      ? "新比赛会替换当前牌局，你可以先导出存档。"
+                      : "10,000 起始筹码 · 50 / 100 初始盲注"}
                 </p>
                 {newMode === "cash" ? (
                   <label>
@@ -2643,7 +3132,7 @@ export default function App() {
                   </label>
                 ) : (
                   <div className="notice">
-                    256 人 · 多桌同时模拟 · 晋级时保留你的现有筹码；出局后快速模拟至冠军产生。
+                    64 人 · 多桌同时模拟 · 晋级时保留你的现有筹码；出局后快速模拟至冠军产生。
                   </div>
                 )}
                 <label>
@@ -2684,6 +3173,85 @@ export default function App() {
                   确认入座 <ArrowUpRight size={17} />
                 </button>
               </>
+            ) : modal === "cash-details" ? (
+              <>
+                <h2>单次赛说明</h2>
+                <ul className="mode-details-list">
+                  <li>2–8 人同桌，与电脑选手进行一场独立牌局。</li>
+                  <li>人数和难度可自由选择。</li>
+                  <li>起始筹码统一为 10,000，不设晋级流程。</li>
+                </ul>
+              </>
+            ) : modal === "tournament-details" ? (
+              <>
+                <h2>冠军赛说明</h2>
+                <ul className="mode-details-list">
+                  <li>64 人分桌比赛，依次进行首轮、次轮、半决赛和总决赛。</li>
+                  <li>前三轮每桌 8 进 4，最后 8 人进入总决赛。</li>
+                  <li>前三轮晋级后统一筹码，总决赛保留现有筹码并按 8、6、4、2、1 人推进。</li>
+                  <li>每赢一手牌获得积分，最终按名次获得额外奖励。</li>
+                </ul>
+                <div className="championship-bracket" aria-labelledby="championship-bracket-title">
+                  <div className="championship-bracket-heading">
+                    <div>
+                      <strong id="championship-bracket-title">冠军赛晋级树</strong>
+                    </div>
+                    <span>64 <i aria-hidden="true">→</i> 1</span>
+                  </div>
+                  <div className="bracket-track">
+                    <div className="bracket-track-label">
+                      <span>四轮赛制</span>
+                      <small>分桌晋级 → 冠军桌</small>
+                    </div>
+                    <div className="bracket-track-scroll">
+                      <div className="bracket-track-nodes">
+                        {championshipQualifyingStages.map((stage) => (
+                          <div className="bracket-node" key={stage.round}>
+                            <small>{stage.round}</small>
+                            <strong>{stage.players}</strong>
+                            <span>{stage.tables}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : modal === "points" ? (
+              <>
+                <p className="eyebrow">SCORING</p>
+                <h2>计分规则</h2>
+                <div className="rules-copy">
+                  <p>
+                    积分只累计你亲自参与过的冠军赛：完全由系统自动模拟、你未参赛的冠军赛不计分；日常单次现金局的手数只计入"手数"战绩，不计入积分。
+                  </p>
+                  <p>
+                    赢下一手牌 <strong>+0.1</strong> 分——包括你亲自坐镇的牌桌，以及冠军赛期间你出局后系统代打的其他牌桌。
+                  </p>
+                  <p>冠军赛结束时，按最终名次一次性发放名次分：</p>
+                  <div className="points-rule-chart" aria-label="名次积分对照表">
+                    {[
+                      { label: "冠军", points: 20 },
+                      { label: "亚军", points: 15 },
+                      { label: "季军（第 3 名）", points: 12 },
+                      { label: "第 4 名", points: 11 },
+                      { label: "第 5 名", points: 10 },
+                      { label: "第 6 名", points: 9 },
+                      { label: "第 7 名", points: 8 },
+                      { label: "第 8 名", points: 7 },
+                      { label: "第 9 名及以后", points: 0 },
+                    ].map((row) => (
+                      <div className="points-rule-row" key={row.label}>
+                        <span>{row.label}</span>
+                        <b>+{row.points}</b>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="muted rules-chart-note">
+                    积分榜按总积分从高到低排序；分数相同时依次比较赢手总数、历史最佳名次、参赛场次，最后按姓名排序。
+                  </p>
+                </div>
+              </>
             ) : (
               <>
                 <p className="eyebrow">THE RULES</p>
@@ -2710,7 +3278,7 @@ export default function App() {
                     可弃牌、过牌、跟注、加注或全下。全下形成独立边池；完全相同的牌型平分底池，零头按庄位后顺序分配。
                   </p>
                   <p>
-                    竞赛前五轮每桌八人晋级四人，轮间统一筹码。冠军桌按八、六、四、二、一人的顺序推进，筹码连续保留。
+                    首轮、次轮和半决赛每桌八人晋级四人，轮间统一筹码。总决赛按八、六、四、二、一人的顺序推进，筹码连续保留。
                   </p>
                   <p>
                     同手淘汰按开局筹码排序；晋级边界开局筹码完全相同时，进行附加赛。冠军桌多人同时出局时，直接进入对应剩余人数阶段。
@@ -2800,99 +3368,99 @@ export default function App() {
             </div>
             {selectedCurrent.id !== -1 && !statsOnly ? (
               <>
-            <label>
-              用 AI 重新塑造
-              <textarea
-                value={instruction}
-                onChange={(e) => setInstruction(e.target.value)}
-                placeholder="例如：谨慎的老手，但关键时刻敢于诈唬"
-              />
-            </label>
-            <button
-              className="gold-button full"
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  setPreview(
-                    await reshape(
-                      data.settings,
-                      key,
-                      selectedCurrent,
-                      instruction,
-                    ),
-                  );
-                } catch (e) {
-                  setToast(e instanceof Error ? e.message : "生成失败");
-                } finally {
-                  setBusy(false);
-                }
-              }}
-            >
-              <Sparkles size={16} />
-              {busy ? "正在塑造人物…" : "生成性格预览"}
-            </button>
-            {preview ? (
-              <div className="ai-preview">
-                <b>{preview.style}</b>
-                <p>{preview.bio}</p>
-                <p>
-                  进攻 {Math.round(preview.aggression * 100)}% · 诈唬{" "}
-                  {Math.round(preview.bluff * 100)}%
-                </p>
+                <label>
+                  用 AI 重新塑造
+                  <textarea
+                    value={instruction}
+                    onChange={(e) => setInstruction(e.target.value)}
+                    placeholder="例如：谨慎的老手，但关键时刻敢于诈唬"
+                  />
+                </label>
                 <button
-                  onClick={() => {
-                    setData((d) => ({
-                      ...d,
-                      previous: {
-                        ...d.previous,
-                        [preview.id]: selectedCurrent,
-                      },
-                      overrides: { ...d.overrides, [preview.id]: preview },
-                    }));
-                    setPreview(null);
-                    setToast("人物已更新，将在新比赛生效");
+                  className="gold-button full"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      setPreview(
+                        await reshape(
+                          data.settings,
+                          key,
+                          selectedCurrent,
+                          instruction,
+                        ),
+                      );
+                    } catch (e) {
+                      setToast(e instanceof Error ? e.message : "生成失败");
+                    } finally {
+                      setBusy(false);
+                    }
                   }}
                 >
-                  应用新性格
+                  <Sparkles size={16} />
+                  {busy ? "正在塑造人物…" : "生成性格预览"}
                 </button>
-              </div>
-            ) : null}
-            <div className="modal-actions">
-              <button
-                onClick={() => {
-                  setData((d) => ({
-                    ...d,
-                    overrides: {
-                      ...d.overrides,
-                      [selectedCurrent.id]: selected!,
-                    },
-                  }));
-                  setToast("已恢复初始人物档案");
-                }}
-              >
-                <RotateCcw size={14} />
-                恢复默认
-              </button>
-              {data.previous[selectedCurrent.id] ? (
-                <button
-                  onClick={() =>
-                    setData((d) => ({
-                      ...d,
-                      overrides: {
-                        ...d.overrides,
-                        [selectedCurrent.id]: d.previous[selectedCurrent.id],
-                      },
-                    }))
-                  }
-                >
-                  恢复上一版
-                </button>
-              ) : null}
-            </div>
-            <small className="muted">
-              不改变身份和水平，当前比赛使用开赛时的人物快照。仅保留公开交手记录。
-            </small>
+                {preview ? (
+                  <div className="ai-preview">
+                    <b>{preview.style}</b>
+                    <p>{preview.bio}</p>
+                    <p>
+                      进攻 {Math.round(preview.aggression * 100)}% · 诈唬{" "}
+                      {Math.round(preview.bluff * 100)}%
+                    </p>
+                    <button
+                      onClick={() => {
+                        setData((d) => ({
+                          ...d,
+                          previous: {
+                            ...d.previous,
+                            [preview.id]: selectedCurrent,
+                          },
+                          overrides: { ...d.overrides, [preview.id]: preview },
+                        }));
+                        setPreview(null);
+                        setToast("人物已更新，将在新比赛生效");
+                      }}
+                    >
+                      应用新性格
+                    </button>
+                  </div>
+                ) : null}
+                <div className="modal-actions">
+                  <button
+                    onClick={() => {
+                      setData((d) => ({
+                        ...d,
+                        overrides: {
+                          ...d.overrides,
+                          [selectedCurrent.id]: selected!,
+                        },
+                      }));
+                      setToast("已恢复初始人物档案");
+                    }}
+                  >
+                    <RotateCcw size={14} />
+                    恢复默认
+                  </button>
+                  {data.previous[selectedCurrent.id] ? (
+                    <button
+                      onClick={() =>
+                        setData((d) => ({
+                          ...d,
+                          overrides: {
+                            ...d.overrides,
+                            [selectedCurrent.id]: d.previous[selectedCurrent.id],
+                          },
+                        }))
+                      }
+                    >
+                      恢复上一版
+                    </button>
+                  ) : null}
+                </div>
+                <small className="muted">
+                  不改变身份和水平，当前比赛使用开赛时的人物快照。仅保留公开交手记录。
+                </small>
               </>
             ) : null}
           </section>
@@ -2917,7 +3485,7 @@ export default function App() {
             <p className="eyebrow">CHARACTER STUDIO</p>
             <h2>批量塑造选手</h2>
             <p className="muted">
-              从当前搜索结果依次选取，逐名调用模型。生成后预览并统一应用，当前比赛不受影响。
+              从选手列表依次选取，逐名调用模型。生成后预览并统一应用，当前比赛不受影响。
             </p>
             <label>
               本批人数
@@ -2926,7 +3494,7 @@ export default function App() {
                 value={batchCount}
                 onChange={(e) => setBatchCount(+e.target.value)}
               >
-                {[5, 10, 30, 100, 300].map((n) => (
+                {[5, 10, 30, 63].map((n) => (
                   <option key={n} value={n}>
                     {n} 人
                   </option>
@@ -2946,9 +3514,7 @@ export default function App() {
               本批最多调用{" "}
               {Math.min(
                 batchCount,
-                characters.filter((p) =>
-                  (profile(p).name + profile(p).style).includes(query),
-                ).length,
+                characters.length,
               )}{" "}
               次，费用按你的模型服务计费。暂停会在当前人物处理完后停止，已生成结果保留。
             </div>
@@ -2958,11 +3524,7 @@ export default function App() {
               onClick={async () => {
                 batchStop.current = false;
                 setBusy(true);
-                const targets = characters
-                  .filter((p) =>
-                    (profile(p).name + profile(p).style).includes(query),
-                  )
-                  .slice(0, batchCount);
+                const targets = characters.slice(0, batchCount);
                 setBatchTotal(targets.length);
                 const completed = new Set(batchResults.map((p) => p.id));
                 try {
@@ -3088,6 +3650,31 @@ export default function App() {
           </section>
         </div>
       ) : null}
+      {saveStale ? (
+        <div className="modal-backdrop stale-save-backdrop">
+          <section
+            className="modal stale-save-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="stale-save-title"
+          >
+            <p className="eyebrow">LOCAL SAVE UPDATED</p>
+            <h2 id="stale-save-title">页面已过期</h2>
+            <p className="muted">
+              另一个标签页已经更新了本地存档。请刷新页面后继续操作。
+            </p>
+            <div className="modal-actions">
+              <button
+                className="gold-button full"
+                onClick={() => window.location.reload()}
+              >
+                刷新页面
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      <Fireworks active={showFireworks} />
     </div>
   );
 }

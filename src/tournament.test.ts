@@ -1,7 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { newGame, hero } from "./engine";
-import { championshipCareerBonuses, championshipStandings, pointsForPlace, qualification, simulateTable } from "./tournament";
+import {
+  championshipCareerBonuses,
+  championshipStandings,
+  pointsForPlace,
+  qualification,
+  simulateTable,
+  simulateTableWithStacks,
+} from "./tournament";
 test("equal starting stacks on qualification boundary produce a playoff", () => {
   const g = newGame(Array.from({ length: 8 }, (_, id) => ({ ...hero, id })));
   g.players.forEach((p, i) => {
@@ -18,6 +25,22 @@ test("a simulated table yields distinct qualified players", () => {
   const winners = simulateTable(profiles, 4, 5);
   assert.equal(winners.length, 4);
   assert.equal(new Set(winners.map((p) => p.id)).size, 4);
+});
+
+test("a simulated table returns the qualified players' ending stacks", () => {
+  const profiles = Array.from({ length: 8 }, (_, id) => ({ ...hero, id }));
+  const startingStacks = profiles.map((_, index) => 9000 + index * 250);
+  const result = simulateTableWithStacks(profiles, 8, 5, undefined, startingStacks);
+
+  assert.equal(result.qualified.length, profiles.length);
+  assert.equal(
+    result.qualified.every((player) => Number.isInteger(result.stacks[String(player.id)])),
+    true,
+  );
+  assert.equal(
+    Object.values(result.stacks).reduce((sum, chips) => sum + chips, 0),
+    startingStacks.reduce((sum, chips) => sum + chips, 0),
+  );
 });
 
 test("championship points award the top eight and no points below eighth", () => {

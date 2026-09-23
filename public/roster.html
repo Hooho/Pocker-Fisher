@@ -1,0 +1,1247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>RIVER CLUB · 63 人物志</title>
+<style>
+  :root {
+    --bg: #0d1311;
+    --panel: #161e1b;
+    --line: #2a3530;
+    --text: #e8e4d6;
+    --muted: #98a39b;
+    --gold: #d8b968;
+    --green: #6a8f6a;
+    --red: #c87a6a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC",sans-serif}
+  header{padding:28px 36px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:linear-gradient(var(--bg),#0d1311e8);backdrop-filter:blur(8px);z-index:5}
+  h1{margin:0;font-size:22px;letter-spacing:1px}
+  h1 small{color:var(--gold);font-weight:400;margin-left:10px;font-size:13px;letter-spacing:2px}
+  .sub{color:var(--muted);margin:6px 0 18px;font-size:13px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .controls input{flex:1;min-width:200px;background:var(--panel);border:1px solid var(--line);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px}
+  .controls input:focus{outline:none;border-color:var(--gold)}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{background:transparent;border:1px solid var(--line);color:var(--muted);padding:6px 12px;border-radius:999px;font-size:12px;cursor:pointer;transition:.15s}
+  .chip:hover{border-color:var(--gold);color:var(--text)}
+  .chip.active{background:var(--gold);color:#1a1810;border-color:var(--gold);font-weight:600}
+  .group-label{font-size:11px;color:var(--muted);margin-right:4px;align-self:center;letter-spacing:1px}
+  .count{margin-left:auto;color:var(--muted);font-size:12px}
+  .count b{color:var(--gold)}
+  main{padding:24px 36px 60px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  .card{display:flex;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;transition:.18s}
+  .card:hover{border-color:var(--gold);transform:translateY(-2px)}
+  .card.hidden{display:none}
+  .avatar{flex:0 0 64px;height:64px;width:64px;border-radius:50%;overflow:hidden;background:#222}
+  .avatar svg{width:100%;height:100%;display:block}
+  .meta{flex:1;min-width:0}
+  .title{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+  .name{font-size:15px;font-weight:600}
+  .id{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .tags{display:flex;gap:6px;margin:6px 0}
+  .tag{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .tag-lv{color:var(--gold);border-color:#3a3320}
+  .tag-style{color:#a8c0a8;border-color:#2c3a2c}
+  .bars{display:grid;gap:4px;margin:8px 0 6px}
+  .bar{display:grid;grid-template-columns:48px 36px 1fr;gap:6px;align-items:center;font-size:11px;color:var(--muted)}
+  .bar b{color:var(--text);font-variant-numeric:tabular-nums;text-align:right;font-weight:500}
+  .bar i{height:5px;background:#22302a;border-radius:3px;position:relative;overflow:hidden}
+  .bar i::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--w,0%);background:linear-gradient(90deg,var(--green),var(--gold))}
+  .bio{margin:6px 0 0;font-size:12px;color:#c2bca9;line-height:1.45}
+</style>
+</head>
+<body>
+<header>
+  <h1>RIVER CLUB <small>人物志</small></h1>
+  <p class="sub">63 名预制角色 · 5 档水平 × 6 类风格 · 用于本地对局与冠军之路</p>
+  <div class="controls">
+    <input id="q" placeholder="搜索名字或简介…" />
+    <span class="group-label">水平</span>
+    <div class="chips" id="lv-chips">
+      <button class="chip active" data-level="0">全部</button>
+      <button class="chip" data-level="1">L1</button><button class="chip" data-level="2">L2</button><button class="chip" data-level="3">L3</button><button class="chip" data-level="4">L4</button><button class="chip" data-level="5">L5</button>
+    </div>
+  </div>
+  <div class="controls" style="margin-top:8px">
+    <span class="group-label">风格</span>
+    <div class="chips" id="style-chips">
+      <button class="chip active" data-style="0">全部</button>
+      <button class="chip" data-style="善于适应">善于适应</button><button class="chip" data-style="均衡多变">均衡多变</button><button class="chip" data-style="松手激进">松手激进</button><button class="chip" data-style="松手被动">松手被动</button><button class="chip" data-style="紧手稳健">紧手稳健</button><button class="chip" data-style="紧手被动">紧手被动</button>
+    </div>
+    <span class="count" id="count">显示 <b>63</b> / 63</span>
+  </div>
+</header>
+<main>
+  <div class="grid" id="grid">
+<article class="card" data-id="0" data-name="女娲" data-style="紧手稳健" data-level="1" data-agg="0.48" data-bluff="0.13">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#687c69"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q40 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#687c69" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">女娲</span>
+      <span class="id">#000</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.48</b><i style="--w:48.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.13</b><i style="--w:40%"></i></div>
+    </div>
+    <p class="bio">耐心等待，抓住真正值得出手的机会。</p>
+  </div>
+</article>
+<article class="card" data-id="5" data-name="赵云" data-style="善于适应" data-level="1" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q45 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">赵云</span>
+      <span class="id">#005</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="23" data-name="普京" data-style="善于适应" data-level="4" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q48 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">普京</span>
+      <span class="id">#023</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="28" data-name="牛顿" data-style="均衡多变" data-level="4" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q53 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">牛顿</span>
+      <span class="id">#028</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="31" data-name="李白" data-style="松手激进" data-level="2" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q41 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">李白</span>
+      <span class="id">#031</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:99%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="36" data-name="C罗" data-style="紧手稳健" data-level="2" data-agg="0.48" data-bluff="0.13">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#687c69"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q46 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#687c69" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">C罗</span>
+      <span class="id">#036</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.48</b><i style="--w:48.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.13</b><i style="--w:40%"></i></div>
+    </div>
+    <p class="bio">耐心等待，抓住真正值得出手的机会。</p>
+  </div>
+</article>
+<article class="card" data-id="49" data-name="马云" data-style="松手激进" data-level="5" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q44 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">马云</span>
+      <span class="id">#049</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:99%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="64" data-name="鲁迅" data-style="均衡多变" data-level="5" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q44 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">鲁迅</span>
+      <span class="id">#064</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="65" data-name="苏轼" data-style="善于适应" data-level="1" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q45 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">苏轼</span>
+      <span class="id">#065</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="66" data-name="周杰伦" data-style="紧手稳健" data-level="2" data-agg="0.48" data-bluff="0.13">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#687c69"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q46 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#687c69" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">周杰伦</span>
+      <span class="id">#066</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.48</b><i style="--w:48.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.13</b><i style="--w:40%"></i></div>
+    </div>
+    <p class="bio">耐心等待，抓住真正值得出手的机会。</p>
+  </div>
+</article>
+<article class="card" data-id="82" data-name="张国荣" data-style="均衡多变" data-level="3" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q47 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">张国荣</span>
+      <span class="id">#082</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="89" data-name="雷军" data-style="善于适应" data-level="5" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q54 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">雷军</span>
+      <span class="id">#089</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="98" data-name="巴菲特" data-style="松手被动" data-level="4" data-agg="0.25" data-bluff="0.08">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#748896"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q48 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#748896" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">巴菲特</span>
+      <span class="id">#098</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.25</b><i style="--w:25.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.08</b><i style="--w:25%"></i></div>
+    </div>
+    <p class="bio">相信下一张牌，总愿意再看一眼。</p>
+  </div>
+</article>
+<article class="card" data-id="101" data-name="马斯克" data-style="善于适应" data-level="2" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q51 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">马斯克</span>
+      <span class="id">#101</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="121" data-name="比尔·盖茨" data-style="松手激进" data-level="2" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q41 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">比尔·盖茨</span>
+      <span class="id">#121</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:99%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="123" data-name="王维" data-style="紧手被动" data-level="4" data-agg="0.18" data-bluff="0.04">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#a47162"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q43 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#a47162" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">王维</span>
+      <span class="id">#123</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.18</b><i style="--w:18.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.04</b><i style="--w:12%"></i></div>
+    </div>
+    <p class="bio">谨慎守护筹码，只在把握充足时出手。</p>
+  </div>
+</article>
+<article class="card" data-id="124" data-name="武则天" data-style="均衡多变" data-level="5" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q44 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">武则天</span>
+      <span class="id">#124</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="129" data-name="刘备" data-style="紧手被动" data-level="5" data-agg="0.18" data-bluff="0.04">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#a47162"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q49 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#a47162" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">刘备</span>
+      <span class="id">#129</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.18</b><i style="--w:18.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.04</b><i style="--w:12%"></i></div>
+    </div>
+    <p class="bio">谨慎守护筹码，只在把握充足时出手。</p>
+  </div>
+</article>
+<article class="card" data-id="130" data-name="贝多芬" data-style="均衡多变" data-level="1" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q50 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">贝多芬</span>
+      <span class="id">#130</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="137" data-name="王菲" data-style="善于适应" data-level="3" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q42 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">王菲</span>
+      <span class="id">#137</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="143" data-name="迈克尔·乔丹" data-style="善于适应" data-level="4" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q48 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">迈克尔·乔丹</span>
+      <span class="id">#143</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="153" data-name="唐僧" data-style="紧手被动" data-level="4" data-agg="0.18" data-bluff="0.04">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#a47162"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q43 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#a47162" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">唐僧</span>
+      <span class="id">#153</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.18</b><i style="--w:18.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.04</b><i style="--w:12%"></i></div>
+    </div>
+    <p class="bio">谨慎守护筹码，只在把握充足时出手。</p>
+  </div>
+</article>
+<article class="card" data-id="154" data-name="梅西" data-style="均衡多变" data-level="5" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q44 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">梅西</span>
+      <span class="id">#154</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="156" data-name="勒布朗·詹姆斯" data-style="紧手稳健" data-level="2" data-agg="0.48" data-bluff="0.13">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#687c69"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q46 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#687c69" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">勒布朗·詹姆斯</span>
+      <span class="id">#156</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.48</b><i style="--w:48.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.13</b><i style="--w:40%"></i></div>
+    </div>
+    <p class="bio">耐心等待，抓住真正值得出手的机会。</p>
+  </div>
+</article>
+<article class="card" data-id="161" data-name="莫扎特" data-style="善于适应" data-level="2" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q51 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">莫扎特</span>
+      <span class="id">#161</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="166" data-name="周星驰" data-style="均衡多变" data-level="2" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q41 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">周星驰</span>
+      <span class="id">#166</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="168" data-name="章子怡" data-style="紧手稳健" data-level="4" data-agg="0.48" data-bluff="0.13">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#687c69"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q43 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#687c69" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">章子怡</span>
+      <span class="id">#168</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.48</b><i style="--w:48.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.13</b><i style="--w:40%"></i></div>
+    </div>
+    <p class="bio">耐心等待，抓住真正值得出手的机会。</p>
+  </div>
+</article>
+<article class="card" data-id="169" data-name="李嘉诚" data-style="松手激进" data-level="5" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q44 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">李嘉诚</span>
+      <span class="id">#169</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:99%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="175" data-name="杜甫" data-style="松手激进" data-level="1" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q50 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">杜甫</span>
+      <span class="id">#175</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:99%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="176" data-name="爱因斯坦" data-style="松手被动" data-level="2" data-agg="0.25" data-bluff="0.08">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#748896"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q51 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#748896" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">爱因斯坦</span>
+      <span class="id">#176</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.25</b><i style="--w:25.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.08</b><i style="--w:25%"></i></div>
+    </div>
+    <p class="bio">相信下一张牌，总愿意再看一眼。</p>
+  </div>
+</article>
+<article class="card" data-id="182" data-name="斯蒂芬·库里" data-style="松手被动" data-level="3" data-agg="0.25" data-bluff="0.08">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#748896"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q42 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#748896" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">斯蒂芬·库里</span>
+      <span class="id">#182</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.25</b><i style="--w:25.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.08</b><i style="--w:25%"></i></div>
+    </div>
+    <p class="bio">相信下一张牌，总愿意再看一眼。</p>
+  </div>
+</article>
+<article class="card" data-id="185" data-name="白居易" data-style="善于适应" data-level="1" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q45 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">白居易</span>
+      <span class="id">#185</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="193" data-name="孙悟空" data-style="松手激进" data-level="4" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q53 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">孙悟空</span>
+      <span class="id">#193</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:99%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="209" data-name="孔子" data-style="善于适应" data-level="5" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q54 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">孔子</span>
+      <span class="id">#209</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="214" data-name="诸葛亮" data-style="均衡多变" data-level="5" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q44 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">诸葛亮</span>
+      <span class="id">#214</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="218" data-name="成龙" data-style="松手被动" data-level="4" data-agg="0.25" data-bluff="0.08">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#748896"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q48 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#748896" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">成龙</span>
+      <span class="id">#218</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.25</b><i style="--w:25.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.08</b><i style="--w:25%"></i></div>
+    </div>
+    <p class="bio">相信下一张牌，总愿意再看一眼。</p>
+  </div>
+</article>
+<article class="card" data-id="220" data-name="屈原" data-style="均衡多变" data-level="1" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q50 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">屈原</span>
+      <span class="id">#220</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="227" data-name="科比·布莱恩特" data-style="善于适应" data-level="3" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q42 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">科比·布莱恩特</span>
+      <span class="id">#227</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="235" data-name="梵高" data-style="松手激进" data-level="1" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q50 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">梵高</span>
+      <span class="id">#235</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:99%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="238" data-name="迈克尔·杰克逊" data-style="均衡多变" data-level="4" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q53 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">迈克尔·杰克逊</span>
+      <span class="id">#238</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="242" data-name="乔布斯" data-style="松手被动" data-level="3" data-agg="0.25" data-bluff="0.08">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#748896"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q42 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#748896" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">乔布斯</span>
+      <span class="id">#242</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.25</b><i style="--w:25.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.08</b><i style="--w:25%"></i></div>
+    </div>
+    <p class="bio">相信下一张牌，总愿意再看一眼。</p>
+  </div>
+</article>
+<article class="card" data-id="243" data-name="项羽" data-style="紧手被动" data-level="4" data-agg="0.18" data-bluff="0.04">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#a47162"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q43 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#a47162" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">项羽</span>
+      <span class="id">#243</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.18</b><i style="--w:18.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.04</b><i style="--w:12%"></i></div>
+    </div>
+    <p class="bio">谨慎守护筹码，只在把握充足时出手。</p>
+  </div>
+</article>
+<article class="card" data-id="247" data-name="莎士比亚" data-style="松手激进" data-level="3" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q47 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">莎士比亚</span>
+      <span class="id">#247</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:99%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="268" data-name="特朗普" data-style="均衡多变" data-level="4" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q53 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">特朗普</span>
+      <span class="id">#268</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="279" data-name="关羽" data-style="紧手被动" data-level="5" data-agg="0.18" data-bluff="0.04">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#a47162"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q49 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#a47162" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">关羽</span>
+      <span class="id">#279</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.18</b><i style="--w:18.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.04</b><i style="--w:12%"></i></div>
+    </div>
+    <p class="bio">谨慎守护筹码，只在把握充足时出手。</p>
+  </div>
+</article>
+<article class="card" data-id="281" data-name="周润发" data-style="善于适应" data-level="2" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q51 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">周润发</span>
+      <span class="id">#281</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="282" data-name="秦始皇" data-style="紧手稳健" data-level="3" data-agg="0.48" data-bluff="0.13">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#687c69"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q52 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#687c69" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">秦始皇</span>
+      <span class="id">#282</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.48</b><i style="--w:48.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.13</b><i style="--w:40%"></i></div>
+    </div>
+    <p class="bio">耐心等待，抓住真正值得出手的机会。</p>
+  </div>
+</article>
+<article class="card" data-id="284" data-name="朱元璋" data-style="松手被动" data-level="5" data-agg="0.25" data-bluff="0.08">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#748896"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q54 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#748896" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">朱元璋</span>
+      <span class="id">#284</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.25</b><i style="--w:25.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.08</b><i style="--w:25%"></i></div>
+    </div>
+    <p class="bio">相信下一张牌，总愿意再看一眼。</p>
+  </div>
+</article>
+<article class="card" data-id="292" data-name="奥巴马" data-style="均衡多变" data-level="3" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q47 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">奥巴马</span>
+      <span class="id">#292</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:57.99999999999999%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="295" data-name="刘德华" data-style="松手激进" data-level="1" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q50 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">刘德华</span>
+      <span class="id">#295</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:99%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="300" data-name="李清照" data-style="紧手稳健" data-level="2" data-agg="0.48" data-bluff="0.13">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#687c69"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q40 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#687c69" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">李清照</span>
+      <span class="id">#300</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.48</b><i style="--w:48.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.13</b><i style="--w:40%"></i></div>
+    </div>
+    <p class="bio">耐心等待，抓住真正值得出手的机会。</p>
+  </div>
+</article>
+<article class="card" data-id="307" data-name="李连杰" data-style="均衡多变" data-level="3" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q47 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">李连杰</span>
+      <span class="id">#307</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:58.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="308" data-name="金城武" data-style="善于适应" data-level="2" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#748896"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q48 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#748896" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">金城武</span>
+      <span class="id">#308</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="309" data-name="谢霆锋" data-style="松手激进" data-level="3" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#a47162"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q49 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#a47162" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">谢霆锋</span>
+      <span class="id">#309</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:100%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="310" data-name="陈冠希" data-style="紧手被动" data-level="1" data-agg="0.18" data-bluff="0.04">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q50 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">陈冠希</span>
+      <span class="id">#310</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.18</b><i style="--w:18.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.04</b><i style="--w:12%"></i></div>
+    </div>
+    <p class="bio">谨慎守护筹码，只在把握充足时出手。</p>
+  </div>
+</article>
+<article class="card" data-id="311" data-name="王力宏" data-style="松手被动" data-level="4" data-agg="0.25" data-bluff="0.08">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q51 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">王力宏</span>
+      <span class="id">#311</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.25</b><i style="--w:25.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.08</b><i style="--w:25%"></i></div>
+    </div>
+    <p class="bio">相信下一张牌，总愿意再看一眼。</p>
+  </div>
+</article>
+<article class="card" data-id="313" data-name="高市早苗" data-style="均衡多变" data-level="3" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#b39069"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q53 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#b39069" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">高市早苗</span>
+      <span class="id">#313</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:58.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+<article class="card" data-id="314" data-name="朱棣" data-style="善于适应" data-level="2" data-agg="0.6" data-bluff="0.18">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#748896"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#d0c6b0"/><path d="M40 61h20v17q-10 10-20 0" fill="#d8ae8e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#d8ae8e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q54 43 31 29Z" fill="#d0c6b0"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#748896" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">朱棣</span>
+      <span class="id">#314</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.60</b><i style="--w:60.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.18</b><i style="--w:56%"></i></div>
+    </div>
+    <p class="bio">观察每一次下注，寻找对手的习惯。</p>
+  </div>
+</article>
+<article class="card" data-id="315" data-name="朱允炆" data-style="松手激进" data-level="3" data-agg="0.82" data-bluff="0.32">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#a47162"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#1e2729"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q40 43 31 29Z" fill="#1e2729"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#a47162" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">朱允炆</span>
+      <span class="id">#315</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.82</b><i style="--w:82.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.32</b><i style="--w:100%"></i></div>
+    </div>
+    <p class="bio">喜欢掌握节奏，让对手面对艰难的选择。</p>
+  </div>
+</article>
+<article class="card" data-id="316" data-name="林青霞" data-style="紧手被动" data-level="1" data-agg="0.18" data-bluff="0.04">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#8b7c96"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q41 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#8b7c96" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">林青霞</span>
+      <span class="id">#316</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.18</b><i style="--w:18.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.04</b><i style="--w:12%"></i></div>
+    </div>
+    <p class="bio">谨慎守护筹码，只在把握充足时出手。</p>
+  </div>
+</article>
+<article class="card" data-id="317" data-name="张曼玉" data-style="松手被动" data-level="4" data-agg="0.25" data-bluff="0.08">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#83948b"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#c28d6e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#c28d6e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q42 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#83948b" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">张曼玉</span>
+      <span class="id">#317</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.25</b><i style="--w:25.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.08</b><i style="--w:25%"></i></div>
+    </div>
+    <p class="bio">相信下一张牌，总愿意再看一眼。</p>
+  </div>
+</article>
+<article class="card" data-id="320" data-name="泰勒·斯威夫特" data-style="紧手稳健" data-level="2" data-agg="0.48" data-bluff="0.13">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#748896"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#292821"/><path d="M40 61h20v17q-10 10-20 0" fill="#e5c8aa"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#e5c8aa"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q45 43 31 29Z" fill="#292821"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 41h15v12H32zm21 0h15v12H53zm-6 4h6" fill="none" stroke="#30352f" stroke-width="2"/><path d="M32 79l18 15 18-15" fill="none" stroke="#748896" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">泰勒·斯威夫特</span>
+      <span class="id">#320</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.48</b><i style="--w:48.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.13</b><i style="--w:40%"></i></div>
+    </div>
+    <p class="bio">耐心等待，抓住真正值得出手的机会。</p>
+  </div>
+</article>
+<article class="card" data-id="321" data-name="马化腾" data-style="均衡多变" data-level="3" data-agg="0.58" data-bluff="0.2">
+  <div class="avatar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#a47162"/><circle cx="75" cy="18" r="35" fill="#ffffff" opacity=".08"/><path d="M10 100Q15 65 50 67Q85 65 90 100" fill="#403127"/><path d="M40 61h20v17q-10 10-20 0" fill="#ac795e"/><ellipse cx="50" cy="43" rx="22" ry="28" fill="#ac795e"/><path d="M27 43Q19 8 49 9Q79 8 74 45L66 29Q46 43 31 29Z" fill="#403127"/><path d="M37 46h5m16 0h5" stroke="#352c28" stroke-width="2" stroke-linecap="round"/><path d="M46 60q5 3 10-1" fill="none" stroke="#885b4d" stroke-width="1.5"/><path d="M32 79l18 15 18-15" fill="none" stroke="#a47162" stroke-width="3"/></svg></div>
+  <div class="meta">
+    <div class="title">
+      <span class="name">马化腾</span>
+      <span class="id">#321</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+    <div class="bars">
+      <div class="bar"><span>激进度</span><b>0.58</b><i style="--w:58.0%"></i></div>
+      <div class="bar"><span>诈唬</span><b>0.20</b><i style="--w:62%"></i></div>
+    </div>
+    <p class="bio">在进攻与克制之间寻找平衡。</p>
+  </div>
+</article>
+  </div>
+</main>
+<script>
+  const q = document.getElementById('q');
+  const lvChips = document.querySelectorAll('#lv-chips .chip');
+  const stChips = document.querySelectorAll('#style-chips .chip');
+  const cards = document.querySelectorAll('.card');
+  const count = document.getElementById('count');
+  let lv = 0, st = 0, term = '';
+  function apply() {
+    let n = 0;
+    cards.forEach(c => {
+      const cl = +c.dataset.level, cs = c.dataset.style, cn = c.dataset.name, cb = c.querySelector('.bio').textContent;
+      const matchLv = lv === 0 || cl === lv;
+      const matchSt = st === 0 || cs === st;
+      const matchQ = !term || cn.includes(term) || cb.includes(term);
+      const show = matchLv && matchSt && matchQ;
+      c.classList.toggle('hidden', !show);
+      if (show) n++;
+    });
+    count.innerHTML = '显示 <b>' + n + '</b> / 63';
+  }
+  lvChips.forEach(b => b.addEventListener('click', () => {
+    lvChips.forEach(x => x.classList.remove('active')); b.classList.add('active');
+    lv = +b.dataset.level; apply();
+  }));
+  stChips.forEach(b => b.addEventListener('click', () => {
+    stChips.forEach(x => x.classList.remove('active')); b.classList.add('active');
+    st = +b.dataset.style; apply();
+  }));
+  q.addEventListener('input', e => { term = e.target.value.trim(); apply(); });
+</script>
+</body>
+</html>

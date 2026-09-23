@@ -1,6 +1,7 @@
 import {
   championshipStandings,
   championshipCareerBonuses,
+  eliminatedProfiles,
   qualification,
   type ChampionshipSimulationProgress,
   type SimulationPlayerStatsMap,
@@ -406,6 +407,29 @@ function recordAdvancement(save: Save, players: Character[], place: number): Sav
   }
   return { ...save, playerStats };
 }
+function recordTournamentEliminations(tournament: Tournament, game: Game): Tournament {
+  if (!game.done || tournament.round < 2) return tournament;
+  const newlyEliminated = eliminatedProfiles(game);
+  if (!newlyEliminated.length) return tournament;
+  if (tournament.round === 2) {
+    const recordedIds = new Set((tournament.qualificationOut || []).map((player) => player.id));
+    return {
+      ...tournament,
+      qualificationOut: [
+        ...(tournament.qualificationOut || []),
+        ...newlyEliminated.filter((player) => !recordedIds.has(player.id)),
+      ].slice(-8),
+    };
+  }
+  const recordedIds = new Set((tournament.finalEliminated || []).map((player) => player.id));
+  return {
+    ...tournament,
+    finalEliminated: [
+      ...(tournament.finalEliminated || []),
+      ...newlyEliminated.filter((player) => !recordedIds.has(player.id)),
+    ].slice(-8),
+  };
+}
 function stacksFromGame(game: Game | null): Record<string, number> {
   return Object.fromEntries(
     (game?.players || []).map((player) => [String(player.profile.id), player.chips]),
@@ -577,26 +601,27 @@ function startNextTournamentRound(save: Save, localQualified: Character[]): Save
   const background = round < 3
     ? { remaining: field.filter((p) => !tableIds.has(p.id)), qualified: [], done: false }
     : undefined;
+  const nextTournament = recordTournamentEliminations({
+    ...tournament,
+    round,
+    field,
+    stacks: fieldStacks,
+    background,
+    pendingLocal: undefined,
+    playoff: undefined,
+    finalists: round === 3 ? field : tournament.finalists,
+    qualificationOut: [],
+    out: false,
+    paused: false,
+    autoSimulating: false,
+    simulationComplete: false,
+    simulationCheckpoint: undefined,
+    results: [...tournament.results, `${roundLabel(tournament.round)} · 晋级`],
+  }, game);
   const nextSave: Save = {
     ...save,
     game,
-    tournament: {
-      ...tournament,
-      round,
-      field,
-      stacks: fieldStacks,
-      background,
-      pendingLocal: undefined,
-      playoff: undefined,
-      finalists: round === 3 ? field : tournament.finalists,
-      qualificationOut: [],
-      out: false,
-      paused: false,
-      autoSimulating: false,
-      simulationComplete: false,
-      simulationCheckpoint: undefined,
-      results: [...tournament.results, `${roundLabel(tournament.round)} · 晋级`],
-    },
+    tournament: nextTournament,
   };
   return recordAdvancement(nextSave, field, field.length);
 }
@@ -1120,21 +1145,7 @@ export default function App() {
       }
       let tournament = old.tournament;
       if (next.done && tournament && tournament.round >= 2 && old.game) {
-        const newlyEliminated = next.players
-          .map((player, index) => ({ player, startStack: player.start, index }))
-          .filter(({ player, startStack }) => startStack > 0 && player.chips === 0)
-          .sort((a, b) => a.startStack - b.startStack || a.index - b.index)
-          .map(({ player }) => player.profile);
-        if (tournament.round === 2)
-          tournament = {
-            ...tournament,
-            qualificationOut: [...(tournament.qualificationOut || []), ...newlyEliminated].slice(-8),
-          };
-        else if (tournament.round >= 3)
-          tournament = {
-            ...tournament,
-            finalEliminated: [...(tournament.finalEliminated || []), ...newlyEliminated].slice(-8),
-          };
+        tournament = recordTournamentEliminations(tournament, next);
       }
       const updated: Save = {
         ...old,
@@ -1551,21 +1562,23 @@ export default function App() {
       let round = t.round + 1;
       while (round < 6 && alivePlayers.length <= [6, 4, 2, 1][round - 3]) round++;
       const advancingPlayers = alivePlayers.map((player) => player.profile);
-      setData((d) => recordAdvancement({
-        ...d,
-        tournament: d.tournament ? {
-          ...d.tournament,
-          stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
-          round,
-          field: advancingPlayers,
-          results: [...d.tournament.results, `${roundLabel(t.round)} · 晋级`],
-        } : null,
-        game: startHand(
-          g,
-          Math.min(102400, 100 * 2 ** Math.floor(g.hand / t.pace)),
-          { debugFast: data.settings.debugFast },
-        ),
-      }, advancingPlayers, counts[round] || advancingPlayers.length));
+      const nextGame = startHand(
+        g,
+        Math.min(102400, 100 * 2 ** Math.floor(g.hand / t.pace)),
+        { debugFast: data.settings.debugFast },
+      );
+      setData((d) => {
+        const nextTournament = d.tournament
+          ? recordTournamentEliminations({
+            ...d.tournament,
+            stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
+            round,
+            field: advancingPlayers,
+            results: [...d.tournament.results, `${roundLabel(t.round)} · 晋级`],
+          }, nextGame)
+          : null;
+        return recordAdvancement({ ...d, tournament: nextTournament, game: nextGame }, advancingPlayers, counts[round] || advancingPlayers.length);
+      });
       return;
     }
     if (!t.background) {
@@ -1587,21 +1600,22 @@ export default function App() {
     const original = t.playoff?.original || g;
     const userTied = q.tied.some((p) => p.id === -1);
     if (userTied) {
+      const playoffGame = newGame(
+        [userPlayer, ...q.tied.filter((p) => p.id !== -1)],
+        100,
+        undefined,
+        { debugFast: data.settings.debugFast },
+      );
       setData((d) => ({
         ...d,
         tournament: d.tournament
-          ? {
+          ? recordTournamentEliminations({
             ...d.tournament,
             stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
             playoff: { original, locked, slots: q.slots },
-          }
+          }, playoffGame)
           : null,
-        game: newGame(
-          [userPlayer, ...q.tied.filter((p) => p.id !== -1)],
-          100,
-          undefined,
-          { debugFast: data.settings.debugFast },
-        ),
+        game: playoffGame,
       }));
       setToast("晋级边界出现同筹码平局，进入附加赛");
       return;

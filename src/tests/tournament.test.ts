@@ -1,9 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { newGame, hero } from "../domain/game/engine";
+import { newGame, hero, startHand, type Character } from "../domain/game/engine";
 import {
   championshipCareerBonuses,
   championshipStandings,
+  eliminatedProfiles,
   pointsForPlace,
   qualification,
   simulateTable,
@@ -32,6 +33,32 @@ test("qualification never advances players who have already been eliminated", ()
 
   assert.deepEqual(result.locked.map((player) => player.id), [0, 1, 2, 3]);
   assert.deepEqual(result.tied, []);
+});
+
+test("debug hands preserve chronological elimination order for final standings", () => {
+  const profiles = [
+    hero,
+    ...Array.from({ length: 7 }, (_, id) => ({ ...hero, id, name: `P${id}` })),
+  ];
+  let game = newGame(profiles, 100, undefined, { debugFast: true });
+  const eliminated: Character[] = [];
+  const record = (current: typeof game) => eliminated.push(...eliminatedProfiles(current));
+
+  record(game);
+  while (game.players.filter((player) => player.chips > 0).length > 1) {
+    game = startHand(game, 100, { debugFast: true });
+    record(game);
+  }
+
+  assert.deepEqual(eliminated.map((player) => player.name), [
+    "P0", "P1", "P2", "P3", "P4", "P5", "P6",
+  ]);
+  assert.deepEqual([
+    game.players.find((player) => player.chips > 0)?.profile,
+    ...eliminated.slice().reverse(),
+  ].map((player) => player?.name), [
+    "你", "P6", "P5", "P4", "P3", "P2", "P1", "P0",
+  ]);
 });
 
 test("a simulated table yields distinct qualified players", () => {

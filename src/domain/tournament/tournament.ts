@@ -109,6 +109,16 @@ export function qualification(game: Game, slots: number) {
     slots: 0,
   };
 }
+
+/** Returns players eliminated by this completed hand, in elimination order. */
+export function eliminatedProfiles(game: Game): Character[] {
+  return game.players
+    .map((player, index) => ({ player, startStack: player.start, index }))
+    .filter(({ player, startStack }) => startStack > 0 && player.chips === 0)
+    .sort((a, b) => a.startStack - b.startStack || a.index - b.index)
+    .map(({ player }) => player.profile);
+}
+
 export function simulateTable(
   profiles: Character[],
   slots: number,

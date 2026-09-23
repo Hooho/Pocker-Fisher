@@ -1115,11 +1115,7 @@ export default function App() {
       let tournament = old.tournament;
       if (ended && tournament && tournament.round >= 2 && old.game) {
         const newlyEliminated = next.players
-          .map((player, index) => ({
-            player,
-            startStack: old.game!.players[index].chips,
-            index,
-          }))
+          .map((player, index) => ({ player, startStack: player.start, index }))
           .filter(({ player, startStack }) => startStack > 0 && player.chips === 0)
           .sort((a, b) => a.startStack - b.startStack || a.index - b.index)
           .map(({ player }) => player.profile);

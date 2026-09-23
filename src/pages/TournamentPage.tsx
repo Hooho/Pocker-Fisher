@@ -59,10 +59,10 @@ export function TournamentPage({
               <span>总决赛</span>
             </div>
             <div className="championship-podium" aria-label="前三名颁奖台">
-              {[1, 0, 2].map((index) => {
-                const player = completedStandings[index];
+              {[1, 0, 2].map((standingIndex) => {
+                const player = completedStandings[standingIndex];
                 if (!player) return null;
-                const place = index + 1;
+                const place = standingIndex + 1;
                 return (
                   <article className={`podium-place place-${place}`} key={player.id}>
                     <div className="podium-player">

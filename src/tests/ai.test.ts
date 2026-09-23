@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { aiMove, reshape, requestAI } from "./ai";
-import { defaults } from "./storage";
-import { hero, newGame, observe } from "./engine";
+import { aiMove, reshape, requestAI } from "../domain/game/ai";
+import { defaults } from "../domain/storage/storage";
+import { hero, newGame, observe } from "../domain/game/engine";
 test("AI adapter uses only observation and validates action and character results", async () => {
   const original = globalThis.fetch;
   let body = "";

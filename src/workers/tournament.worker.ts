@@ -1,5 +1,5 @@
-import type { Character } from "./engine";
-import { simulateTableWithStacks, type SimulatedTablePerformance } from "./tournament";
+import type { Character } from "../domain/game/engine";
+import { simulateTableWithStacks, type SimulatedTablePerformance } from "../domain/tournament/tournament";
 type Message =
   | { type: "start"; field: Character[]; stacks: Record<string, number>; size: number; qualify: number; pace: number }
   | { type: "tie"; field: Character[]; slots: number; pace: number }

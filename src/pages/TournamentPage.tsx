@@ -1,7 +1,7 @@
 import { ArrowUpRight, Check, ChevronRight, Medal, Trophy } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Character } from "../engine";
-import type { Tournament } from "../storage";
+import type { Character } from "../domain/game/engine";
+import type { Tournament } from "../domain/storage/storage";
 
 type TournamentPageProps = {
   tournament: Tournament | null;

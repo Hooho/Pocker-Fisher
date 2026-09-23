@@ -24,7 +24,7 @@ npm run dev
 
 路由支持浏览器前进/后退；直接打开无效路径会回到大厅。切换页面不会卸载整个应用，因此进行中的牌局仍可保留。
 
-页面代码位于 `src/pages/`：大厅、牌桌、冠军赛、选手、积分榜和设置分别维护自己的展示结构；`src/App.tsx` 只负责跨页面共享的存档、对局状态、Worker 和事件编排。
+页面代码位于 `src/pages/`：大厅、牌桌、冠军赛、选手、积分榜和设置分别维护自己的展示结构；`src/app/App.tsx` 负责跨页面共享的存档、对局状态、Worker 和事件编排。
 
 ## 当前功能
 
@@ -52,7 +52,16 @@ npm run dev
 
 ## 目录约定
 
-- `src/`：React、TypeScript 与 Three.js 源码。
+- `src/app/`：应用入口编排和客户端路由。
+- `src/pages/`：按路由拆分的页面展示结构。
+- `src/components/`：跨页面复用的 UI 组件，例如 Three.js 牌桌。
+- `src/domain/game/`：牌局引擎、AI 适配和音效等游戏领域逻辑。
+- `src/domain/storage/`：本地存档、导入导出和版本校验。
+- `src/domain/tournament/`：赛事模拟、晋级和排行榜领域逻辑。
+- `src/workers/`：浏览器 Worker 入口，按模拟任务单独维护。
+- `src/tests/`：规则、存档、AI、路由和赛事测试。
+- `src/styles/`：全局样式。
+- `src/main.tsx`：唯一的 React 挂载入口，保持单应用结构。
 - `public/`：运行时直接发布的静态资源与独立静态页面。
 - `scripts/`：资源生成、校验脚本，以及不发布的历史草稿。
 - `samples/`：保留的视觉样例与素材样本。

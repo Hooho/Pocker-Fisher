@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { newGame, hero } from "./engine";
+import { newGame, hero } from "../domain/game/engine";
 import {
   championshipCareerBonuses,
   championshipStandings,
@@ -8,7 +8,7 @@ import {
   qualification,
   simulateTable,
   simulateTableWithStacks,
-} from "./tournament";
+} from "../domain/tournament/tournament";
 test("equal starting stacks on qualification boundary produce a playoff", () => {
   const g = newGame(Array.from({ length: 8 }, (_, id) => ({ ...hero, id })));
   g.players.forEach((p, i) => {

@@ -1,5 +1,5 @@
 import { ArrowUpRight, Info } from "lucide-react";
-import type { Save, Tournament } from "../storage";
+import type { Save, Tournament } from "../domain/storage/storage";
 
 type LobbyPageProps = {
   tournament: Tournament | null;

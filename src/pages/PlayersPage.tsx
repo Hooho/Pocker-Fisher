@@ -1,6 +1,6 @@
 import { ArrowUpRight, Sparkles } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Character } from "../engine";
+import type { Character } from "../domain/game/engine";
 
 type PlayersPageProps = {
   characters: Character[];

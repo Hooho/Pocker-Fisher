@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { Settings } from "./storage";
-import { characterSchema } from "./storage";
+import type { Settings } from "../storage/storage";
+import { characterSchema } from "../storage/storage";
 import type { Character, Observation, Move } from "./engine";
 export async function requestAI(
   settings: Settings,

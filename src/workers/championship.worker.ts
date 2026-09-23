@@ -1,9 +1,9 @@
-import type { Character } from "./engine";
+import type { Character } from "../domain/game/engine";
 import {
   simulateChampionship,
   type ChampionshipSimulationCheckpoint,
   type ChampionshipSimulationProgress,
-} from "./tournament";
+} from "../domain/tournament/tournament";
 
 self.onmessage = (
   event: MessageEvent<{

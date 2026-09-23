@@ -5,14 +5,14 @@ import {
   type ChampionshipSimulationProgress,
   type SimulationPlayerStatsMap,
   type SimulatedTablePerformance,
-} from "./tournament";
-import { pathForPage, useAppRouter } from "./app/router";
-import { LobbyPage } from "./pages/LobbyPage";
-import { PlayersPage } from "./pages/PlayersPage";
-import { SettingsPage, type SettingsSection } from "./pages/SettingsPage";
-import { TablePage } from "./pages/TablePage";
-import { TournamentPage } from "./pages/TournamentPage";
-import { LeaderboardPage } from "./pages/LeaderboardPage";
+} from "../domain/tournament/tournament";
+import { pathForPage, useAppRouter } from "./router";
+import { LobbyPage } from "../pages/LobbyPage";
+import { PlayersPage } from "../pages/PlayersPage";
+import { SettingsPage, type SettingsSection } from "../pages/SettingsPage";
+import { TablePage } from "../pages/TablePage";
+import { TournamentPage } from "../pages/TournamentPage";
+import { LeaderboardPage } from "../pages/LeaderboardPage";
 import { useEffect, useRef, useState, useMemo, useCallback, memo, lazy, Suspense, type CSSProperties } from "react";
 import {
   ArrowUpRight,
@@ -59,7 +59,7 @@ import {
   type Character,
   type Game,
   type Move,
-} from "./engine";
+} from "../domain/game/engine";
 import {
   blank,
   loadSave,
@@ -75,10 +75,10 @@ import {
   type Tournament,
   type ChampionshipRecord,
   type PlayerCareerStats,
-} from "./storage";
-import { aiMove, reshape, requestAI } from "./ai";
-const Table3D = lazy(() => import("./Table3D"));
-import { playGameSound } from "./sound";
+} from "../domain/storage/storage";
+import { aiMove, reshape, requestAI } from "../domain/game/ai";
+const Table3D = lazy(() => import("../components/Table3D"));
+import { playGameSound } from "../domain/game/sound";
 const levels = ["入门", "普通", "进阶", "专家", "大师"];
 const rounds = [
   "首轮",
@@ -1143,7 +1143,7 @@ export default function App() {
       );
       if (t) o.qualify = t.round < 3 ? 4 : 1;
       const fallback = () => {
-        worker = new Worker(new URL("./bot.worker.ts", import.meta.url), {
+        worker = new Worker(new URL("../workers/bot.worker.ts", import.meta.url), {
           type: "module",
         });
         worker.onmessage = (e: MessageEvent<Move>) => {
@@ -1203,7 +1203,7 @@ export default function App() {
       backgroundWorker.current.postMessage({ type: "resume" });
       return;
     }
-    const worker = new Worker(new URL("./tournament.worker.ts", import.meta.url), { type: "module" });
+    const worker = new Worker(new URL("../workers/tournament.worker.ts", import.meta.url), { type: "module" });
     backgroundWorker.current = worker;
     worker.onmessage = (event: MessageEvent<{
       table?: {
@@ -1304,7 +1304,7 @@ export default function App() {
       completedTables: checkpoint?.nextTableIndex ?? 0,
       totalTables: checkpoint ? Math.ceil(checkpoint.field.length / 8) : 0,
     });
-    const worker = new Worker(new URL("./championship.worker.ts", import.meta.url), { type: "module" });
+    const worker = new Worker(new URL("../workers/championship.worker.ts", import.meta.url), { type: "module" });
     eliminatedWorker.current = worker;
     worker.onmessage = (event: MessageEvent<{
       progress?: ChampionshipSimulationProgress;
@@ -1616,7 +1616,7 @@ export default function App() {
       });
     };
     if (q.tied.length) {
-      const worker = new Worker(new URL("./tournament.worker.ts", import.meta.url), { type: "module" });
+      const worker = new Worker(new URL("../workers/tournament.worker.ts", import.meta.url), { type: "module" });
       worker.onmessage = (event: MessageEvent<{
         tieQualified?: Character[];
         qualifiedStacks?: Record<string, number>;

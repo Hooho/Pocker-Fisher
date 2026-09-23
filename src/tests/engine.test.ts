@@ -12,7 +12,7 @@ import {
   hero,
   settle,
   type Character,
-} from "./engine";
+} from "../domain/game/engine";
 const profiles: Character[] = Array.from({ length: 8 }, (_, i) => ({
   ...hero,
   id: i,

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { blank, parseSave, summarizeSaveRecords } from "./storage";
-import { newGame, hero } from "./engine";
+import { blank, parseSave, summarizeSaveRecords } from "../domain/storage/storage";
+import { newGame, hero } from "../domain/game/engine";
 test("a tournament export can be imported unchanged", () => {
   const save = {
     ...blank,

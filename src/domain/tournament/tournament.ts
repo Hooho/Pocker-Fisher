@@ -7,7 +7,7 @@ import {
   type Game,
   type Character,
   type Observation,
-} from "./engine";
+} from "../game/engine";
 export type SimulatedTablePlayer = {
   profile: Character;
   chips: number;

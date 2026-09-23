@@ -1,6 +1,6 @@
 import { z } from "zod";
-import type { Game, Character } from "./engine";
-import type { ChampionshipSimulationCheckpoint } from "./tournament";
+import type { Game, Character } from "../game/engine";
+import type { ChampionshipSimulationCheckpoint } from "../tournament/tournament";
 
 const SAVE_STORAGE_KEY = "river-save";
 const SAVE_LOCK_NAME = "river-save-write";

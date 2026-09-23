@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pathForPage, resolvePage } from "./app/router";
+import { pathForPage, resolvePage } from "../app/router";
 
 test("app routes resolve clean paths and query strings", () => {
   assert.equal(resolvePage("/"), "lobby");

@@ -628,13 +628,23 @@ function Card({
     </div>
   );
 }
+const OPTIMIZED_AVATAR_IDS = new Set([
+  0, 5, 23, 28, 31, 36, 49, 64, 65, 66, 82, 89, 98, 101, 121, 123,
+  124, 129, 130, 137, 143, 154, 156, 161, 166, 168, 169, 175, 176, 182,
+  185, 320,
+]);
+
 function Avatar({ p, playerAvatar }: { p: Character; playerAvatar?: string | null }) {
+  const avatarSrc = OPTIMIZED_AVATAR_IDS.has(p.id)
+    ? `/avatars-webp/${String(p.id).padStart(3, "0")}.webp`
+    : `/avatars/${p.id % 300}.svg`;
+
   return p.id === -1 ? (
     <div className="hero-avatar">
       {playerAvatar ? <img src={playerAvatar} alt={`${p.name}头像`} /> : "♠"}
     </div>
   ) : (
-    <img src={`/avatars/${p.id % 300}.svg`} alt={p.name} loading="lazy" />
+    <img src={avatarSrc} alt={p.name} loading="lazy" />
   );
 }
 type LeaderboardEntry = PlayerCareerStats & {

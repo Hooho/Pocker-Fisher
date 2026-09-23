@@ -47,7 +47,7 @@ npm run dev
 
 ## 数据与资源
 
-`public/characters.json` 为 63 人正式资源；`public/avatars/` 存放程序化 SVG 头像，`public/avatars-raster/` 存放 JPG/PNG 头像素材。`scripts/characters.mjs` 是构建前资源生成脚本，不在玩家开局时运行。
+`public/characters.json` 为 63 人正式资源；`public/avatars/` 存放程序化 SVG 头像，`public/avatars-webp/` 存放已压缩的 128px WebP 头像，`public/avatars-raster/` 存放 JPG/PNG 头像素材。`scripts/characters.mjs` 是构建前资源生成脚本，不在玩家开局时运行。
 缩减人物库前的头像草稿保留在 `scripts/avatar-drafts/`，不发布到静态站点。未批量删除任何原始文件。
 
 ## 目录约定

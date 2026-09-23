@@ -351,8 +351,40 @@ export function summarizeSaveRecords(save: Save): SaveRecordSummary {
     hasPersonalization,
   };
 }
+
+function repairLegacyDebugGame(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const save = value as Record<string, unknown>;
+  const repairGame = (candidate: unknown) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return candidate;
+    const game = candidate as Record<string, unknown>;
+    const players = Array.isArray(game.players) ? game.players : [];
+    const board = Array.isArray(game.board) ? game.board : [];
+    const deck = Array.isArray(game.deck) ? game.deck : [];
+    if (game.done !== true || game.street !== 3 || board.length !== 5 || !deck.length) return candidate;
+    const holeCards = players.reduce((count, player) => {
+      if (!player || typeof player !== "object") return count;
+      const cards = (player as Record<string, unknown>).cards;
+      return count + (Array.isArray(cards) ? cards.length : 0);
+    }, 0);
+    const expectedDeckSize = 52 - 3 - board.length - holeCards;
+    if (expectedDeckSize < 0 || deck.length <= expectedDeckSize) return candidate;
+    return { ...game, deck: deck.slice(0, expectedDeckSize) };
+  };
+  const repaired: Record<string, unknown> = { ...save, game: repairGame(save.game) };
+  if ("pausedTournament" in save) {
+    repaired.pausedTournament =
+      save.pausedTournament && typeof save.pausedTournament === "object"
+        ? {
+          ...(save.pausedTournament as Record<string, unknown>),
+          game: repairGame((save.pausedTournament as Record<string, unknown>).game),
+        }
+        : save.pausedTournament;
+  }
+  return repaired;
+}
 export function parseSave(value: unknown): Save {
-  const data=schema.parse(value);
+  const data=schema.parse(repairLegacyDebugGame(value));
   if (!data.playerStats["-1"] && data.stats.wins > 0) {
     data.playerStats["-1"] = {
       matches: 0,

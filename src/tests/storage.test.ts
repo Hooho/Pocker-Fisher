@@ -33,6 +33,11 @@ test("a debug hand can be saved and imported unchanged", () => {
   );
   const save = { ...blank, game, savedAt: new Date().toISOString() };
   assert.deepEqual(parseSave(JSON.parse(JSON.stringify(save))), save);
+  const legacySave = {
+    ...save,
+    game: { ...game, deck: [...game.deck, 40, 41, 42] },
+  };
+  assert.deepEqual(parseSave(JSON.parse(JSON.stringify(legacySave))), save);
 });
 test("a suspended championship keeps its table and current simulation progress", () => {
   const game = newGame([hero, { ...hero, id: 7 }]);

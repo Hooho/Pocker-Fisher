@@ -1653,23 +1653,6 @@ export default function App() {
         };
       });
     };
-    if (data.settings.debugFast) {
-      const slots = t.playoff?.slots ?? 4;
-      const debugQualified = [
-        userPlayer,
-        ...g.players.map((player) => player.profile),
-      ].filter((player, index, players) =>
-        players.findIndex((other) => other.id === player.id) === index,
-      ).slice(0, slots);
-      const debugStacks = Object.fromEntries(
-        debugQualified.map((player) => [
-          String(player.id),
-          currentGameStacks[String(player.id)] || 10000,
-        ]),
-      );
-      queueLocalAdvancers(debugQualified, debugStacks);
-      return;
-    }
     if (q.tied.length) {
       const worker = new Worker(new URL("../workers/tournament.worker.ts", import.meta.url), { type: "module" });
       worker.onmessage = (event: MessageEvent<{

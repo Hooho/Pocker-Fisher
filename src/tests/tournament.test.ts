@@ -20,6 +20,20 @@ test("equal starting stacks on qualification boundary produce a playoff", () => 
   assert.equal(result.tied.length, 3);
   assert.equal(result.slots, 1);
 });
+
+test("qualification never advances players who have already been eliminated", () => {
+  const g = newGame(Array.from({ length: 8 }, (_, id) => ({ ...hero, id })));
+  g.players.forEach((p, i) => {
+    p.chips = i < 4 ? 20000 - i * 1000 : 0;
+    p.start = 10000;
+  });
+
+  const result = qualification(g, 4);
+
+  assert.deepEqual(result.locked.map((player) => player.id), [0, 1, 2, 3]);
+  assert.deepEqual(result.tied, []);
+});
+
 test("a simulated table yields distinct qualified players", () => {
   const profiles = Array.from({ length: 8 }, (_, id) => ({ ...hero, id }));
   const winners = simulateTable(profiles, 4, 5);

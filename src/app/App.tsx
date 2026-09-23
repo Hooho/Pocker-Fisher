@@ -7,6 +7,7 @@ import {
   type SimulatedTablePerformance,
 } from "../domain/tournament/tournament";
 import { pathForPage, useAppRouter } from "./router";
+import { publicAsset } from "./assets";
 import { LobbyPage } from "../pages/LobbyPage";
 import { PlayersPage } from "../pages/PlayersPage";
 import { SettingsPage, type SettingsSection } from "../pages/SettingsPage";
@@ -646,8 +647,8 @@ function Avatar({
   className?: string;
 }) {
   const avatarSrc = OPTIMIZED_AVATAR_IDS.has(p.id)
-    ? `/avatars-webp/${String(p.id).padStart(3, "0")}.webp`
-    : `/avatars/${p.id % 300}.svg`;
+    ? publicAsset(`avatars-webp/${String(p.id).padStart(3, "0")}.webp`)
+    : publicAsset(`avatars/${p.id % 300}.svg`);
 
   return p.id === -1 ? (
     <div className={`hero-avatar ${className}`.trim()}>
@@ -1041,7 +1042,7 @@ export default function App() {
   const userPlayerRef = useRef(userPlayer);
   userPlayerRef.current = userPlayer;
   useEffect(() => {
-    Promise.all([loadSave(), fetch("/characters.json").then((r) => r.json())])
+    Promise.all([loadSave(), fetch(publicAsset("characters.json")).then((r) => r.json())])
       .then(([saved, chars]) => {
         const restored = saved.tournament?.out && !saved.tournament.complete && !saved.tournament.simulationComplete
           ? { ...saved, tournament: { ...saved.tournament, autoSimulating: true } }
@@ -1055,7 +1056,7 @@ export default function App() {
       .catch(() => {
         setToast("本地存档读取失败，可导入备份；未覆盖原存档");
         setSaveError(true);
-        fetch("/characters.json")
+        fetch(publicAsset("characters.json"))
           .then((r) => r.json())
           .then(setCharacters);
         setReady(true);
@@ -1511,9 +1512,17 @@ export default function App() {
         return;
       }
       if (alivePlayers.length === 1) {
+        const finalEliminated = [...(t.finalEliminated || [])];
+        const recordedIds = new Set(finalEliminated.map((player) => player.id));
+        g.players
+          .filter((player) => player.start > 0 && player.chips === 0 && !recordedIds.has(player.profile.id))
+          .forEach((player) => {
+            finalEliminated.push(player.profile);
+            recordedIds.add(player.profile.id);
+          });
         const actualPlacements = [
           alivePlayers[0].profile,
-          ...(t.finalEliminated || []).slice().reverse(),
+          ...finalEliminated.slice().reverse(),
           ...(t.topTwoOuts || []),
         ].filter((player, index, players) => players.findIndex((other) => other.id === player.id) === index);
         const record = createChampionshipRecord(actualPlacements, "played", t.entrants || 64);
@@ -2638,7 +2647,7 @@ export default function App() {
                   </div>
                 );
               })}
-              {g.done && g.winners.length && !celebrationDone ? <><div className="victory-flash" /><div className="winner-banner"><small>{g.winners.length > 1 ? "POT SPLIT · 底池平分" : "POT AWARDED · 底池归属"}</small><strong>{g.winners.map(i => g.players[i].profile.name).join(" & ")}{g.winners.length === 1 ? " 赢下底池" : ""}</strong><span>{g.winners.map(i => Math.max(0, g.players[i].chips - g.players[i].start + g.players[i].total).toLocaleString()).join(" / ")} 筹码到账</span></div></> : null}
+              {g.done && g.winners.length && !celebrationDone ? <><div className="victory-flash" /><div className="winner-banner"><small>{g.winners.length > 1 ? "底池平分" : "底池归属"}</small><strong>{g.winners.map(i => g.players[i].profile.name).join(" & ")}{g.winners.length === 1 ? " 赢下底池" : ""}</strong><span>{g.winners.map(i => Math.max(0, g.players[i].chips - g.players[i].start + g.players[i].total).toLocaleString()).join(" / ")} 筹码到账</span></div></> : null}
               {paused ? (
                 <div className="pause-overlay">
                   <Pause size={26} />
@@ -3137,11 +3146,6 @@ export default function App() {
               <X size={20} />
             </button>
             <Avatar p={selectedCurrent} playerAvatar={data.playerProfile.avatar} />
-            <p className="eyebrow">
-              {selectedCurrent.id === -1
-                ? "本人战绩"
-                : `PLAYER ${String(selectedCurrent.id + 1).padStart(3, "0")}`}
-            </p>
             <h2>{selectedCurrent.name}</h2>
             {!statsOnly ? (
               <>

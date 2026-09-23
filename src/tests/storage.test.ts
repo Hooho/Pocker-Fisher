@@ -24,6 +24,16 @@ test("a tournament export can be imported unchanged", () => {
   };
   assert.deepEqual(parseSave(JSON.parse(JSON.stringify(save))), save);
 });
+test("a debug hand can be saved and imported unchanged", () => {
+  const game = newGame(
+    [hero, { ...hero, id: 0 }, { ...hero, id: 1 }],
+    100,
+    undefined,
+    { debugFast: true },
+  );
+  const save = { ...blank, game, savedAt: new Date().toISOString() };
+  assert.deepEqual(parseSave(JSON.parse(JSON.stringify(save))), save);
+});
 test("a suspended championship keeps its table and current simulation progress", () => {
   const game = newGame([hero, { ...hero, id: 7 }]);
   const tournament = {

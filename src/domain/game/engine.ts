@@ -266,9 +266,11 @@ function finishDebugHand(g: Game): Game {
     player.raiseAt = g.current;
     player.last = "全下";
   });
-  g.deck = remaining;
   g.board = board;
   g.street = 3;
+  const holeCards = g.players.reduce((count, player) => count + player.cards.length, 0);
+  const deckSize = 52 - g.street - g.board.length - holeCards;
+  g.deck = remaining.slice(0, deckSize);
   g.current = Math.max(...g.players.map((player) => player.bet));
   g.turn = heroIndex;
   g.log = ["调试模式 · 你拿到皇家同花顺 · 全员全下", ...g.log].slice(0, 60);

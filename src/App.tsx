@@ -6,6 +6,7 @@ import {
   type SimulationPlayerStatsMap,
   type SimulatedTablePerformance,
 } from "./tournament";
+import { pathForPage, useAppRouter } from "./app/router";
 import { useEffect, useRef, useState, useMemo, useCallback, memo, lazy, Suspense, type CSSProperties } from "react";
 import {
   ArrowUpRight,
@@ -802,7 +803,7 @@ export default function App() {
   const [data, setData] = useState<Save>(blank);
   const [ready, setReady] = useState(false);
   const [characters, setCharacters] = useState<Character[]>([]);
-  const [page, setPage] = useState("lobby");
+  const [page, setPage] = useAppRouter();
   const [settingsSection, setSettingsSection] = useState<"ai" | "players" | "profile">("ai");
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [modal, setModal] = useState<
@@ -852,6 +853,12 @@ export default function App() {
   const localLeaderboardRow = useRef<HTMLButtonElement>(null);
   const leaderboardScrollRef = useRef<HTMLElement>(null);
   const [leaderboardScrolled, setLeaderboardScrolled] = useState(false);
+
+  useEffect(() => {
+    if (ready && page === "table" && !data.game) {
+      setPage("lobby", { replace: true });
+    }
+  }, [data.game, page, ready, setPage]);
   // The raw onScroll event can fire far more often than once per frame (especially
   // with trackpad inertia), and calling setState synchronously on every single one
   // was itself the stutter: each call is main-thread work competing with the
@@ -2175,7 +2182,7 @@ export default function App() {
       <aside className="sidebar">
         <a
           className="brand"
-          href="#"
+          href={pathForPage("lobby")}
           onClick={(e) => {
             e.preventDefault();
             if (page === "table") {
@@ -2191,25 +2198,7 @@ export default function App() {
           </span>
         </a>
         <div className="side-label">THE POKER ROOM</div>
-        <nav>
-          {page !== "lobby" ? (
-            <button
-              className="home-nav-button"
-              aria-label="大厅"
-              title="大厅"
-              onClick={() => {
-                if (page === "table") {
-                  setPaused(true);
-                  if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: true } } : old);
-                }
-                setPage("lobby");
-              }}
-            >
-              <Home size={18} />
-              大厅
-            </button>
-          ) : null}
-        </nav>
+
         {moreMenuOpen ? (
           <div className="more-menu-backdrop" onMouseDown={() => setMoreMenuOpen(false)} />
         ) : null}
@@ -3254,12 +3243,8 @@ export default function App() {
               </>
             ) : (
               <>
-                <p className="eyebrow">THE RULES</p>
                 <h2>无限注德州扑克</h2>
                 <div className="rules-copy">
-                  <p>
-                    每人两张底牌，依次发出翻牌三张、转牌和河牌。从七张牌中选出最佳五张，比较牌型。
-                  </p>
                   <div className="hand-rank-chart" aria-label="牌型从大到小，附示例">
                     {handRankExamples.map((example, index) => (
                       <div className="hand-rank-row" key={example.name}>
@@ -3274,18 +3259,6 @@ export default function App() {
                     ))}
                   </div>
                   <p className="muted rules-chart-note">花色不分大小，仅用于示例配色。</p>
-                  <p>
-                    可弃牌、过牌、跟注、加注或全下。全下形成独立边池；完全相同的牌型平分底池，零头按庄位后顺序分配。
-                  </p>
-                  <p>
-                    首轮、次轮和半决赛每桌八人晋级四人，轮间统一筹码。总决赛按八、六、四、二、一人的顺序推进，筹码连续保留。
-                  </p>
-                  <p>
-                    同手淘汰按开局筹码排序；晋级边界开局筹码完全相同时，进行附加赛。冠军桌多人同时出局时，直接进入对应剩余人数阶段。
-                  </p>
-                  <p>
-                    电脑只接收自己的底牌与公开历史。人物性格会影响出手频率；模型响应异常时由本地策略接管。
-                  </p>
                 </div>
               </>
             )}

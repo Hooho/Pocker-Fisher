@@ -7360,6 +7360,71 @@ footer {
   min-width: 0;
 }
 
+.reset-settings {
+  max-width: 720px;
+}
+
+.reset-settings h1 {
+  margin: 0 0 8px;
+  font-size: 27px;
+}
+
+.reset-settings .muted {
+  margin: 0;
+}
+
+.reset-danger-panel {
+  margin-top: 22px;
+  padding: 20px;
+  border: 1px solid #8f654f;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2b2822, #241f1d);
+}
+
+.reset-danger-panel h2 {
+  margin: 0 0 10px;
+  color: #e3b29b;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.reset-danger-panel p {
+  margin: 0;
+  color: #c5a99c;
+  font-size: 11px;
+  line-height: 1.9;
+}
+
+.reset-data-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin: 16px 0 20px;
+  color: #dfc6b8;
+  font-size: 11px;
+}
+
+.reset-data-summary span {
+  display: inline-flex;
+  gap: 5px;
+}
+
+.reset-data-summary strong {
+  color: #f0d6c3;
+  font-weight: 600;
+}
+
+.reset-button {
+  background: #9a5b4b;
+  border-color: #c18a73;
+  color: #fff1e7;
+}
+
+.reset-button:hover {
+  background: #b26e59;
+  border-color: #e1ab8f;
+}
+
 .settings-section-heading {
   margin-bottom: 20px;
 }
@@ -7544,7 +7609,7 @@ footer {
   .settings-menu {
     position: static;
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0;
     padding: 0;
     border-right: 0;

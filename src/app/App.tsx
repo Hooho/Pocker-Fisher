@@ -836,6 +836,8 @@ export default function App() {
   const [profileNameDraft, setProfileNameDraft] = useState("本地玩家");
   const [profileAvatarDraft, setProfileAvatarDraft] = useState<string | null>(null);
   const [profileSaving, setProfileSaving] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [toast, setToast] = useState("");
   const [raise, setRaise] = useState(200);
   const [selected, setSelected] = useState<Character | null>(null);
@@ -1814,6 +1816,40 @@ export default function App() {
       setProfileSaving(false);
     }
   };
+  const resetAllData = async () => {
+    setResetting(true);
+    try {
+      await saveData(blank);
+      resetTableTimer();
+      setData(blank);
+      setProfileNameDraft(blank.playerProfile.name);
+      setProfileAvatarDraft(blank.playerProfile.avatar);
+      setKey("");
+      setBatchResults([]);
+      setBatchOpen(false);
+      setSelected(null);
+      setPreview(null);
+      setImported(null);
+      setModal(null);
+      setConfirmDialog(null);
+      setPaused(false);
+      setSaveError(false);
+      setSaveStale(false);
+      setResetConfirmOpen(false);
+      setPage("lobby");
+      setToast("所有数据已重置");
+    } catch (error) {
+      if (isSaveConflictError(error)) {
+        setResetConfirmOpen(false);
+        markSaveStale();
+        return;
+      }
+      setSaveError(true);
+      setToast("重置失败，请先导出存档备份后重试");
+    } finally {
+      setResetting(false);
+    }
+  };
   const active = g && !g.done && g.turn === 0 && !paused;
   const limits = g && !g.done ? legal(g) : null;
   const presetValue = (preset: number | { fraction: number }) => {
@@ -1837,7 +1873,7 @@ export default function App() {
     }
     commit(act(g, { type: "raise", amount: raise }));
   };
-  const overlayOpen = !!(modal || selected || batchOpen || imported || confirmDialog || saveStale);
+  const overlayOpen = !!(modal || selected || batchOpen || imported || confirmDialog || resetConfirmOpen || saveStale);
   useEffect(() => {
     if (!active || !g || overlayOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -2157,6 +2193,33 @@ export default function App() {
         </div>
       </form>
     </>
+  );
+  const resetSettingsContent = (
+    <section className="reset-settings" aria-labelledby="reset-settings-title">
+      <div className="settings-section-heading">
+        <h1 id="reset-settings-title">重置</h1>
+        <p className="muted">清理本机保存的牌局、战绩、人物修改、个人资料和设置。</p>
+      </div>
+      <div className="reset-danger-panel">
+        <h2>重置所有数据</h2>
+        <p>
+          此操作会删除当前浏览器中的全部游戏进度和个性化内容，无法撤销。头像文件和应用资源不会受到影响。
+        </p>
+        <div className="reset-data-summary" aria-label="当前存档摘要">
+          <span>手数 <strong>{currentSaveSummary.hands.toLocaleString()}</strong></span>
+          <span>冠军赛 <strong>{currentSaveSummary.championships.toLocaleString()}</strong></span>
+          <span>选手战绩 <strong>{currentSaveSummary.playerRecords.toLocaleString()}</strong></span>
+        </div>
+        <button
+          type="button"
+          className="reset-button"
+          disabled={resetting}
+          onClick={() => setResetConfirmOpen(true)}
+        >
+          <RotateCcw size={15} /> {resetting ? "正在重置…" : "重置所有数据"}
+        </button>
+      </div>
+    </section>
   );
   return (
     <div className={`app ${page === "table" ? "immersive" : ""} ${page === "lobby" ? "home-screen" : ""}`}>
@@ -2701,6 +2764,7 @@ export default function App() {
             aiContent={aiSettingsContent}
             playersContent={playerDirectoryContent}
             profileContent={profileSettingsContent}
+            resetContent={resetSettingsContent}
           />
         ) : page === "players" ? (
           <div className="content-page">{playerDirectoryContent}</div>
@@ -3330,6 +3394,44 @@ export default function App() {
                 onClick={() => applyImportedSave(imported, true)}
               >
                 确认覆盖
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+      {resetConfirmOpen ? (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !resetting) setResetConfirmOpen(false);
+          }}
+        >
+          <section
+            className="modal reset-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="reset-confirm-title"
+          >
+            <p className="eyebrow">RESET LOCAL DATA</p>
+            <h2 id="reset-confirm-title">确认重置所有数据？</h2>
+            <div className="notice import-warning">
+              当前牌局、冠军赛进度、战绩、人物修改、个人资料和设置都会被清空。此操作无法撤销，建议先导出存档备份。
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                disabled={resetting}
+                onClick={() => setResetConfirmOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="reset-button"
+                disabled={resetting}
+                onClick={() => void resetAllData()}
+              >
+                <RotateCcw size={14} /> {resetting ? "正在重置…" : "确认重置"}
               </button>
             </div>
           </section>

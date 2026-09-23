@@ -1113,7 +1113,7 @@ export default function App() {
         next.players.filter((p) => p.cards.length === 2 && p.profile.id !== -1).forEach((p) => { memories[p.profile.id] = [...handLog, ...(memories[p.profile.id] || [])].slice(0, 60) });
       }
       let tournament = old.tournament;
-      if (ended && tournament && tournament.round >= 2 && old.game) {
+      if (next.done && tournament && tournament.round >= 2 && old.game) {
         const newlyEliminated = next.players
           .map((player, index) => ({ player, startStack: player.start, index }))
           .filter(({ player, startStack }) => startStack > 0 && player.chips === 0)

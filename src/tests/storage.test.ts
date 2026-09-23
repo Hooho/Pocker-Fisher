@@ -33,11 +33,39 @@ test("a debug hand can be saved and imported unchanged", () => {
   );
   const save = { ...blank, game, savedAt: new Date().toISOString() };
   assert.deepEqual(parseSave(JSON.parse(JSON.stringify(save))), save);
-  const legacySave = {
-    ...save,
-    game: { ...game, deck: [...game.deck, 40, 41, 42] },
+
+  const board = [10, 11, 12, 0, 1];
+  const players = game.players.map((player, index) => ({
+    ...player,
+    chips: 10000,
+    cards: index === 0 ? [8, 9] : [2 + index * 2, 3 + index * 2],
+    bet: 0,
+    total: 0,
+    folded: false,
+    acted: false,
+    start: 10000,
+  }));
+  const reserved = new Set([...board, ...players.flatMap((player) => player.cards)]);
+  const legacyDeck = Array.from({ length: 52 }, (_, card) => card)
+    .filter((card) => !reserved.has(card))
+    .slice(0, 38);
+  const legacyGame = {
+    ...game,
+    players,
+    board,
+    deck: legacyDeck,
+    street: 3,
+    done: true,
+    result: "牌局结束",
+    winners: [0],
   };
-  assert.deepEqual(parseSave(JSON.parse(JSON.stringify(legacySave))), save);
+  const legacySave = { ...blank, game: legacyGame, savedAt: save.savedAt };
+  assert.deepEqual(parseSave(JSON.parse(JSON.stringify(legacySave))), legacySave);
+  const legacyPaddedSave = {
+    ...legacySave,
+    game: { ...legacyGame, deck: [...legacyDeck, 40, 41, 42] },
+  };
+  assert.deepEqual(parseSave(JSON.parse(JSON.stringify(legacyPaddedSave))), legacySave);
 });
 test("an unrecoverable active game does not block the rest of a save", () => {
   const game = newGame([hero, { ...hero, id: 0 }]);

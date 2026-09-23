@@ -231,71 +231,34 @@ export function startHand(
   }
   g.turn = big;
   g.log = [`第 ${g.hand} 手 · 盲注 ${bb / 2} / ${bb}`, ...g.log].slice(0, 60);
+  if (options.debugFast) forceDebugPocketAces(g);
   advance(g);
-  return options.debugFast ? finishDebugHand(g) : g;
+  return g;
 }
 
-function finishDebugHand(g: Game): Game {
-  if (g.done) return g;
+function forceDebugPocketAces(g: Game) {
   const heroIndex = g.players.findIndex((player) => player.profile.id === hero.id);
-  if (heroIndex < 0 || g.players.filter((player) => player.chips > 0).length < 2) return g;
-  const allInIndex = g.players.findIndex(
-    (player, index) => index !== heroIndex && player.chips > 0,
-  );
-  if (allInIndex < 0) return g;
-
-  const heroCards = [8, 9];
-  const board = [10, 11, 12, 0, 1];
-  const reserved = new Set([...heroCards, ...board]);
-  const remaining = Array.from({ length: 52 }, (_, card) => card).filter(
-    (card) => !reserved.has(card),
-  );
-
-  g.players.forEach((player, index) => {
-    if (player.chips <= 0) {
-      player.cards = [];
-      player.folded = true;
-      player.last = "已出局";
-      return;
-    }
-    player.cards = index === heroIndex
-      ? heroCards
-      : [remaining.shift()!, remaining.shift()!];
-    if (index !== heroIndex && index !== allInIndex) {
-      player.folded = true;
-      player.acted = true;
-      player.last = "弃牌";
-    }
-  });
-  const allInPlayer = g.players[allInIndex];
-  const allIn = allInPlayer.chips;
-  allInPlayer.folded = false;
-  allInPlayer.chips = 0;
-  allInPlayer.bet += allIn;
-  allInPlayer.total += allIn;
-  allInPlayer.acted = true;
-  allInPlayer.raiseAt = g.current;
-  allInPlayer.last = "全下";
+  if (heroIndex < 0) return;
   const heroPlayer = g.players[heroIndex];
-  const call = Math.max(0, allInPlayer.total - heroPlayer.bet);
-  const heroPay = Math.min(heroPlayer.chips, call);
-  heroPlayer.chips -= heroPay;
-  heroPlayer.bet += heroPay;
-  heroPlayer.total += heroPay;
-  heroPlayer.folded = false;
-  heroPlayer.acted = true;
-  heroPlayer.raiseAt = g.current;
-  heroPlayer.last = heroPlayer.chips === 0 ? "全下" : `跟注 ${heroPay}`;
-  g.board = board;
-  g.street = 3;
-  const holeCards = g.players.reduce((count, player) => count + player.cards.length, 0);
-  const deckSize = 52 - g.street - g.board.length - holeCards;
-  g.deck = remaining.slice(0, deckSize);
-  g.current = Math.max(...g.players.map((player) => player.bet));
-  g.turn = heroIndex;
-  g.log = ["调试模式 · 你拿到皇家同花顺 · 一名选手全下", ...g.log].slice(0, 60);
-  settle(g);
-  return g;
+  if (heroPlayer.cards.length !== 2) return;
+
+  const targetAces = [12, 25];
+  const missingAces = targetAces.filter((card) => !heroPlayer.cards.includes(card));
+  const replacementCards = heroPlayer.cards.filter((card) => !targetAces.includes(card));
+  for (const ace of missingAces) {
+    const replacement = replacementCards.shift();
+    const heroSlot = heroPlayer.cards.findIndex((card) => !targetAces.includes(card));
+    if (replacement === undefined || heroSlot < 0) return;
+    const owner = g.players.find((player, index) => index !== heroIndex && player.cards.includes(ace));
+    if (owner) {
+      owner.cards[owner.cards.indexOf(ace)] = replacement;
+    } else {
+      const deckSlot = g.deck.indexOf(ace);
+      if (deckSlot < 0) return;
+      g.deck[deckSlot] = replacement;
+    }
+    heroPlayer.cards[heroSlot] = ace;
+  }
 }
 export function legal(g: Game) {
   const p = g.players[g.turn];

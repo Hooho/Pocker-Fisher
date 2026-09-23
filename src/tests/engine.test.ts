@@ -4,6 +4,7 @@ import {
   evaluate,
   currentHandName,
   newGame,
+  rank,
   startHand,
   act,
   decide,
@@ -41,7 +42,7 @@ test("heads up dealer posts small blind and acts first", () => {
   assert.equal(g.turn, g.dealer);
   assert.equal(g.players[g.dealer].bet, 50);
 });
-test("debug mode gives the local player a royal flush and settles an all-in hand", () => {
+test("debug mode gives the local player pocket aces and keeps normal hand flow", () => {
   const debugProfiles = [
     hero,
     { ...hero, id: 100, name: "对手" },
@@ -49,12 +50,16 @@ test("debug mode gives the local player a royal flush and settles an all-in hand
   ];
   const g = newGame(debugProfiles, 100, undefined, { debugFast: true });
 
-  assert.equal(g.done, true);
-  assert.equal(evaluate([...g.players[0].cards, ...g.board]).name, "皇家同花顺");
-  assert.deepEqual(g.winners, [0]);
-  assert.equal(g.deck.length + g.board.length + g.players.flatMap((player) => player.cards).length, 49);
-  assert.equal(g.players.slice(1).filter((player) => player.chips === 0).length, 1);
-  assert.ok(g.players.slice(1).filter((player) => player.chips > 0).every((player) => player.folded));
+  assert.equal(g.done, false);
+  assert.deepEqual(g.players[0].cards.map(rank), [14, 14]);
+  assert.equal(g.board.length, 0);
+  assert.equal(g.deck.length + g.board.length + g.players.flatMap((player) => player.cards).length, 52);
+  assert.equal(g.players.slice(1).filter((player) => player.chips === 0).length, 0);
+  assert.equal(g.winners.length, 0);
+
+  const next = startHand(g, 100, { debugFast: true });
+  assert.equal(next.done, false);
+  assert.deepEqual(next.players[0].cards.map(rank), [14, 14]);
 });
 test("fold awards pot and preserves chips", () => {
   let g = newGame(profiles.slice(0, 2));

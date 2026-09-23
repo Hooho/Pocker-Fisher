@@ -2056,17 +2056,17 @@ export default function App() {
           </select>
         </label>
         <label>
-          调试快速赛
+          调试模式
           <select
             value={data.settings.debugFast ? "on" : "off"}
             onChange={(e) => updateSettings({ debugFast: e.target.value === "on" })}
           >
             <option value="off">关闭</option>
-            <option value="on">开启 · 皇家同花顺 / 一名选手全下</option>
+            <option value="on">开启 · 真人固定拿两个 A</option>
           </select>
         </label>
         <div className="notice settings-wide">
-          调试模式只对新冠军赛生效：本地玩家固定拿皇家同花顺，当前牌桌一名选手全下；结算后请手动点击下一手。
+          调试模式只对新冠军赛生效：每手正常发牌和行动，仅将真人底牌固定为两个 A；不改变结算、淘汰或晋级逻辑。
         </div>
         <div className="settings-wide provider-picker">
           <div className="provider-picker-heading">

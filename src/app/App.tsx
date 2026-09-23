@@ -1692,36 +1692,6 @@ export default function App() {
   useEffect(() => {
     if (page === "table" && !paused && g?.done && t && !t.out && !t.complete && g.players[0]?.chips === 0) advanceTournament();
   }, [g?.done, g?.hand, g?.players[0]?.chips, t?.round, t?.out, t?.complete, t?.background?.done, page, paused]);
-  useEffect(() => {
-    if (
-      !ready ||
-      !data.settings.debugFast ||
-      !g?.done ||
-      !t ||
-      t.out ||
-      t.complete ||
-      t.autoSimulating ||
-      t.paused ||
-      busy ||
-      paused ||
-      page !== "table"
-    ) return;
-    const timer = window.setTimeout(() => nextHand(), 180);
-    return () => window.clearTimeout(timer);
-  }, [
-    ready,
-    data.settings.debugFast,
-    g?.done,
-    g?.hand,
-    t?.out,
-    t?.complete,
-    t?.autoSimulating,
-    t?.paused,
-    t?.round,
-    busy,
-    paused,
-    page,
-  ]);
   const applyImportedSave = (nextSave: Save, overwroteExisting: boolean) => {
     generation.current++;
     setData(nextSave);
@@ -2099,7 +2069,7 @@ export default function App() {
           </select>
         </label>
         <div className="notice settings-wide">
-          调试模式只对新冠军赛生效：本地玩家固定拿皇家同花顺，当前牌桌选手一次性全下，并自动推进比赛。
+          调试模式只对新冠军赛生效：本地玩家固定拿皇家同花顺，当前牌桌一名选手全下；结算后请手动点击下一手。
         </div>
         <div className="settings-wide provider-picker">
           <div className="provider-picker-heading">

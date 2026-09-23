@@ -36,7 +36,6 @@ export type Game = {
   winners: number[];
 };
 export type Move = { type: "fold" | "call" | "raise"; amount?: number };
-export type StartHandOptions = { debugFast?: boolean };
 export const hero: Character = {
   id: -1,
   name: "你",
@@ -148,7 +147,6 @@ export function newGame(
   profiles: Character[],
   bb = 100,
   stacks?: number[],
-  options: StartHandOptions = {},
 ): Game {
   return startHand({
     players: profiles.map((profile, index) => ({
@@ -176,12 +174,11 @@ export function newGame(
     log: [],
     result: "",
     winners: [],
-  }, bb, options);
+  }, bb);
 }
 export function startHand(
   old: Game,
   bb = old.bb,
-  options: StartHandOptions = {},
 ): Game {
   const g = structuredClone(old);
   g.deck = shuffled(Array.from({ length: 52 }, (_, i) => i));
@@ -231,34 +228,8 @@ export function startHand(
   }
   g.turn = big;
   g.log = [`第 ${g.hand} 手 · 盲注 ${bb / 2} / ${bb}`, ...g.log].slice(0, 60);
-  if (options.debugFast) forceDebugPocketAces(g);
   advance(g);
   return g;
-}
-
-function forceDebugPocketAces(g: Game) {
-  const heroIndex = g.players.findIndex((player) => player.profile.id === hero.id);
-  if (heroIndex < 0) return;
-  const heroPlayer = g.players[heroIndex];
-  if (heroPlayer.cards.length !== 2) return;
-
-  const targetAces = [12, 25];
-  const missingAces = targetAces.filter((card) => !heroPlayer.cards.includes(card));
-  const replacementCards = heroPlayer.cards.filter((card) => !targetAces.includes(card));
-  for (const ace of missingAces) {
-    const replacement = replacementCards.shift();
-    const heroSlot = heroPlayer.cards.findIndex((card) => !targetAces.includes(card));
-    if (replacement === undefined || heroSlot < 0) return;
-    const owner = g.players.find((player, index) => index !== heroIndex && player.cards.includes(ace));
-    if (owner) {
-      owner.cards[owner.cards.indexOf(ace)] = replacement;
-    } else {
-      const deckSlot = g.deck.indexOf(ace);
-      if (deckSlot < 0) return;
-      g.deck[deckSlot] = replacement;
-    }
-    heroPlayer.cards[heroSlot] = ace;
-  }
 }
 export function legal(g: Game) {
   const p = g.players[g.turn];

@@ -4,7 +4,6 @@ import {
   evaluate,
   currentHandName,
   newGame,
-  rank,
   startHand,
   act,
   decide,
@@ -42,24 +41,23 @@ test("heads up dealer posts small blind and acts first", () => {
   assert.equal(g.turn, g.dealer);
   assert.equal(g.players[g.dealer].bet, 50);
 });
-test("debug mode gives the local player pocket aces and keeps normal hand flow", () => {
+test("a new hand keeps normal dealing and hand flow", () => {
   const debugProfiles = [
     hero,
     { ...hero, id: 100, name: "对手" },
     { ...hero, id: 101, name: "对手 2" },
   ];
-  const g = newGame(debugProfiles, 100, undefined, { debugFast: true });
+  const g = newGame(debugProfiles);
 
   assert.equal(g.done, false);
-  assert.deepEqual(g.players[0].cards.map(rank), [14, 14]);
   assert.equal(g.board.length, 0);
   assert.equal(g.deck.length + g.board.length + g.players.flatMap((player) => player.cards).length, 52);
   assert.equal(g.players.slice(1).filter((player) => player.chips === 0).length, 0);
   assert.equal(g.winners.length, 0);
 
-  const next = startHand(g, 100, { debugFast: true });
+  const next = startHand(g, 100);
   assert.equal(next.done, false);
-  assert.deepEqual(next.players[0].cards.map(rank), [14, 14]);
+  assert.equal(next.board.length, 0);
 });
 test("fold awards pot and preserves chips", () => {
   let g = newGame(profiles.slice(0, 2));

@@ -595,7 +595,6 @@ function startNextTournamentRound(save: Save, localQualified: Character[]): Save
     table,
     100,
     table.map((p) => fieldStacks[String(p.id)]),
-    { debugFast: save.settings.debugFast },
   );
   const tableIds = new Set(table.map((p) => p.id));
   const background = round < 3
@@ -1429,9 +1428,7 @@ export default function App() {
     const game = newGame([
       userPlayer,
       ...roster.slice(0, newMode === "cash" ? seatCount - 1 : 7),
-    ], 100, undefined, {
-      debugFast: newMode === "tournament" && data.settings.debugFast,
-    });
+    ]);
     const tournament: Tournament | null =
       newMode === "tournament"
         ? {
@@ -1497,7 +1494,6 @@ export default function App() {
         t
           ? Math.min(102400, 100 * 2 ** Math.floor(g.hand / (t?.pace || 10)))
           : 100,
-        { debugFast: Boolean(t && data.settings.debugFast) },
       ),
     );
   };
@@ -1565,7 +1561,6 @@ export default function App() {
       const nextGame = startHand(
         g,
         Math.min(102400, 100 * 2 ** Math.floor(g.hand / t.pace)),
-        { debugFast: data.settings.debugFast },
       );
       setData((d) => {
         const nextTournament = d.tournament
@@ -1603,8 +1598,6 @@ export default function App() {
       const playoffGame = newGame(
         [userPlayer, ...q.tied.filter((p) => p.id !== -1)],
         100,
-        undefined,
-        { debugFast: data.settings.debugFast },
       );
       setData((d) => ({
         ...d,
@@ -2062,11 +2055,11 @@ export default function App() {
             onChange={(e) => updateSettings({ debugFast: e.target.value === "on" })}
           >
             <option value="off">关闭</option>
-            <option value="on">开启 · 真人固定拿两个 A</option>
+            <option value="on">开启 · 显示所有底牌</option>
           </select>
         </label>
         <div className="notice settings-wide">
-          调试模式只对新冠军赛生效：每手正常发牌和行动，仅将真人底牌固定为两个 A；不改变结算、淘汰或晋级逻辑。
+          调试模式只影响牌桌显示：显示所有选手的底牌，不改变发牌、行动、结算、淘汰或晋级逻辑。
         </div>
         <div className="settings-wide provider-picker">
           <div className="provider-picker-heading">
@@ -2502,6 +2495,7 @@ export default function App() {
               {g.players.map((p, i) => {
                 const seatPosition = getTableSeatPosition(g.players.length, i, tableStageSize);
                 const show =
+                  data.settings.debugFast ||
                   p.profile.id === -1 ||
                   (g.done && !p.folded && g.board.length === 5);
                 const actionType = p.last.includes("弃牌")

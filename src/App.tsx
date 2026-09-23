@@ -7,6 +7,12 @@ import {
   type SimulatedTablePerformance,
 } from "./tournament";
 import { pathForPage, useAppRouter } from "./app/router";
+import { LobbyPage } from "./pages/LobbyPage";
+import { PlayersPage } from "./pages/PlayersPage";
+import { SettingsPage, type SettingsSection } from "./pages/SettingsPage";
+import { TablePage } from "./pages/TablePage";
+import { TournamentPage } from "./pages/TournamentPage";
+import { LeaderboardPage } from "./pages/LeaderboardPage";
 import { useEffect, useRef, useState, useMemo, useCallback, memo, lazy, Suspense, type CSSProperties } from "react";
 import {
   ArrowUpRight,
@@ -804,7 +810,7 @@ export default function App() {
   const [ready, setReady] = useState(false);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [page, setPage] = useAppRouter();
-  const [settingsSection, setSettingsSection] = useState<"ai" | "players" | "profile">("ai");
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>("ai");
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [modal, setModal] = useState<
     "new" | "rules" | "points" | "cash-details" | "tournament-details" | null
@@ -1927,51 +1933,16 @@ export default function App() {
       ? `${roundLabel(t.round)} · 附加赛`
       : roundLabel(t.round)
     : "单次赛";
-  const renderPlayerDirectory = () => {
-    return (
-      <>
-        {page === "settings" ? null : (
-          <div className="page-heading">
-            <div>
-              <h1>每个人，都有自己的底牌。</h1>
-              <p className="muted">63 位固定选手，不同的性格，相同的公平规则。</p>
-            </div>
-            <span className="pill">
-              <Sparkles size={14} /> 支持 AI 人物塑造
-            </span>
-          </div>
-        )}
-        <div className="batch-bar">
-          <span>支持逐个塑造，也可以批量更新选手列表。</span>
-          <button onClick={() => setBatchOpen(true)}>
-            <Sparkles size={15} />
-            批量 AI 塑造
-          </button>
-        </div>
-        <div className="character-grid">
-          {characters.map((raw) => {
-            const p = profile(raw);
-            return (
-              <button
-                className="character-card"
-                key={p.id}
-                onClick={() => openPlayerProfile(raw)}
-              >
-                <Avatar p={p} />
-                <span className="character-level">{levels[p.level - 1]}</span>
-                <h3>
-                  <span>{p.name}</span>
-                  <ArrowUpRight className="character-profile-icon" size={15} aria-hidden="true" />
-                </h3>
-                <span className="style-tag">{p.style}</span>
-                <p>{p.bio}</p>
-              </button>
-            );
-          })}
-        </div>
-      </>
-    );
-  };
+  const playerDirectoryContent = (
+    <PlayersPage
+      characters={characters}
+      levels={levels}
+      profile={profile}
+      onOpenPlayerProfile={openPlayerProfile}
+      onOpenBatch={() => setBatchOpen(true)}
+      renderAvatar={(player) => <Avatar p={player} />}
+    />
+  );
   const aiSettingsContent = (
     <>
       <div className="settings-form">
@@ -2298,98 +2269,16 @@ export default function App() {
         {!ready ? (
           <div className="loading">正在布置你的扑克室…</div>
         ) : page === "lobby" ? (
-          <div className="lobby lobby-home">
-            <div className="lobby-atmosphere" aria-hidden="true">
-              <div className="lobby-table">
-                <span className="lobby-table-inlay" />
-                <span className="lobby-table-mark">摸鱼德州</span>
-              </div>
-              <div className="lobby-playing-cards">
-                <div className="ambient-playing-card"><b>A</b><span>♣</span></div>
-                <div className="ambient-playing-card red"><b>K</b><span>♦</span></div>
-                <div className="ambient-playing-card"><b>Q</b><span>♠</span></div>
-                <div className="ambient-playing-card red"><b>J</b><span>♥</span></div>
-                <div className="ambient-playing-card"><b>10</b><span>♣</span></div>
-              </div>
-              <div className="ambient-card-back"><span>♠</span><i>摸鱼德州</i></div>
-              <div className="lobby-chip-stack stack-left"><i /><i /><i /><i /><i /></div>
-              <div className="lobby-chip-stack stack-right"><i /><i /><i /><i /><i /></div>
-              <div className="ambient-loose-chip chip-gold">500</div>
-              <div className="ambient-loose-chip chip-red">100</div>
-            </div>
-            <div className="lobby-save-note">
-              <div>随时退出！随时关闭！实时保存！</div>
-              <div>只保存本地，可下载存档，上传恢复</div>
-            </div>
-            <div className="mode-grid">
-              <div className="mode-card-wrap">
-                <div
-                  className="mode-card home-mode-card"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => openNew("cash")}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      openNew("cash");
-                    }
-                  }}
-                >
-                  <div className="mode-title-row">
-                    <h3>单次赛</h3>
-                    <button
-                      type="button"
-                      className="mode-details-button"
-                      aria-label="查看单次赛说明"
-                      title="查看单次赛说明"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openModeDetails("cash");
-                      }}
-                    >
-                      <Info size={15} />
-                    </button>
-                  </div>
-                  <p>开启一场独立牌局，与电脑选手对战。</p>
-                  <div className="mode-footer"><span>2–8 人牌桌 · 难度自选</span><ArrowUpRight size={20} /></div>
-                </div>
-              </div>
-              <div className="mode-card-wrap">
-                <div
-                  className="mode-card competition home-mode-card"
-                  role="button"
-                  tabIndex={0}
-                  onClick={enterChampionship}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      enterChampionship();
-                    }
-                  }}
-                >
-                  <div className="mode-title-row">
-                    <h3>冠军之路</h3>
-                    <button
-                      type="button"
-                      className="mode-details-button"
-                      aria-label="查看冠军赛说明"
-                      title="查看冠军赛说明"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        openModeDetails("tournament");
-                      }}
-                    >
-                      <Info size={15} />
-                    </button>
-                  </div>
-                  <p>{(t || data.pausedTournament?.tournament) && !(t || data.pausedTournament?.tournament)?.complete ? (t || data.pausedTournament?.tournament)?.out ? "你已出局，剩余选手正在自动模拟。" : `继续你的比赛 · ${roundLabel((t || data.pausedTournament?.tournament)!.round)}` : "多桌同时开赛，依次经过首轮、次轮、半决赛和总决赛。"}</p>
-                  <div className="mode-footer"><span>{(t || data.pausedTournament?.tournament)?.complete ? "查看本届结果" : (t || data.pausedTournament?.tournament)?.out ? "查看实时模拟进度" : (t || data.pausedTournament?.tournament) ? "冠军赛已暂停 · 点击继续" : "同时模拟其他牌桌 · 逐轮晋级"}</span><ArrowUpRight size={20} /></div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <LobbyPage
+            tournament={t}
+            pausedTournament={data.pausedTournament}
+            roundLabel={roundLabel}
+            onNew={openNew}
+            onModeDetails={openModeDetails}
+            onEnterChampionship={enterChampionship}
+          />
         ) : page === "table" && g ? (
-          <div className="table-page">
+          <TablePage>
             <div className="table-heading">
               <div className="table-heading-title table-heading-left">
                 <button
@@ -2794,262 +2683,75 @@ export default function App() {
                 )}
               </div>
             </div>
-          </div>
+          </TablePage>
         ) : page === "settings" ? (
-          <div className="content-page settings-page">
-            <aside className="settings-menu" aria-label="设置菜单">
-              <h1>设置</h1>
-              <button
-                className={settingsSection === "ai" ? "active" : ""}
-                aria-current={settingsSection === "ai" ? "page" : undefined}
-                onClick={() => setSettingsSection("ai")}
-              >
-                <Sparkles size={17} /> AI 设置
-              </button>
-              <button
-                className={settingsSection === "players" ? "active" : ""}
-                aria-current={settingsSection === "players" ? "page" : undefined}
-                onClick={() => setSettingsSection("players")}
-              >
-                <Users size={17} /> 电脑选手
-              </button>
-              <button
-                className={settingsSection === "profile" ? "active" : ""}
-                aria-current={settingsSection === "profile" ? "page" : undefined}
-                onClick={() => setSettingsSection("profile")}
-              >
-                <UserRound size={17} /> 个人资料
-              </button>
-            </aside>
-            <section className="settings-panel">
-              {settingsSection === "ai"
-                ? aiSettingsContent
-                : settingsSection === "players"
-                  ? renderPlayerDirectory()
-                  : profileSettingsContent}
-            </section>
-          </div>
+          <SettingsPage
+            section={settingsSection}
+            onSectionChange={setSettingsSection}
+            aiContent={aiSettingsContent}
+            playersContent={playerDirectoryContent}
+            profileContent={profileSettingsContent}
+          />
         ) : page === "players" ? (
-          <div className="content-page">
-            {renderPlayerDirectory()}
-          </div>
+          <div className="content-page">{playerDirectoryContent}</div>
         ) : page === "tournament" ? (
-          <div className={`content-page${t?.complete ? " championship-complete-page" : ""}`}>
-            <div className="page-heading championship-heading">
-              <div>
-                <h1>冠军赛</h1>
-                <p className="muted">
-                  {t?.complete
-                    ? "本届赛事已结束，以下为最终名次。"
-                    : "64 位选手同时分桌比赛，晋级选手带着当前筹码进入下一轮。"}
-                </p>
-              </div>
-              <div className="championship-actions">
-                <button
-                  className="gold-button"
-                  onClick={() => {
-                    if (t?.complete) openNew("tournament");
-                    else enterChampionship();
-                  }}
-                >
-                  {t?.out && !t.simulationComplete ? "查看模拟进度" : t?.complete ? "再开一届" : t ? "返回比赛" : "亲自参赛"}
-                  <ArrowUpRight size={17} />
-                </button>
-              </div>
-            </div>
-            {t?.complete ? (
-              <>
-                {completedStandings.length ? (
-                  <section className="championship-results championship-results-complete" aria-labelledby="championship-results-title">
-                    <div className="championship-results-heading">
-                      <div>
-                        <small>FINAL RESULTS</small>
-                        <h2 id="championship-results-title">本届最终名次</h2>
-                      </div>
-                      <span>总决赛</span>
-                    </div>
-                    <div className="championship-podium" aria-label="前三名颁奖台">
-                      {[1, 0, 2].map((index) => {
-                        const player = completedStandings[index];
-                        if (!player) return null;
-                        const place = index + 1;
-                        return (
-                          <article className={"podium-place place-" + place} key={player.id}>
-                            <div className="podium-player">
-                              <span className="podium-award" aria-hidden="true">
-                                {place === 1 ? <Trophy size={22} /> : <Medal size={20} />}
-                              </span>
-                              <Avatar p={player} playerAvatar={data.playerProfile.avatar} />
-                              <span className="podium-player-name">
-                                <small>第 {place} 名{place === 1 ? " · 冠军" : ""}</small>
-                                <strong>{player.id === -1 ? userPlayer.name : player.name}</strong>
-                              </span>
-                            </div>
-                            <div className="podium-step"><b>{String(place).padStart(2, "0")}</b></div>
-                          </article>
-                        );
-                      })}
-                    </div>
-                    <div className="finalists-list" aria-label="第四至第八名">
-                      <div className="finalists-list-heading">
-                        <h3>第四至第八名</h3>
-                        <span>其余晋级选手</span>
-                      </div>
-                      <ol start={4}>
-                        {completedStandings.slice(3, 8).map((player, index) => (
-                          <li key={player.id}>
-                            <b className="finalist-rank">{index + 4}</b>
-                            <Avatar p={player} playerAvatar={data.playerProfile.avatar} />
-                            <strong>{player.id === -1 ? userPlayer.name : player.name}</strong>
-                            <span>第 {index + 4} 名</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  </section>
-                ) : (
-                  <section className="championship-results-empty" role="status">
-                    <Medal size={24} />
-                    <strong>本届赛事已结束</strong>
-                    <span>暂时没有可显示的最终排名记录。</span>
-                  </section>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="tournament-summary">
-                  <Trophy size={46} />
-                  <div>
-                    <h2>
-                      {t
-                        ? t.out
-                          ? "你已出局 · 正在模拟剩余赛事"
-                          : roundLabel(t.round)
-                        : "四轮比赛，一场属于你的征程"}
-                    </h2>
-                    <p>
-                      {t
-                        ? `${t.field.length} 位本轮选手 · ${t.results.length} 次晋级${t.background && !t.background.done ? ` · 其他桌剩余 ${t.background.remaining.length} 人` : ""}`
-                        : "首轮、次轮和半决赛分桌晋级，最后八人进入总决赛。"}
-                    </p>
-                  </div>
-                  <b>64 <span>→ 1</span></b>
-                </div>
-                {t?.out && !t.simulationComplete ? (
-                  <SimulationProgressPanel
-                    progress={eliminatedProgress}
-                    label="你出局后的赛事进度"
-                    playerAvatar={data.playerProfile.avatar}
-                    resumeHint="刷新后会从最近完成的牌桌继续；刷新时正在进行的牌桌会重算。"
-                  />
-                ) : null}
-                <div className="rounds">
-                  {rounds.map((name, i) => (
-                    <div
-                      className={`round ${t && Math.min(t.round, rounds.length - 1) === i ? "current" : ""} ${t && t.round > i ? "passed" : ""}`}
-                      key={name}
-                    >
-                      <div className="round-number">
-                        {t && t.round > i ? <Check size={20} /> : String(i + 1).padStart(2, "0")}
-                      </div>
-                      <div>
-                        <small>{i < 3 ? "分组晋级" : "冠军桌"}</small>
-                        <h3>{name}</h3>
-                      </div>
-                      <span>{counts[i]} 人</span>
-                      <ChevronRight size={18} />
-                    </div>
-                  ))}
-                </div>
-                <div className="records-teaser">
-                  <span><Medal size={16} /> 已保存 <b>{data.tournamentRecords.length}</b> 届赛事</span>
-                  <button onClick={() => setPage("leaderboard")}>查看积分榜 <ChevronRight size={15} /></button>
-                </div>
-              </>
-            )}
-          </div>
+          <TournamentPage
+            tournament={t}
+            completedStandings={completedStandings}
+            userPlayerName={userPlayer.name}
+            tournamentRecordsCount={data.tournamentRecords.length}
+            rounds={rounds}
+            counts={counts}
+            roundLabel={roundLabel}
+            onPrimaryAction={() => {
+              if (t?.complete) openNew("tournament");
+              else enterChampionship();
+            }}
+            simulationProgress={
+              <SimulationProgressPanel
+                progress={eliminatedProgress}
+                label="你出局后的赛事进度"
+                playerAvatar={data.playerProfile.avatar}
+                resumeHint="刷新后会从最近完成的牌桌继续；刷新时正在进行的牌桌会重算。"
+              />
+            }
+            onViewLeaderboard={() => setPage("leaderboard")}
+            renderAvatar={(player) => <Avatar p={player} playerAvatar={data.playerProfile.avatar} />}
+          />
         ) : (
-          <div className="content-page leaderboard-page">
-            <div className="page-heading leaderboard-heading">
-              <div>
-                <h1>冠军积分榜</h1>
-              </div>
-              <div className="championship-count" aria-label={`已进行冠军赛 ${data.stats.tournaments} 次`}>
-                <small>已进行冠军赛</small>
-                <strong>{data.stats.tournaments} 次</strong>
-              </div>
-            </div>
-            <div className="leaderboard-summary career-summary">
-              <div><small>我的排名</small><strong>第 {localRank} 名 / {leaderboard.length} 位</strong></div>
-              <button
-                type="button"
-                className="career-summary-rule"
-                onClick={() => setModal("points")}
-                aria-label="计分规则 · 点击查看详细说明"
-              >
-                <span className="career-summary-rule-label">
-                  <small>计分规则</small>
-                  <Info size={13} aria-hidden="true" />
-                </span>
-                <strong>赢手 +0.1 · 冠军 +20</strong>
-              </button>
-            </div>
-            <section
-              className="leaderboard-card"
-              aria-label="所有选手积分与战绩"
-              ref={leaderboardScrollRef}
-              onScroll={() => {
-                if (leaderboardScrollFrame.current != null) return;
-                leaderboardScrollFrame.current = requestAnimationFrame(() => {
-                  leaderboardScrollFrame.current = null;
-                  const next = (leaderboardScrollRef.current?.scrollTop ?? 0) > 0;
-                  if (next === leaderboardScrolledRef.current) return;
-                  leaderboardScrolledRef.current = next;
-                  setLeaderboardScrolled(next);
-                });
-              }}
-            >
-              <div className="leaderboard-head">
-                <span>排名 · 选手</span><span>积分</span><span>最佳成绩</span><span>比赛</span>
-                <span>晋级</span><span>赢手</span><span>最高筹码</span>
-              </div>
-              <div className="leaderboard-body">
-                <LeaderboardRows
-                  rows={leaderboard}
-                  playerAvatar={data.playerProfile.avatar}
-                  userPlayerName={userPlayer.name}
-                  localRowRef={localLeaderboardRow}
-                  onSelect={selectLeaderboardPlayer}
-                />
-              </div>
-            </section>
-            <div className="leaderboard-floating-actions">
-              {leaderboardScrolled ? (
-                <button
-                  type="button"
-                  className="leaderboard-scroll-top"
-                  aria-label="滚动到顶部"
-                  onClick={() => leaderboardScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
-                >
-                  <ArrowUp size={17} />
-                </button>
-              ) : null}
-              <button
-                type="button"
-                className="leaderboard-locate-self"
-                aria-label={`定位到我的排名，第 ${localRank} 名`}
-                onClick={() => localLeaderboardRow.current?.scrollIntoView({
-                  behavior: "smooth",
-                  block: "center",
-                  inline: "nearest",
-                })}
-              >
-                <LocateFixed size={17} />
-                <span>定位自己</span>
-                <b>第 {localRank} 名</b>
-              </button>
-            </div>
-          </div>
+          <LeaderboardPage
+            tournamentCount={data.stats.tournaments}
+            localRank={localRank}
+            totalPlayers={leaderboard.length}
+            leaderboardScrolled={leaderboardScrolled}
+            leaderboardRef={leaderboardScrollRef}
+            rows={
+              <LeaderboardRows
+                rows={leaderboard}
+                playerAvatar={data.playerProfile.avatar}
+                userPlayerName={userPlayer.name}
+                localRowRef={localLeaderboardRow}
+                onSelect={selectLeaderboardPlayer}
+              />
+            }
+            onOpenPoints={() => setModal("points")}
+            onScroll={() => {
+              if (leaderboardScrollFrame.current != null) return;
+              leaderboardScrollFrame.current = requestAnimationFrame(() => {
+                leaderboardScrollFrame.current = null;
+                const next = (leaderboardScrollRef.current?.scrollTop ?? 0) > 0;
+                if (next === leaderboardScrolledRef.current) return;
+                leaderboardScrolledRef.current = next;
+                setLeaderboardScrolled(next);
+              });
+            }}
+            onScrollTop={() => leaderboardScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })}
+            onLocateSelf={() => localLeaderboardRow.current?.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+              inline: "nearest",
+            })}
+          />
         )}
       </main>
       <input

@@ -520,33 +520,30 @@ function championshipWinCount(records: ChampionshipRecord[], id: number) {
   }
   return won;
 }
-function placementCounts(records: ChampionshipRecord[], id: number) {
-  // Same "played" filter as championshipWinCount: simulated-only runs don't count.
-  // Standings only ever record the top 8 finishers, so `top8` is simply how many
-  // times this player's id shows up in any record's standings at all.
-  const counts = { champion: 0, runnerUp: 0, third: 0, top8: 0 };
+type ChampionshipTitle = "champion" | "runner-up" | "third";
+function championshipTitle(records: ChampionshipRecord[], id: number): ChampionshipTitle | null {
+  let bestPlace = Number.POSITIVE_INFINITY;
   for (const record of records) {
     if (record.mode !== "played") continue;
     const place = record.standings.find((standing) => standing.player.id === id)?.place;
-    if (!place) continue;
-    counts.top8 += 1;
-    if (place === 1) counts.champion += 1;
-    else if (place === 2) counts.runnerUp += 1;
-    else if (place === 3) counts.third += 1;
+    if (place && place < bestPlace) bestPlace = place;
   }
-  return counts;
+  if (bestPlace === 1) return "champion";
+  if (bestPlace === 2) return "runner-up";
+  if (bestPlace === 3) return "third";
+  return null;
 }
-function placementSummary(counts: { champion: number; runnerUp: number; third: number; top8: number }) {
-  if (!counts.top8) return null;
-  // Podium finishes read as one run-together group ("1冠2亚3季"); the overall
-  // top-8 tally is spelled out in full ("3八强") rather than the bare "3强",
-  // which read ambiguously next to the single-character 冠/亚/季 labels.
-  const podium = [
-    counts.champion ? `${counts.champion}冠` : "",
-    counts.runnerUp ? `${counts.runnerUp}亚` : "",
-    counts.third ? `${counts.third}季` : "",
+type HistoricalHonors = {
+  champion: number;
+  runnerUp: number;
+  top8: number;
+};
+function historicalHonorsLabel(honors: HistoricalHonors) {
+  return [
+    honors.champion ? `${honors.champion}冠` : "",
+    honors.runnerUp ? `${honors.runnerUp}亚` : "",
+    honors.top8 ? `${honors.top8}八强` : "",
   ].join("");
-  return [podium, `${counts.top8}八强`].filter(Boolean).join(" ");
 }
 function startNextTournamentRound(save: Save, localQualified: Character[]): Save {
   const tournament = save.tournament;
@@ -634,22 +631,30 @@ const OPTIMIZED_AVATAR_IDS = new Set([
   185, 320,
 ]);
 
-function Avatar({ p, playerAvatar }: { p: Character; playerAvatar?: string | null }) {
+function Avatar({
+  p,
+  playerAvatar,
+  className = "",
+}: {
+  p: Character;
+  playerAvatar?: string | null;
+  className?: string;
+}) {
   const avatarSrc = OPTIMIZED_AVATAR_IDS.has(p.id)
     ? `/avatars-webp/${String(p.id).padStart(3, "0")}.webp`
     : `/avatars/${p.id % 300}.svg`;
 
   return p.id === -1 ? (
-    <div className="hero-avatar">
+    <div className={`hero-avatar ${className}`.trim()}>
       {playerAvatar ? <img src={playerAvatar} alt={`${p.name}头像`} /> : "♠"}
     </div>
   ) : (
-    <img src={avatarSrc} alt={p.name} loading="lazy" />
+    <img className={className || undefined} src={avatarSrc} alt={p.name} loading="lazy" />
   );
 }
 type LeaderboardEntry = PlayerCareerStats & {
   player: Character;
-  placement: { champion: number; runnerUp: number; third: number; top8: number };
+  honors: HistoricalHonors;
 };
 // App() is one large component, so any unrelated state change anywhere (opening
 // a modal, toggling the header's "更多" menu, the table timer ticking once a
@@ -689,7 +694,7 @@ const LeaderboardRows = memo(function LeaderboardRows({
           <strong className="leaderboard-points">{(row.pointsTenths / 10).toFixed(1)}</strong>
           <span className="leaderboard-best">
             <strong>{bestResultLabel(row.bestPlace)}</strong>
-            {placementSummary(row.placement) ? <small>{placementSummary(row.placement)}</small> : null}
+            {historicalHonorsLabel(row.honors) ? <small>{historicalHonorsLabel(row.honors)}</small> : null}
           </span>
           <span>{row.matches}</span>
           <span>{row.advances}</span>
@@ -1919,24 +1924,21 @@ export default function App() {
   // on every render of this component was the source of the scroll stutter on the
   // points page: any unrelated state change anywhere in the app (timers, toasts,
   // animations) re-ran this synchronously and re-rendered all 63 rows. Memoized
-  // so it only recomputes when the underlying data actually changes, and the
-  // per-player placement lookup is now a single pass over records instead of one
-  // records-scan per player.
+  // so it only recomputes when the underlying data actually changes.
   const localPlayerName = data.playerProfile.name.trim() || "本地玩家";
   const leaderboard = useMemo(() => {
     const localPlayer: Character = { ...hero, name: localPlayerName };
     const championshipBonuses = championshipCareerBonuses(data.tournamentRecords);
-    const placementById = new Map<number, { champion: number; runnerUp: number; third: number; top8: number }>();
+    const honorsById = new Map<number, HistoricalHonors>();
     for (const record of data.tournamentRecords) {
       if (record.mode !== "played") continue;
       for (const standing of record.standings) {
-        if (!standing.place) continue;
-        const counts = placementById.get(standing.player.id) || { champion: 0, runnerUp: 0, third: 0, top8: 0 };
-        counts.top8 += 1;
-        if (standing.place === 1) counts.champion += 1;
-        else if (standing.place === 2) counts.runnerUp += 1;
-        else if (standing.place === 3) counts.third += 1;
-        placementById.set(standing.player.id, counts);
+        if (!standing.place || standing.place > 8) continue;
+        const honors = honorsById.get(standing.player.id) || { champion: 0, runnerUp: 0, top8: 0 };
+        if (standing.place === 1) honors.champion += 1;
+        else if (standing.place === 2) honors.runnerUp += 1;
+        else honors.top8 += 1;
+        honorsById.set(standing.player.id, honors);
       }
     }
     const profiles = new Map<number, Character>();
@@ -1955,7 +1957,7 @@ export default function App() {
               ? Math.min(stats.bestPlace, championship.bestPlace)
               : championship.bestPlace
             : stats.bestPlace,
-          placement: placementById.get(player.id) || { champion: 0, runnerUp: 0, third: 0, top8: 0 },
+          honors: honorsById.get(player.id) || { champion: 0, runnerUp: 0, top8: 0 },
         };
       })
       .sort((a, b) =>
@@ -2469,6 +2471,8 @@ export default function App() {
                 const actionText = actionAmount
                   ? `${actionAmount[1] === "加注" ? "加注至" : "跟注"} ${Number(actionAmount[2].replaceAll(",", "")).toLocaleString()}`
                   : p.last;
+                const seatTitle = championshipTitle(data.tournamentRecords, p.profile.id);
+                const seatTitleLabel = seatTitle === "champion" ? "冠军" : seatTitle === "runner-up" ? "亚军" : "季军";
                 return (
                   <div
                     key={p.profile.id}
@@ -2517,10 +2521,14 @@ export default function App() {
                       </span>
                     ) : null}
                     <div className="seat-info">
-                      <Avatar p={p.profile} playerAvatar={data.playerProfile.avatar} />
-                      {championshipWinCount(data.tournamentRecords, p.profile.id) > 0 ? (
-                        <i className="seat-champion-badge" aria-label="冠军" title="冠军">
-                          <Crown size={9} />
+                      <Avatar
+                        p={p.profile}
+                        playerAvatar={data.playerProfile.avatar}
+                        className={seatTitle ? `seat-avatar-title seat-avatar-${seatTitle}` : undefined}
+                      />
+                      {seatTitle ? (
+                        <i className={`seat-title-badge seat-title-${seatTitle}`} aria-label={seatTitleLabel} title={seatTitleLabel}>
+                          {seatTitle === "champion" ? <Crown size={9} /> : <Medal size={9} />}
                         </i>
                       ) : null}
                       <div>

@@ -1127,7 +1127,7 @@ footer>span:last-child {
   text-align: left;
 }
 
-.seat-champion-badge {
+.seat-title-badge {
   position: absolute;
   left: 3px;
   top: 3px;
@@ -1140,9 +1140,45 @@ footer>span:last-child {
   background: radial-gradient(circle at 35% 30%, #f7e3a0, #c9a052 65%, #8a6d3a);
   border: 1px solid #f0dca066;
   color: #2a2313;
-  box-shadow: 0 2px 6px #000a;
+  box-shadow: 0 2px 6px #0008;
   z-index: 2;
   pointer-events: none;
+}
+
+.seat-title-champion {
+  background: radial-gradient(circle at 35% 30%, #f7e3a0, #c9a052 65%, #8a6d3a);
+  color: #2a2313;
+}
+
+.seat-title-runner-up {
+  background: radial-gradient(circle at 35% 30%, #eef2ec, #aeb9b0 65%, #6d7a72);
+  color: #253029;
+}
+
+.seat-title-third {
+  background: radial-gradient(circle at 35% 30%, #edc6a5, #b77b55 65%, #744832);
+  color: #332016;
+}
+
+.seat-info img.seat-avatar-title,
+.seat-info .hero-avatar.seat-avatar-title {
+  border: 2px solid #d6b55f;
+  box-shadow: 0 0 0 1px #0b100d, 0 2px 8px #0008;
+}
+
+.seat-info img.seat-avatar-champion,
+.seat-info .hero-avatar.seat-avatar-champion {
+  border-color: #d6b55f;
+}
+
+.seat-info img.seat-avatar-runner-up,
+.seat-info .hero-avatar.seat-avatar-runner-up {
+  border-color: #b8c2ba;
+}
+
+.seat-info img.seat-avatar-third,
+.seat-info .hero-avatar.seat-avatar-third {
+  border-color: #b8845d;
 }
 
 .seat-info img,

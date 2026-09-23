@@ -384,7 +384,30 @@ function repairLegacyDebugGame(value: unknown): unknown {
   return repaired;
 }
 export function parseSave(value: unknown): Save {
-  const data=schema.parse(repairLegacyDebugGame(value));
+  const normalized = repairLegacyDebugGame(value);
+  const parsed = schema.safeParse(normalized);
+  let data: Save;
+  if (parsed.success) {
+    data = parsed.data;
+  } else if (normalized && typeof normalized === "object" && !Array.isArray(normalized)) {
+    const unsafeActiveState = parsed.error.issues.some(
+      (issue) =>
+        issue.message === "重复牌张" ||
+        issue.path.some((part) => ["chips", "bet", "total", "start"].includes(String(part))),
+    );
+    if (unsafeActiveState) throw parsed.error;
+    const recoverable: Record<string, unknown> = {
+      ...(normalized as Record<string, unknown>),
+      game: null,
+      tournament: null,
+    };
+    delete recoverable.pausedTournament;
+    const fallback = schema.safeParse(recoverable);
+    if (!fallback.success) throw parsed.error;
+    data = fallback.data;
+  } else {
+    throw parsed.error;
+  }
   if (!data.playerStats["-1"] && data.stats.wins > 0) {
     data.playerStats["-1"] = {
       matches: 0,

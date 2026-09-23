@@ -39,6 +39,18 @@ test("a debug hand can be saved and imported unchanged", () => {
   };
   assert.deepEqual(parseSave(JSON.parse(JSON.stringify(legacySave))), save);
 });
+test("an unrecoverable active game does not block the rest of a save", () => {
+  const game = newGame([hero, { ...hero, id: 0 }]);
+  const corrupted = {
+    ...blank,
+    game: { ...game, deck: [] },
+    stats: { ...blank.stats, hands: 3 },
+  };
+  const recovered = parseSave(JSON.parse(JSON.stringify(corrupted)));
+  assert.equal(recovered.game, null);
+  assert.equal(recovered.tournament, null);
+  assert.equal(recovered.stats.hands, 3);
+});
 test("a suspended championship keeps its table and current simulation progress", () => {
   const game = newGame([hero, { ...hero, id: 7 }]);
   const tournament = {

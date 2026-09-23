@@ -920,7 +920,8 @@ export default function App() {
   // reading up-to-date page/paused/tournament state at click time.
   const openPlayerProfileState = useRef({ page, paused, t });
   const tableEliminated = !!t?.out;
-  const tableTimerRunning = page === "table" && !tableEliminated && pageVisible;
+  const tableFinished = !!t?.complete;
+  const tableTimerRunning = page === "table" && !tableEliminated && !tableFinished && pageVisible;
   const tableTimerState = useRef(loadTableTimer());
   useEffect(() => {
     if (page !== "table") {
@@ -950,7 +951,7 @@ export default function App() {
     saveTableTimer(tableTimerState.current);
     setTableSeconds(0);
   };
-  const prevTableEliminated = useRef(tableEliminated);
+  const prevTableEnded = useRef(tableEliminated || tableFinished);
   useEffect(() => {
     const handleVisibility = () =>
       setPageVisible(document.visibilityState === "visible");
@@ -966,14 +967,13 @@ export default function App() {
   useEffect(() => {
     setMoreMenuOpen(false);
   }, [page]);
-  // Only elimination resets the clock here; a fresh new game/tournament resets it
-  // explicitly in start() instead. That way merely returning to an in-progress
-  // table (e.g. after a page refresh, which always lands back on the lobby first)
-  // resumes the accumulated time rather than zeroing it.
+  // Only elimination or completion of the whole tournament resets the clock.
+  // Starting another hand or a new table keeps the accumulated time.
   useEffect(() => {
-    if (tableEliminated && !prevTableEliminated.current) resetTableTimer();
-    prevTableEliminated.current = tableEliminated;
-  }, [tableEliminated]);
+    const tableEnded = tableEliminated || tableFinished;
+    if (tableEnded && !prevTableEnded.current) resetTableTimer();
+    prevTableEnded.current = tableEnded;
+  }, [tableEliminated, tableFinished]);
   useEffect(() => {
     const st = tableTimerState.current;
     if (tableTimerRunning) {
@@ -1455,7 +1455,6 @@ export default function App() {
         },
       };
     });
-    resetTableTimer();
     setPaused(false);
     setPage("table");
     setModal(null);

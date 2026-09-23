@@ -36,6 +36,7 @@ export type Game = {
   winners: number[];
 };
 export type Move = { type: "fold" | "call" | "raise"; amount?: number };
+export type StartHandOptions = { debugFast?: boolean };
 export const hero: Character = {
   id: -1,
   name: "你",
@@ -143,7 +144,12 @@ function next(g: Game, from: number, can: (p: Player) => boolean) {
   }
   return -1;
 }
-export function newGame(profiles: Character[], bb = 100, stacks?: number[]): Game {
+export function newGame(
+  profiles: Character[],
+  bb = 100,
+  stacks?: number[],
+  options: StartHandOptions = {},
+): Game {
   return startHand({
     players: profiles.map((profile, index) => ({
       profile,
@@ -170,9 +176,13 @@ export function newGame(profiles: Character[], bb = 100, stacks?: number[]): Gam
     log: [],
     result: "",
     winners: [],
-  });
+  }, bb, options);
 }
-export function startHand(old: Game, bb = old.bb): Game {
+export function startHand(
+  old: Game,
+  bb = old.bb,
+  options: StartHandOptions = {},
+): Game {
   const g = structuredClone(old);
   g.deck = shuffled(Array.from({ length: 52 }, (_, i) => i));
   g.board = [];
@@ -222,6 +232,47 @@ export function startHand(old: Game, bb = old.bb): Game {
   g.turn = big;
   g.log = [`第 ${g.hand} 手 · 盲注 ${bb / 2} / ${bb}`, ...g.log].slice(0, 60);
   advance(g);
+  return options.debugFast ? finishDebugHand(g) : g;
+}
+
+function finishDebugHand(g: Game): Game {
+  if (g.done) return g;
+  const heroIndex = g.players.findIndex((player) => player.profile.id === hero.id);
+  if (heroIndex < 0 || g.players.filter((player) => player.chips > 0).length < 2) return g;
+
+  const heroCards = [8, 9];
+  const board = [10, 11, 12, 0, 1];
+  const reserved = new Set([...heroCards, ...board]);
+  const remaining = Array.from({ length: 52 }, (_, card) => card).filter(
+    (card) => !reserved.has(card),
+  );
+
+  g.players.forEach((player, index) => {
+    if (player.chips <= 0) {
+      player.cards = [];
+      player.folded = true;
+      player.last = "已出局";
+      return;
+    }
+    player.folded = false;
+    player.cards = index === heroIndex
+      ? heroCards
+      : [remaining.shift()!, remaining.shift()!];
+    const allIn = player.chips;
+    player.chips = 0;
+    player.bet += allIn;
+    player.total += allIn;
+    player.acted = true;
+    player.raiseAt = g.current;
+    player.last = "全下";
+  });
+  g.deck = remaining;
+  g.board = board;
+  g.street = 3;
+  g.current = Math.max(...g.players.map((player) => player.bet));
+  g.turn = heroIndex;
+  g.log = ["调试模式 · 你拿到皇家同花顺 · 全员全下", ...g.log].slice(0, 60);
+  settle(g);
   return g;
 }
 export function legal(g: Game) {

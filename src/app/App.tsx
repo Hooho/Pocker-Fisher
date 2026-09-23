@@ -566,7 +566,12 @@ function startNextTournamentRound(save: Save, localQualified: Character[]): Save
       player.id === -1 ? heroStack : knownStacks[String(player.id)] ?? 10000,
     ]),
   );
-  const game = newGame(table, 100, table.map((p) => fieldStacks[String(p.id)]));
+  const game = newGame(
+    table,
+    100,
+    table.map((p) => fieldStacks[String(p.id)]),
+    { debugFast: save.settings.debugFast },
+  );
   const tableIds = new Set(table.map((p) => p.id));
   const background = round < 3
     ? { remaining: field.filter((p) => !tableIds.has(p.id)), qualified: [], done: false }
@@ -1412,7 +1417,9 @@ export default function App() {
     const game = newGame([
       userPlayer,
       ...roster.slice(0, newMode === "cash" ? seatCount - 1 : 7),
-    ]);
+    ], 100, undefined, {
+      debugFast: newMode === "tournament" && data.settings.debugFast,
+    });
     const tournament: Tournament | null =
       newMode === "tournament"
         ? {
@@ -1478,6 +1485,7 @@ export default function App() {
         t
           ? Math.min(102400, 100 * 2 ** Math.floor(g.hand / (t?.pace || 10)))
           : 100,
+        { debugFast: Boolean(t && data.settings.debugFast) },
       ),
     );
   };
@@ -1543,7 +1551,11 @@ export default function App() {
           field: advancingPlayers,
           results: [...d.tournament.results, `${roundLabel(t.round)} · 晋级`],
         } : null,
-        game: startHand(g, Math.min(102400, 100 * 2 ** Math.floor(g.hand / t.pace))),
+        game: startHand(
+          g,
+          Math.min(102400, 100 * 2 ** Math.floor(g.hand / t.pace)),
+          { debugFast: data.settings.debugFast },
+        ),
       }, advancingPlayers, counts[round] || advancingPlayers.length));
       return;
     }
@@ -1575,7 +1587,12 @@ export default function App() {
             playoff: { original, locked, slots: q.slots },
           }
           : null,
-        game: newGame([userPlayer, ...q.tied.filter((p) => p.id !== -1)]),
+        game: newGame(
+          [userPlayer, ...q.tied.filter((p) => p.id !== -1)],
+          100,
+          undefined,
+          { debugFast: data.settings.debugFast },
+        ),
       }));
       setToast("晋级边界出现同筹码平局，进入附加赛");
       return;
@@ -1627,6 +1644,23 @@ export default function App() {
         };
       });
     };
+    if (data.settings.debugFast) {
+      const slots = t.playoff?.slots ?? 4;
+      const debugQualified = [
+        userPlayer,
+        ...g.players.map((player) => player.profile),
+      ].filter((player, index, players) =>
+        players.findIndex((other) => other.id === player.id) === index,
+      ).slice(0, slots);
+      const debugStacks = Object.fromEntries(
+        debugQualified.map((player) => [
+          String(player.id),
+          currentGameStacks[String(player.id)] || 10000,
+        ]),
+      );
+      queueLocalAdvancers(debugQualified, debugStacks);
+      return;
+    }
     if (q.tied.length) {
       const worker = new Worker(new URL("../workers/tournament.worker.ts", import.meta.url), { type: "module" });
       worker.onmessage = (event: MessageEvent<{
@@ -1649,6 +1683,36 @@ export default function App() {
   useEffect(() => {
     if (page === "table" && !paused && g?.done && t && !t.out && !t.complete && g.players[0]?.chips === 0) advanceTournament();
   }, [g?.done, g?.hand, g?.players[0]?.chips, t?.round, t?.out, t?.complete, t?.background?.done, page, paused]);
+  useEffect(() => {
+    if (
+      !ready ||
+      !data.settings.debugFast ||
+      !g?.done ||
+      !t ||
+      t.out ||
+      t.complete ||
+      t.autoSimulating ||
+      t.paused ||
+      busy ||
+      paused ||
+      page !== "table"
+    ) return;
+    const timer = window.setTimeout(() => nextHand(), 180);
+    return () => window.clearTimeout(timer);
+  }, [
+    ready,
+    data.settings.debugFast,
+    g?.done,
+    g?.hand,
+    t?.out,
+    t?.complete,
+    t?.autoSimulating,
+    t?.paused,
+    t?.round,
+    busy,
+    paused,
+    page,
+  ]);
   const applyImportedSave = (nextSave: Save, overwroteExisting: boolean) => {
     generation.current++;
     setData(nextSave);
@@ -2015,6 +2079,19 @@ export default function App() {
             <option value="all">AI 增强 · 每次行动</option>
           </select>
         </label>
+        <label>
+          调试快速赛
+          <select
+            value={data.settings.debugFast ? "on" : "off"}
+            onChange={(e) => updateSettings({ debugFast: e.target.value === "on" })}
+          >
+            <option value="off">关闭</option>
+            <option value="on">开启 · 皇家同花顺 / 全员全下</option>
+          </select>
+        </label>
+        <div className="notice settings-wide">
+          调试模式只对新冠军赛生效：本地玩家固定拿皇家同花顺，当前牌桌选手一次性全下，并自动推进比赛。
+        </div>
         <div className="settings-wide provider-picker">
           <div className="provider-picker-heading">
             <span>快速配置模型</span>

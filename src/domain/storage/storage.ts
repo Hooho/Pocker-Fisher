@@ -148,6 +148,7 @@ export type Settings = {
   difficulty: number;
   speed: number;
   mode: "local" | "key" | "all";
+  debugFast: boolean;
   endpoint: string;
   model: string;
   sound: boolean;
@@ -158,6 +159,7 @@ export const defaults: Settings = {
   difficulty: 2,
   speed: 1000,
   mode: "local",
+  debugFast: false,
   endpoint: "",
   model: "",
   sound: true,
@@ -247,6 +249,7 @@ const schema = z.object({
     difficulty: z.number().int().min(1).max(5),
     speed: z.number().min(100).max(5000),
     mode: z.enum(["local", "key", "all"]),
+    debugFast: z.boolean().default(false),
     endpoint: z.string().max(1000),
     model: z.string().max(200),
     sound: z.boolean(),

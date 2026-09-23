@@ -53,7 +53,8 @@ test("debug mode gives the local player a royal flush and settles an all-in hand
   assert.equal(evaluate([...g.players[0].cards, ...g.board]).name, "皇家同花顺");
   assert.deepEqual(g.winners, [0]);
   assert.equal(g.deck.length + g.board.length + g.players.flatMap((player) => player.cards).length, 49);
-  assert.ok(g.players.slice(1).every((player) => player.chips === 0));
+  assert.equal(g.players.slice(1).filter((player) => player.chips === 0).length, 1);
+  assert.ok(g.players.slice(1).filter((player) => player.chips > 0).every((player) => player.folded));
 });
 test("fold awards pot and preserves chips", () => {
   let g = newGame(profiles.slice(0, 2));

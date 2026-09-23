@@ -1515,7 +1515,7 @@ export default function App() {
         const finalEliminated = [...(t.finalEliminated || [])];
         const recordedIds = new Set(finalEliminated.map((player) => player.id));
         g.players
-          .filter((player) => player.start > 0 && player.chips === 0 && !recordedIds.has(player.profile.id))
+          .filter((player) => player.chips === 0 && !recordedIds.has(player.profile.id))
           .forEach((player) => {
             finalEliminated.push(player.profile);
             recordedIds.add(player.profile.id);
@@ -2095,7 +2095,7 @@ export default function App() {
             onChange={(e) => updateSettings({ debugFast: e.target.value === "on" })}
           >
             <option value="off">关闭</option>
-            <option value="on">开启 · 皇家同花顺 / 全员全下</option>
+            <option value="on">开启 · 皇家同花顺 / 一名选手全下</option>
           </select>
         </label>
         <div className="notice settings-wide">

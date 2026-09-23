@@ -239,6 +239,10 @@ function finishDebugHand(g: Game): Game {
   if (g.done) return g;
   const heroIndex = g.players.findIndex((player) => player.profile.id === hero.id);
   if (heroIndex < 0 || g.players.filter((player) => player.chips > 0).length < 2) return g;
+  const allInIndex = g.players.findIndex(
+    (player, index) => index !== heroIndex && player.chips > 0,
+  );
+  if (allInIndex < 0) return g;
 
   const heroCards = [8, 9];
   const board = [10, 11, 12, 0, 1];
@@ -254,18 +258,34 @@ function finishDebugHand(g: Game): Game {
       player.last = "已出局";
       return;
     }
-    player.folded = false;
     player.cards = index === heroIndex
       ? heroCards
       : [remaining.shift()!, remaining.shift()!];
-    const allIn = player.chips;
-    player.chips = 0;
-    player.bet += allIn;
-    player.total += allIn;
-    player.acted = true;
-    player.raiseAt = g.current;
-    player.last = "全下";
+    if (index !== heroIndex && index !== allInIndex) {
+      player.folded = true;
+      player.acted = true;
+      player.last = "弃牌";
+    }
   });
+  const allInPlayer = g.players[allInIndex];
+  const allIn = allInPlayer.chips;
+  allInPlayer.folded = false;
+  allInPlayer.chips = 0;
+  allInPlayer.bet += allIn;
+  allInPlayer.total += allIn;
+  allInPlayer.acted = true;
+  allInPlayer.raiseAt = g.current;
+  allInPlayer.last = "全下";
+  const heroPlayer = g.players[heroIndex];
+  const call = Math.max(0, allInPlayer.total - heroPlayer.bet);
+  const heroPay = Math.min(heroPlayer.chips, call);
+  heroPlayer.chips -= heroPay;
+  heroPlayer.bet += heroPay;
+  heroPlayer.total += heroPay;
+  heroPlayer.folded = false;
+  heroPlayer.acted = true;
+  heroPlayer.raiseAt = g.current;
+  heroPlayer.last = heroPlayer.chips === 0 ? "全下" : `跟注 ${heroPay}`;
   g.board = board;
   g.street = 3;
   const holeCards = g.players.reduce((count, player) => count + player.cards.length, 0);
@@ -273,7 +293,7 @@ function finishDebugHand(g: Game): Game {
   g.deck = remaining.slice(0, deckSize);
   g.current = Math.max(...g.players.map((player) => player.bet));
   g.turn = heroIndex;
-  g.log = ["调试模式 · 你拿到皇家同花顺 · 全员全下", ...g.log].slice(0, 60);
+  g.log = ["调试模式 · 你拿到皇家同花顺 · 一名选手全下", ...g.log].slice(0, 60);
   settle(g);
   return g;
 }

@@ -1069,6 +1069,32 @@ footer>span:last-child {
   font-size: 24px;
 }
 
+.board-cards .board-card-deal {
+  animation: deal 0.3s ease-out both;
+}
+
+.board-cards .board-card-reveal {
+  transform-style: preserve-3d;
+  animation: board-card-reveal 0.52s cubic-bezier(.2, .75, .25, 1) both;
+}
+
+@keyframes board-card-reveal {
+  0% {
+    opacity: 0.7;
+    transform: perspective(420px) rotateY(90deg) scale(0.94);
+  }
+
+  55% {
+    opacity: 1;
+    transform: perspective(420px) rotateY(-8deg) scale(1.02);
+  }
+
+  100% {
+    opacity: 1;
+    transform: perspective(420px) rotateY(0) scale(1);
+  }
+}
+
 .card.small {
   width: 35px;
   height: 48px;

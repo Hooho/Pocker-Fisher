@@ -629,17 +629,19 @@ function Card({
   back = false,
   small = false,
   highlight = false,
+  className = "",
   style,
 }: {
   value?: number;
   back?: boolean;
   small?: boolean;
   highlight?: boolean;
+  className?: string;
   style?: CSSProperties;
 }) {
   return (
     <div
-      className={`card ${small ? "small" : ""} ${highlight ? "highlight" : ""} ${back ? "back" : ""} ${value !== undefined && [1, 2].includes(suit(value)) ? "red" : ""}`}
+      className={`card ${className} ${small ? "small" : ""} ${highlight ? "highlight" : ""} ${back ? "back" : ""} ${value !== undefined && [1, 2].includes(suit(value)) ? "red" : ""}`}
       style={style}
     >
       {back ? (
@@ -2473,11 +2475,9 @@ export default function App() {
                     <Card
                       key={`${g.hand}-${i}-${g.board[i]}`}
                       value={g.board[i]}
-                      style={
-                        g.board[i] !== undefined
-                          ? { animationDelay: `${i * 90}ms` }
-                          : undefined
-                      }
+                      back={g.board[i] === undefined}
+                      className={g.board[i] === undefined ? "board-card-deal" : "board-card-reveal"}
+                      style={{ animationDelay: g.board[i] === undefined ? `${i * 90}ms` : "0ms" }}
                       highlight={
                         (g.done &&
                           g.winners.some((w) =>

@@ -148,6 +148,8 @@ export default function Table3D({
       }
     }
     scene.add(chips);
+    const potCenter = new THREE.Vector3(0, 0, 0.78);
+    chips.position.copy(potCenter);
     const chipGroups = [chips];
     const initialFlights: Array<{
       group: THREE.Group;
@@ -301,7 +303,7 @@ export default function Table3D({
         chips.visible = false;
         chips.scale.y = Math.max(0.7, Math.min(1.5, Math.log2(1 + pot / 100) / 3.4));
         totals.forEach((amount, index) => {
-          if (amount > 0) queueInitialFlight(playerPosition(index, players), new THREE.Vector3(0, 0, 0));
+          if (amount > 0) queueInitialFlight(playerPosition(index, players), potCenter.clone());
         });
         renderer.render(scene, camera);
         return;
@@ -311,7 +313,7 @@ export default function Table3D({
         if (amount > (previous[index] || 0)) {
           const from = playerPosition(index, players);
           from.y = 0.22;
-          queueActionFlight(from, new THREE.Vector3(0, 0.22, 0));
+          queueActionFlight(from, potCenter.clone());
         }
       });
 
@@ -321,7 +323,7 @@ export default function Table3D({
       const groupCount = finished ? winners.length : 1;
       while (chipGroups.length < groupCount) {
         const copy = chips.clone(true);
-        copy.position.set(0, 0, 0);
+        copy.position.copy(potCenter);
         copy.scale.set(1, 1, 1);
         copy.visible = true;
         scene.add(copy);
@@ -344,7 +346,7 @@ export default function Table3D({
             Math.sin(angle) * 2.05,
           );
         } else {
-          destinations[index] = new THREE.Vector3(0, 0, 0);
+          destinations[index] = potCenter.clone();
         }
       });
       if (groupCount === 0) {

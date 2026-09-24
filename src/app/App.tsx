@@ -747,22 +747,65 @@ const LeaderboardRows = memo(function LeaderboardRows({
 function Fireworks({ active }: { active: boolean }) {
   const bursts = useMemo(() => {
     if (!active) return [];
-    const colors = ["#f4d67f", "#ff7a6b", "#6bc8ff", "#7ee787", "#ffb86b", "#d68bff", "#ff9ecf"];
-    return Array.from({ length: 8 }, (_, i) => {
-      const particles = 22 + Math.floor(Math.random() * 10);
+    const colors = ["#f4d67f", "#ff7a6b", "#6bc8ff", "#7ee787", "#ffb86b", "#d68bff", "#ff9ecf", "#ffffff"];
+    return Array.from({ length: 22 }, (_, i) => {
+      const particles = 30 + Math.floor(Math.random() * 16);
       return {
         id: i,
-        left: 12 + Math.random() * 76,
-        top: 8 + Math.random() * 50,
-        delay: i * 0.5 + Math.random() * 0.25,
+        left: 7 + Math.random() * 86,
+        top: 7 + Math.random() * 54,
+        delay: i * 0.3 + Math.random() * 0.25,
         color: colors[i % colors.length],
         particles,
+        distance: 170 + Math.random() * 170,
       };
     });
+  }, [active]);
+  const confetti = useMemo(() => {
+    if (!active) return [];
+    const colors = ["#f4d67f", "#ff7a6b", "#6bc8ff", "#7ee787", "#ffb86b", "#d68bff", "#ff9ecf", "#f7f0d0"];
+    return Array.from({ length: 220 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 100,
+      delay: Math.random() * 1.8,
+      duration: 5.5 + Math.random() * 2.6,
+      drift: Math.round((Math.random() - 0.5) * 220),
+      spin: `${Math.round(360 + Math.random() * 720)}deg`,
+      width: 6 + Math.round(Math.random() * 7),
+      height: 10 + Math.round(Math.random() * 11),
+      color: colors[i % colors.length],
+    }));
   }, [active]);
   if (!active) return null;
   return (
     <div className="fireworks-overlay" aria-hidden="true">
+      <div className="champion-celebration-flash" />
+      <div className="champion-celebration-copy">
+        <div className="champion-plaque">
+          <span className="champion-plaque-kicker">CHAMPIONSHIP WON</span>
+          <strong>恭喜您 <em>赢得总冠军</em></strong>
+          <span className="champion-plaque-rule">✦　✦　✦</span>
+          <small>击败全部对手 · 登上冠军宝座</small>
+        </div>
+      </div>
+      <div className="fireworks-confetti">
+        {confetti.map((piece) => (
+          <i
+            className={piece.id % 5 === 0 ? "firework-confetti-piece confetti-round" : "firework-confetti-piece"}
+            key={piece.id}
+            style={{
+              left: `${piece.left}%`,
+              width: `${piece.width}px`,
+              height: `${piece.height}px`,
+              animationDelay: `${piece.delay}s`,
+              animationDuration: `${piece.duration}s`,
+              "--confetti-color": piece.color,
+              "--confetti-drift": `${piece.drift}px`,
+              "--confetti-spin": piece.spin,
+            } as CSSProperties}
+          />
+        ))}
+      </div>
       {bursts.map((burst) => (
         <div
           key={burst.id}
@@ -781,6 +824,7 @@ function Fireworks({ active }: { active: boolean }) {
                 {
                   "--angle": `${(360 / burst.particles) * p}deg`,
                   "--color": burst.color,
+                  "--burst-distance": `${burst.distance}px`,
                   animationDelay: `${burst.delay}s`,
                 } as CSSProperties
               }
@@ -955,6 +999,16 @@ export default function App() {
   const eliminatedWorker = useRef<Worker | null>(null);
   const g = data.game;
   const t = data.tournament;
+  const championshipWon = Boolean(
+    t &&
+    !t.complete &&
+    g &&
+    g.done &&
+    t.round >= counts.length - 1 &&
+    g.players.filter((player) => player.chips > 0).length === 1 &&
+    g.players[0]?.profile.id === -1 &&
+    g.players[0].chips > 0,
+  );
   // Lets openPlayerProfile stay a stable useCallback (see below) while still
   // reading up-to-date page/paused/tournament state at click time.
   const openPlayerProfileState = useRef({ page, paused, t });
@@ -1036,30 +1090,27 @@ export default function App() {
   }, [tableTimerRunning]);
   const [showFireworks, setShowFireworks] = useState(false);
   const fireworksTimer = useRef<number | null>(null);
-  const prevTournamentRound = useRef(t?.round);
-  const localPlayerInTournament = t?.field.some((player) => player.id === -1) ?? false;
-  const triggerFireworks = (durationMs: number) => {
+  const championCelebrationInitialized = useRef(false);
+  const previousChampionReady = useRef(false);
+  const triggerFireworks = useCallback((durationMs: number) => {
     setShowFireworks(true);
     if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
     fireworksTimer.current = window.setTimeout(() => setShowFireworks(false), durationMs);
-  };
-  // Watch the resulting round state so synchronous advancement, background-table
-  // completion, and tie-breaks share one trigger. Completion by itself is not an
-  // advancement, and should not launch fireworks.
+  }, []);
+  // Trigger only when the real player wins the final hand. Advancing rounds or
+  // an automatically simulated championship should stay visually quiet.
   useEffect(() => {
-    const prevRound = prevTournamentRound.current;
-    if (
-      t &&
-      !t.out &&
-      !t.complete &&
-      localPlayerInTournament &&
-      typeof prevRound === "number" &&
-      t.round > prevRound
-    ) {
-      triggerFireworks(5000);
+    if (!ready) return;
+    if (!championCelebrationInitialized.current) {
+      championCelebrationInitialized.current = true;
+      previousChampionReady.current = championshipWon;
+      return;
     }
-    prevTournamentRound.current = t?.round;
-  }, [t?.round, t?.out, t?.complete, localPlayerInTournament]);
+    if (championshipWon && !previousChampionReady.current) {
+      triggerFireworks(9500);
+    }
+    previousChampionReady.current = championshipWon;
+  }, [championshipWon, ready, triggerFireworks]);
   useEffect(() => {
     return () => {
       if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
@@ -1954,11 +2005,6 @@ export default function App() {
     : 0;
   const waitingOnOtherTables = busy && !!t?.background && !t.background.done;
   const canAdvance = !!g?.done && alive <= threshold;
-  const championshipWon = !!t
-    && t.round >= counts.length - 1
-    && !!g?.done
-    && alive === 1
-    && g.players[0]?.chips > 0;
   const advancementTargetRound = t ? Math.min(t.round + 1, counts.length - 1) : 0;
   const advancementTargetLabel = t
     ? `${roundLabel(advancementTargetRound)} ${counts[advancementTargetRound]}强`

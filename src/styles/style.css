@@ -8648,28 +8648,165 @@ footer {
   z-index: 80;
   overflow: hidden;
   pointer-events: none;
+  isolation: isolate;
+  background: #060b08b8;
+}
+
+.champion-celebration-flash {
+  position: absolute;
+  inset: -20%;
+  z-index: 1;
+  background:
+    radial-gradient(circle at 50% 48%, #fff8d9 0%, #f7d87942 12%, transparent 42%),
+    radial-gradient(circle at 18% 22%, #ffb86b31, transparent 25%),
+    radial-gradient(circle at 83% 26%, #7acbff2b, transparent 24%);
+  animation: champion-screen-flash 1.5s ease-out both;
+}
+
+.champion-celebration-copy {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  text-align: center;
+  animation: champion-plaque-arrive .95s cubic-bezier(.13, .82, .18, 1.08) both;
+}
+
+.champion-plaque {
+  position: relative;
+  width: min(720px, calc(100vw - 36px));
+  padding: 28px 40px 24px;
+  box-sizing: border-box;
+  border: 3px solid #f6d77f;
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, #6c4a1f 0%, #d4a942 7%, #5a3b1a 12%, #1a2119 19%, #263123 50%, #171d18 81%, #5a3b1a 88%, #d4a942 94%, #6c4a1f 100%);
+  box-shadow:
+    0 0 0 2px #fff0a84f,
+    0 0 0 8px #4f351a,
+    0 0 0 11px #d0a33e,
+    0 0 0 14px #5b3b18,
+    0 0 42px 12px #f2ca625c,
+    inset 0 0 0 2px #fff1ac85,
+    inset 0 0 34px #000b;
+}
+
+.champion-plaque::before,
+.champion-plaque::after {
+  content: "✦";
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: #fff0a3;
+  font-size: 26px;
+  line-height: 1;
+  border: 2px solid #f5d477;
+  background: linear-gradient(145deg, #d2a641, #684419 72%);
+  box-shadow: 0 0 0 3px #573918, 0 0 18px #f4cf6e88;
+}
+
+.champion-plaque::before {
+  left: -29px;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.champion-plaque::after {
+  right: -29px;
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.champion-plaque-kicker {
+  display: block;
+  color: #f5d77d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 7px;
+  text-shadow: 0 0 12px #f6d77f;
+}
+
+.champion-plaque strong {
+  display: block;
+  margin-top: 9px;
+  color: #fff1b7;
+  font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+  font-size: clamp(30px, 6vw, 68px);
+  font-weight: 700;
+  letter-spacing: .12em;
+  line-height: 1.2;
+  text-shadow: 0 2px 0 #8d6425, 0 0 18px #f6d77f, 0 4px 22px #000;
+}
+
+.champion-plaque strong em {
+  color: #ffd75e;
+  font-style: normal;
+}
+
+.champion-plaque-rule {
+  display: block;
+  margin: 13px 0 8px;
+  color: #f4ce68;
+  font-size: 14px;
+  letter-spacing: 5px;
+  text-shadow: 0 0 12px #f4ce68;
+}
+
+.champion-plaque small {
+  display: block;
+  color: #e9dfbd;
+  font-size: 12px;
+  letter-spacing: 4px;
+}
+
+.fireworks-confetti {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+}
+
+.firework-confetti-piece {
+  position: absolute;
+  top: -12vh;
+  display: block;
+  border-radius: 2px;
+  background: var(--confetti-color, #f4d67f);
+  box-shadow: 0 0 8px #fff6, 0 2px 5px #0008;
+  opacity: 0;
+  animation: champion-confetti-fall var(--confetti-duration, 6s) linear var(--confetti-delay, 0s) both;
+  will-change: transform, opacity;
+}
+
+.firework-confetti-piece.confetti-round {
+  border-radius: 50%;
 }
 
 .firework-burst {
   position: absolute;
   width: 0;
   height: 0;
+  z-index: 8;
   opacity: 0;
-  animation: firework-burst-fade 1.9s ease-out forwards;
+  animation: firework-burst-fade 2.35s ease-out forwards;
 }
 
 .firework-particle {
   position: absolute;
   top: 0;
   left: 0;
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--color, #f4d67f);
-  box-shadow: 0 0 7px 1.5px var(--color, #f4d67f);
+  box-shadow: 0 0 10px 3px var(--color, #f4d67f);
   opacity: 0;
   transform: rotate(var(--angle)) translateX(0);
-  animation: firework-particle-fly 1.7s cubic-bezier(0.15, 0.6, 0.3, 1) forwards;
+  animation: firework-particle-fly 2.15s cubic-bezier(0.15, 0.6, 0.3, 1) forwards;
 }
 
 @keyframes firework-burst-fade {
@@ -8698,15 +8835,106 @@ footer {
 
   100% {
     opacity: 0;
-    transform: rotate(var(--angle)) translateX(100px) scale(0.4);
+    transform: rotate(var(--angle)) translateX(var(--burst-distance, 230px)) scale(0.4);
+  }
+}
+
+@keyframes champion-screen-flash {
+  0% {
+    opacity: 0;
+    transform: scale(.6);
+  }
+
+  12% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: .45;
+    transform: scale(1.12);
+  }
+}
+
+@keyframes champion-plaque-arrive {
+  0% {
+    opacity: 0;
+    transform: scale(.55) translateY(26px);
+  }
+
+  65% {
+    opacity: 1;
+    transform: scale(1.04) translateY(0);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes champion-confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -12vh, 0) rotate(0deg) scale(.7);
+  }
+
+  8% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: .18;
+    transform: translate3d(var(--confetti-drift, 0px), 115vh, 0) rotate(var(--confetti-spin, 720deg)) scale(.95);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
 
+  .champion-celebration-flash,
+  .champion-celebration-copy,
+  .firework-confetti-piece,
   .firework-burst,
   .firework-particle {
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .champion-plaque {
+    width: calc(100vw - 48px);
+    padding: 22px 24px 19px;
+  }
+
+  .champion-plaque::before,
+  .champion-plaque::after {
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+  }
+
+  .champion-plaque::before {
+    left: -21px;
+  }
+
+  .champion-plaque::after {
+    right: -21px;
+  }
+
+  .champion-plaque-kicker {
+    font-size: 8px;
+    letter-spacing: 4px;
+  }
+
+  .champion-plaque strong {
+    font-size: clamp(24px, 9vw, 40px);
+    letter-spacing: .06em;
+  }
+
+  .champion-plaque small {
+    font-size: 9px;
+    letter-spacing: 2px;
   }
 }
 

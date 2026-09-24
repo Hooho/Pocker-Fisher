@@ -2405,6 +2405,13 @@ export default function App() {
         <h1 id="info-settings-title">说明</h1>
         <p className="muted">了解游戏存档的保存位置、读取时机和备份方式。</p>
       </div>
+      <div className="info-settings-highlight" role="note">
+        <span className="info-settings-highlight-mark"><Check size={18} /></span>
+        <div>
+          <strong>随时退出，随时关闭！实时保存！</strong>
+          <span>不用担心中断牌局，重新打开游戏后会自动恢复进度。</span>
+        </div>
+      </div>
       <div className="info-settings-grid">
         <article className="info-settings-card info-settings-card-primary">
           <div className="info-settings-card-heading">
@@ -2415,7 +2422,7 @@ export default function App() {
             </div>
           </div>
           <p>
-            游戏运行时会先快速保存到 Webview 的本地存储，同时在后台自动备份为 JSON 文件。
+            游戏运行时会先快速保存到 Webview 的本地存储，同时在后台自动备份为 JSON 文件。存档只保存在本地，不会自动上传到云端。
           </p>
           <dl className="info-settings-list">
             <div>
@@ -2448,6 +2455,25 @@ export default function App() {
           </p>
           <div className="info-settings-browser-actions">
             <span>需要备份或迁移时，请使用游戏中的“导出存档”功能生成 JSON 文件。</span>
+          </div>
+        </article>
+        <article className="info-settings-card info-settings-card-wide">
+          <div className="info-settings-card-heading">
+            <span className="info-settings-icon info-settings-icon-muted"><Upload size={17} /></span>
+            <div>
+              <p className="eyebrow">BACKUP &amp; TRANSFER</p>
+              <h2>下载存档，上传恢复</h2>
+            </div>
+          </div>
+          <p>
+            你可以随时导出一份 JSON 存档，也可以在另一台设备导入它来继续游戏。
+          </p>
+          <div className="info-settings-transfer">
+            <span><Download size={14} /> 导出最新存档</span>
+            <span><Upload size={14} /> 导入并恢复进度</span>
+          </div>
+          <div className="info-settings-browser-actions">
+            支持跨端使用：只要在不同设备之间保持同一份最新存档文件，并在切换设备时导入即可。不同设备之间不会自动同步。
           </div>
         </article>
       </div>

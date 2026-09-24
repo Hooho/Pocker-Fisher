@@ -22,9 +22,9 @@ npm run dev
 
 ## 一键发布扩展
 
-`npm run release` 会按顺序递增版本号、执行扩展构建、生成 VSIX，并发布到 VS Code Marketplace 和 Open VSX（Cursor 使用的第三方扩展注册表）。脚本不会创建 Git 提交或推送代码。
+`npm run release` 是一个交互式发布向导。它会逐步询问版本类型、是否运行测试、是否打包 VSIX、是否创建 Release Commit / Git Tag，以及是否发布到 VS Code Marketplace 和 Open VSX（Cursor 可使用的第三方扩展注册表）。发布渠道默认选择“否”，脚本不会推送代码。
 
-首次发布前，在当前终端设置两个令牌；不要把令牌写入 `package.json`、脚本或提交到 Git：
+如果在向导中选择发布，提前在当前终端设置对应令牌；只打包或只做检查时不需要令牌。不要把令牌写入 `package.json`、脚本或提交到 Git：
 
 ```sh
 export VSCE_PAT="你的 Azure DevOps PAT"
@@ -34,18 +34,30 @@ export OVSX_PAT="你的 Open VSX Token"
 发布命令：
 
 ```sh
-npm run release             # patch，例如 1.0.0 -> 1.0.1
-npm run release -- minor    # minor，例如 1.0.0 -> 1.1.0
-npm run release -- major    # major，例如 1.0.0 -> 2.0.0
+npm run release                 # 交互式向导，推荐
+npm run release -- patch        # 预选修复版本，再确认提交和发布选项
+npm run release -- minor        # 预选新增功能版本
+npm run release -- major        # 预选重大不兼容版本
+npm run release -- --no-bump    # 保持当前版本，适合重试已打包版本
+npm run release -- --version 1.0.0  # 手动指定版本，适合首次发布
 ```
 
-正式发布前可以只构建和检查 VSIX，不改版本号、不调用发布接口：
+向导中的版本选项对应 SemVer：修复问题使用 `patch`，新增功能使用 `minor`，重大不兼容变更使用 `major`。首次发布可以选择“保持当前版本号”或手动输入当前版本；如果只想生成 VSIX，发布问题选择“否”即可。
+
+发布成功后会生成类似下面的 Git 历史：
+
+```text
+chore(release): v1.0.1
+v1.0.1
+```
+
+正式发布前也可以只构建和检查 VSIX，不改版本号、不创建提交、不调用发布接口：
 
 ```sh
 npm run release:check
 ```
 
-如果某一个市场发布失败，可以使用 `--no-bump` 保持当前版本重试，并用 `--skip-vscode` 或 `--skip-openvsx` 跳过已经成功的市场。
+如果某一个市场发布失败，可以使用 `--no-bump` 保持当前版本重试，并用 `--skip-vscode` 或 `--skip-openvsx` 跳过已经成功的市场。脚本只暂存版本文件，不会把其他工作区改动提交进去。
 
 ## 单应用路由
 

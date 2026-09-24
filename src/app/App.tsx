@@ -2766,7 +2766,7 @@ export default function App() {
                           : championshipWon
                             ? (
                               <span className="advance-button-copy champion-button-copy">
-                                <strong className="advance-button-target">恭喜赢得总冠军</strong>
+                                <strong className="advance-button-target">查看结果</strong>
                               </span>
                             )
                             : canAdvance && t
@@ -2779,6 +2779,11 @@ export default function App() {
                             : g.players[0].chips === 0
                               ? "结算比赛"
                               : "下一手"}
+                        <ChevronRight size={17} />
+                      </button>
+                    ) : t?.complete ? (
+                      <button className="gold-button" onClick={() => setPage("tournament")}>
+                        查看结果
                         <ChevronRight size={17} />
                       </button>
                     ) : (

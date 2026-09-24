@@ -7,7 +7,7 @@ const SAVE_LOCK_NAME = "river-save-write";
 const SAVE_CHANNEL_NAME = "river-save-sync";
 const GAME_LOG_LIMIT = 15;
 
-type StoredSave = {
+export type StoredSave = {
   revision: number;
   save: Save;
 };
@@ -625,6 +625,10 @@ function saveFingerprint(save: Save) {
   return stableSerialize(content);
 }
 
+function writeBrowserStoredSave(stored: StoredSave) {
+  localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(stored));
+}
+
 function readBrowserStoredSave(): StoredSave {
   const raw = localStorage.getItem(SAVE_STORAGE_KEY);
   if (!raw) return { revision: 0, save: blank };
@@ -659,6 +663,15 @@ async function readVsCodeStoredSave(): Promise<StoredSave> {
   };
 }
 
+function isStoredSaveNewer(candidate: StoredSave, current: StoredSave) {
+  if (candidate.revision <= 0 || candidate.save.savedAt === "") return false;
+  if (current.revision <= 0 || current.save.savedAt === "") return true;
+
+  const candidateTime = Date.parse(candidate.save.savedAt) || 0;
+  const currentTime = Date.parse(current.save.savedAt) || 0;
+  return candidateTime > currentTime || (candidateTime === currentTime && candidate.revision > current.revision);
+}
+
 function getSaveChannel(): BroadcastChannel | null {
   if (typeof BroadcastChannel === "undefined") return null;
   if (!saveChannel) saveChannel = new BroadcastChannel(SAVE_CHANNEL_NAME);
@@ -685,86 +698,77 @@ export function getSaveRevision() {
   return localRevision;
 }
 
-async function writeVsCodeSave(data: Save, expectedRevision: number) {
+async function writeVsCodeSave(stored: StoredSave) {
   const result = await requestVsCodeStorage<{ revision: number }>({
     operation: "save",
-    expectedRevision,
-    save: data,
+    expectedRevision: stored.revision,
+    save: stored.save,
   });
-  if (!Number.isInteger(result.revision) || result.revision < 0) {
+  if (!Number.isInteger(result.revision) || result.revision !== stored.revision) {
     throw new Error("VS Code 返回了无效的存档版本");
   }
   return result.revision;
 }
 
-const loadVsCodeSave = async (): Promise<StoredSave> => {
-  const stored = await readVsCodeStoredSave();
-  if (stored.revision > 0) return stored;
+let vscodeBackupTimer: number | null = null;
+let pendingVscodeBackup: StoredSave | null = null;
 
-  // Migrate saves created by the browser/localStorage build once, so installing
-  // the extension does not silently reset a player's existing progress.
-  try {
-    const legacy = readBrowserStoredSave();
-    if (
-      legacy.revision > 0 ||
-      saveFingerprint(legacy.save) !== saveFingerprint(blank)
-    ) {
-      const revision = await writeVsCodeSave(legacy.save, 0);
-      return { revision, save: legacy.save };
-    }
-  } catch {
-    // A malformed or unavailable legacy store should not block the extension
-    // from starting with a clean, validated save.
-  }
-  return stored;
-};
+function scheduleVscodeBackup(stored: StoredSave) {
+  if (!getVsCodeApi()) return;
+  pendingVscodeBackup = stored;
+  if (vscodeBackupTimer !== null) window.clearTimeout(vscodeBackupTimer);
+  vscodeBackupTimer = window.setTimeout(() => {
+    const next = pendingVscodeBackup;
+    pendingVscodeBackup = null;
+    vscodeBackupTimer = null;
+    if (!next) return;
+    void writeVsCodeSave(next).catch((error) => {
+      console.error("[摸鱼德州] 自动备份存档失败", error);
+    });
+  }, 750);
+}
 
 export const loadSave = async () => {
-  const stored = getVsCodeApi()
-    ? await loadVsCodeSave()
-    : readBrowserStoredSave();
+  const browserSave = readBrowserStoredSave();
+  let stored = browserSave;
+  if (getVsCodeApi()) {
+    try {
+      const vscodeSave = await readVsCodeStoredSave();
+      if (isStoredSaveNewer(vscodeSave, browserSave)) {
+        stored = vscodeSave;
+        writeBrowserStoredSave(stored);
+      }
+    } catch {
+      // The localStorage save remains the primary recovery path when the
+      // optional VS Code JSON backup is unavailable.
+    }
+  }
   localRevision = stored.revision;
   knownRevision = stored.revision;
+  scheduleVscodeBackup(stored);
   return stored.save;
 };
 
 export const saveData = async (data: Save) => {
-  if (getVsCodeApi()) {
-    const current = await readVsCodeStoredSave();
-    if (current.revision !== localRevision) {
-      throw new SaveConflictError();
-    }
-    if (saveFingerprint(current.save) === saveFingerprint(data)) {
-      return current.revision;
-    }
-
-    const save = { ...data, savedAt: new Date().toISOString() };
-    const revision = await writeVsCodeSave(save, current.revision);
-    localRevision = revision;
-    notifySaveChanged(revision);
-    return revision;
-  }
-
-  return withSaveLock(() => {
+  const stored = await withSaveLock(() => {
     const current = readBrowserStoredSave();
     if (current.revision !== localRevision) {
       throw new SaveConflictError();
     }
 
     if (saveFingerprint(current.save) === saveFingerprint(data)) {
-      return current.revision;
+      return current;
     }
 
     const revision = current.revision + 1;
     const save = { ...data, savedAt: new Date().toISOString() };
-    localStorage.setItem(
-      SAVE_STORAGE_KEY,
-      JSON.stringify({ revision, save }),
-    );
+    writeBrowserStoredSave({ revision, save });
     localRevision = revision;
     notifySaveChanged(revision);
-    return revision;
+    return { revision, save };
   });
+  scheduleVscodeBackup(stored);
+  return stored;
 };
 
 export function subscribeToSaveChanges(listener: (revision: number) => void) {
@@ -805,13 +809,6 @@ export function subscribeToSaveChanges(listener: (revision: number) => void) {
 }
 
 export function checkSaveRevision() {
-  if (getVsCodeApi()) {
-    return requestVsCodeStorage<{ revision: number }>({ operation: "revision" })
-      .then((value) => {
-        knownRevision = value.revision;
-        return value.revision;
-      });
-  }
   return Promise.resolve(readBrowserStoredSave().revision);
 }
 

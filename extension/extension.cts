@@ -60,6 +60,52 @@ function isSaveConflictRequest(message: SaveStorageRequest): boolean {
   );
 }
 
+function isPersistedSave(value: unknown): value is PersistedSave {
+  return (
+    isRecord(value) &&
+    typeof value.revision === "number" &&
+    Number.isInteger(value.revision) &&
+    value.revision >= 0 &&
+    "save" in value
+  );
+}
+
+function getBackupLocation(context: vscode.ExtensionContext) {
+  const workspace = vscode.workspace.workspaceFolders?.[0]?.uri;
+  if (workspace) {
+    const directory = vscode.Uri.joinPath(workspace, ".vscode");
+    return { directory, file: vscode.Uri.joinPath(directory, "river-club-save.json") };
+  }
+
+  return {
+    directory: context.globalStorageUri,
+    file: vscode.Uri.joinPath(context.globalStorageUri, "river-club-save.json"),
+  };
+}
+
+async function readJsonBackup(context: vscode.ExtensionContext): Promise<PersistedSave | null> {
+  const { file } = getBackupLocation(context);
+  try {
+    const contents = await vscode.workspace.fs.readFile(file);
+    const value: unknown = JSON.parse(new TextDecoder().decode(contents));
+    return isPersistedSave(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+async function writeJsonBackup(
+  context: vscode.ExtensionContext,
+  value: PersistedSave,
+): Promise<void> {
+  const { directory, file } = getBackupLocation(context);
+  await vscode.workspace.fs.createDirectory(directory);
+  await vscode.workspace.fs.writeFile(
+    file,
+    new TextEncoder().encode(`${JSON.stringify(value, null, 2)}\n`),
+  );
+}
+
 function getNonce(): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let value = "";
@@ -200,11 +246,12 @@ export function activate(context: vscode.ExtensionContext): void {
     message: SaveStorageRequest,
   ): Promise<void> => {
     if (message.operation === "load") {
+      const backup = await readJsonBackup(context);
       postStorageResponse(webview, {
         type: "riverClub.storageResponse",
         requestId: message.requestId,
         ok: true,
-        value: readPersistedSave(),
+        value: backup ?? readPersistedSave(),
       });
       return;
     }
@@ -231,16 +278,11 @@ export function activate(context: vscode.ExtensionContext): void {
 
     try {
       const result = await enqueueSave(async () => {
-        const current = readPersistedSave();
-        if (current.revision !== message.expectedRevision) {
-          return { conflict: true as const, revision: current.revision };
-        }
-
         const next: PersistedSave = {
-          revision: current.revision + 1,
+          revision: message.expectedRevision!,
           save: message.save,
         };
-        await context.globalState.update(saveGlobalStateKey, next);
+        await writeJsonBackup(context, next);
         return { conflict: false as const, revision: next.revision };
       });
 

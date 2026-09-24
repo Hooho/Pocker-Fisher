@@ -2717,7 +2717,14 @@ export default function App() {
                       <button
                         className="gold-button"
                         disabled={busy || (alive <= 1 && !t)}
-                        onClick={nextHand}
+                        onClick={() => {
+                          if (championshipWon) {
+                            advanceTournament();
+                            setPage("tournament");
+                            return;
+                          }
+                          nextHand();
+                        }}
                       >
                         {busy
                           ? "请稍候…"

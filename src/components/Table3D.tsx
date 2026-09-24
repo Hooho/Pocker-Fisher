@@ -6,20 +6,18 @@ export default function Table3D({
   done,
   winnerIndices,
   playerCount,
-  playerTotals,
 }: {
   potValue: number;
   done: boolean;
   winnerIndices: number[];
   playerCount: number;
-  playerTotals: number[];
 }) {
   const update = useRef<
-    ((pot: number, done: boolean, winners: number[], players: number, totals: number[]) => void) | null
+    ((pot: number, done: boolean, winners: number[], players: number) => void) | null
   >(null);
   useEffect(() => {
-    update.current?.(potValue, done, winnerIndices, playerCount, playerTotals);
-  }, [potValue, done, winnerIndices, playerCount, playerTotals]);
+    update.current?.(potValue, done, winnerIndices, playerCount);
+  }, [potValue, done, winnerIndices, playerCount]);
   const host = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -128,7 +126,7 @@ export default function Table3D({
         chip.position.set(
           (stack - 2) * 0.23,
           0.2 + h * 0.046,
-          (stack % 2) * 0.12,
+          1.9 + (stack % 2) * 0.12,
         );
         chips.add(chip);
         for (let k = 0; k < 6; k++) {
@@ -148,130 +146,7 @@ export default function Table3D({
       }
     }
     scene.add(chips);
-    const potCenter = new THREE.Vector3(0, 0, 0.78);
-    chips.position.copy(potCenter);
     const chipGroups = [chips];
-    const initialFlights: Array<{
-      group: THREE.Group;
-      from: THREE.Vector3;
-      to: THREE.Vector3;
-      startedAt: number;
-    }> = [];
-    let contributionSnapshot: number[] = [];
-    let initialFlightFrame = 0;
-    let actionFlightFrame = 0;
-    let initialFlightPot = 0;
-    let initialFlightFinished = false;
-    const actionFlights: Array<{
-      group: THREE.Group;
-      from: THREE.Vector3;
-      to: THREE.Vector3;
-      startedAt: number;
-      spin: number;
-    }> = [];
-    const actionChipGeometry = new THREE.CylinderGeometry(0.16, 0.16, 0.045, 28);
-    const actionChipMaterial = new THREE.MeshStandardMaterial({
-      color: 0xc6a35d,
-      roughness: 0.36,
-      metalness: 0.2,
-    });
-    const actionChipEdgeGeometry = new THREE.TorusGeometry(0.125, 0.012, 8, 24);
-    const actionChipEdgeMaterial = new THREE.MeshStandardMaterial({
-      color: 0xf0db9a,
-      roughness: 0.3,
-      metalness: 0.25,
-    });
-
-    const playerPosition = (index: number, players: number) => {
-      const angle = Math.PI / 2 + (index * Math.PI * 2) / Math.max(1, players);
-      return new THREE.Vector3(
-        Math.cos(angle) * 4.25,
-        0,
-        Math.sin(angle) * 2.05,
-      );
-    };
-
-    const animateActionFlights = () => {
-      const now = performance.now();
-      for (let i = actionFlights.length - 1; i >= 0; i -= 1) {
-        const flight = actionFlights[i];
-        const progress = Math.min(1, (now - flight.startedAt) / 820);
-        const ease = 1 - (1 - progress) ** 3;
-        flight.group.position.lerpVectors(flight.from, flight.to, ease);
-        flight.group.position.y += Math.sin(Math.PI * progress) * 0.72;
-        flight.group.rotation.x = flight.spin + progress * Math.PI * 5;
-        flight.group.rotation.z = Math.sin(Math.PI * progress) * 0.22;
-        flight.group.scale.setScalar(0.82 + Math.sin(Math.PI * progress) * 0.16);
-        if (progress >= 1) {
-          scene.remove(flight.group);
-          actionFlights.splice(i, 1);
-        }
-      }
-      renderer.render(scene, camera);
-      actionFlightFrame = actionFlights.length
-        ? requestAnimationFrame(animateActionFlights)
-        : 0;
-    };
-
-    const queueActionFlight = (from: THREE.Vector3, to: THREE.Vector3) => {
-      const group = new THREE.Group();
-      const chip = new THREE.Mesh(actionChipGeometry, actionChipMaterial);
-      chip.position.y = 0.22;
-      group.add(chip);
-      const edge = new THREE.Mesh(actionChipEdgeGeometry, actionChipEdgeMaterial);
-      edge.rotation.x = Math.PI / 2;
-      edge.position.y = 0.246;
-      group.add(edge);
-      group.position.copy(from);
-      group.rotation.x = (Math.random() - 0.5) * 0.35;
-      scene.add(group);
-      actionFlights.push({
-        group,
-        from,
-        to,
-        startedAt: performance.now(),
-        spin: group.rotation.x,
-      });
-      if (actionFlights.length === 1) {
-        actionFlightFrame = requestAnimationFrame(animateActionFlights);
-      }
-    };
-
-    const animateInitialFlights = () => {
-      const now = performance.now();
-      for (let i = initialFlights.length - 1; i >= 0; i -= 1) {
-        const flight = initialFlights[i];
-        const progress = Math.min(1, (now - flight.startedAt) / 1500);
-        const ease = 1 - (1 - progress) ** 3;
-        flight.group.position.lerpVectors(flight.from, flight.to, ease);
-        flight.group.scale.setScalar(0.72 + ease * 0.28);
-        if (progress >= 1) {
-          scene.remove(flight.group);
-          initialFlights.splice(i, 1);
-        }
-      }
-      renderer.render(scene, camera);
-      if (initialFlights.length) {
-        initialFlightFrame = requestAnimationFrame(animateInitialFlights);
-      } else {
-        chips.visible = !initialFlightFinished && initialFlightPot > 0;
-        renderer.render(scene, camera);
-        initialFlightFrame = 0;
-      }
-    };
-
-    const queueInitialFlight = (from: THREE.Vector3, to: THREE.Vector3) => {
-      const group = chips.clone(true);
-      group.visible = true;
-      group.position.copy(from);
-      group.scale.setScalar(0.72);
-      scene.add(group);
-      initialFlights.push({ group, from, to, startedAt: performance.now() });
-      if (initialFlights.length === 1) {
-        initialFlightFrame = requestAnimationFrame(animateInitialFlights);
-      }
-    };
-
     const resize = () => {
       const w = el.clientWidth,
         h = el.clientHeight;
@@ -288,44 +163,15 @@ export default function Table3D({
     ro.observe(el);
     resize();
     let frame = 0;
-    update.current = (pot, finished, winners, players, totals) => {
-      const previous = contributionSnapshot;
-      const handRestarted = previous.length > 0 && totals.some((amount, index) => amount < (previous[index] || 0));
-      const shouldAnimateInitial = previous.length === 0 || handRestarted;
-      contributionSnapshot = [...totals];
-
-      if (shouldAnimateInitial) {
-        cancelAnimationFrame(initialFlightFrame);
-        initialFlights.forEach(({ group }) => scene.remove(group));
-        initialFlights.length = 0;
-        initialFlightPot = pot;
-        initialFlightFinished = finished;
-        chips.visible = false;
-        chips.scale.y = Math.max(0.7, Math.min(1.5, Math.log2(1 + pot / 100) / 3.4));
-        totals.forEach((amount, index) => {
-          if (amount > 0) queueInitialFlight(playerPosition(index, players), potCenter.clone());
-        });
-        renderer.render(scene, camera);
-        return;
-      }
-
-      totals.forEach((amount, index) => {
-        if (amount > (previous[index] || 0)) {
-          const from = playerPosition(index, players);
-          from.y = 0.22;
-          queueActionFlight(from, potCenter.clone());
-        }
-      });
-
+    update.current = (pot, finished, winners, players) => {
       cancelAnimationFrame(frame);
       const start = performance.now();
       const movingToWinners = finished && winners.length > 0;
       const groupCount = finished ? winners.length : 1;
       while (chipGroups.length < groupCount) {
         const copy = chips.clone(true);
-        copy.position.copy(potCenter);
+        copy.position.set(0, 0, 0);
         copy.scale.set(1, 1, 1);
-        copy.visible = true;
         scene.add(copy);
         chipGroups.push(copy);
       }
@@ -343,10 +189,10 @@ export default function Table3D({
           destinations[index] = new THREE.Vector3(
             Math.cos(angle) * 4.25,
             0,
-            Math.sin(angle) * 2.05,
+            Math.sin(angle) * 2.05 - 1.41,
           );
         } else {
-          destinations[index] = potCenter.clone();
+          destinations[index] = new THREE.Vector3(0, 0, 0);
         }
       });
       if (groupCount === 0) {
@@ -373,17 +219,9 @@ export default function Table3D({
       };
       tick();
     };
-    update.current(potValue, done, winnerIndices, playerCount, playerTotals);
+    update.current(potValue, done, winnerIndices, playerCount);
     return () => {
       cancelAnimationFrame(frame);
-      cancelAnimationFrame(initialFlightFrame);
-      cancelAnimationFrame(actionFlightFrame);
-      initialFlights.forEach(({ group }) => scene.remove(group));
-      actionFlights.forEach(({ group }) => scene.remove(group));
-      actionChipGeometry.dispose();
-      actionChipMaterial.dispose();
-      actionChipEdgeGeometry.dispose();
-      actionChipEdgeMaterial.dispose();
       update.current = null;
       ro.disconnect();
       scene.traverse((obj) => {

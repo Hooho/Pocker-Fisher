@@ -1098,7 +1098,10 @@ export default function App() {
   // Keep the celebration replayable until the player confirms the championship.
   // That means refreshing the unconfirmed final hand can replay the moment too.
   useEffect(() => {
-    if (ready && championshipWon) triggerFireworks(9500);
+    if (ready && championshipWon) {
+      triggerFireworks(9500);
+      playGameSound("champion", data.settings.sound);
+    }
   }, [championshipWon, ready, triggerFireworks]);
   useEffect(() => {
     return () => {

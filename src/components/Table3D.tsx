@@ -126,7 +126,7 @@ export default function Table3D({
         chip.position.set(
           (stack - 2) * 0.23,
           0.2 + h * 0.046,
-          1.9 + (stack % 2) * 0.12,
+          (stack % 2) * 0.12,
         );
         chips.add(chip);
         for (let k = 0; k < 6; k++) {
@@ -189,7 +189,7 @@ export default function Table3D({
           destinations[index] = new THREE.Vector3(
             Math.cos(angle) * 4.25,
             0,
-            Math.sin(angle) * 2.05 - 1.41,
+            Math.sin(angle) * 2.05,
           );
         } else {
           destinations[index] = new THREE.Vector3(0, 0, 0);

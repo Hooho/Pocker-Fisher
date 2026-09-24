@@ -915,6 +915,7 @@ export default function App() {
     onConfirm: () => void;
   } | null>(null);
   const [lastAction, setLastAction] = useState<{ id: number; player: number } | null>(null);
+  const [chipToss, setChipToss] = useState<{ seat: number; token: number } | null>(null);
   const [celebrationDone, setCelebrationDone] = useState(false);
   const tableStageRef = useRef<HTMLDivElement>(null);
   const [tableStageSize, setTableStageSize] = useState<TableStageSize>({ width: 0, height: 0 });
@@ -1193,7 +1194,7 @@ export default function App() {
     const previous = g?.log[0] || "";
     if (top !== previous && !top.startsWith("第 ") && !top.includes("赢得")) {
       const player = next.players.find(p => top.startsWith(`${p.profile.name} · `));
-      if (player) { const label = player.last; const type = label.includes("弃牌") ? "fold" : label.includes("全下") ? "allin" : label.includes("加注") ? "raise" : label.includes("跟注") ? "call" : "check"; actionId.current++; setLastAction({ id: actionId.current, player: player.profile.id }); playGameSound(type, data.settings.sound) }
+      if (player) { const label = player.last; const type = label.includes("弃牌") ? "fold" : label.includes("全下") ? "allin" : label.includes("加注") ? "raise" : label.includes("跟注") ? "call" : "check"; actionId.current++; setLastAction({ id: actionId.current, player: player.profile.id }); if (["raise", "allin", "call"].includes(type)) { const seatIndex = next.players.indexOf(player); if (seatIndex >= 0) setChipToss({ seat: seatIndex, token: actionId.current }) } playGameSound(type, data.settings.sound) }
     }
     if (top.startsWith("第 ")) setLastAction(null);
     if (next.board.length > (g?.board.length || 0)) playGameSound("deal", data.settings.sound);
@@ -2560,7 +2561,7 @@ export default function App() {
                 <strong>{tableRoundLabel}</strong>
                 <span>第 {g.hand} 手</span>
               </div>
-              <Table3D potValue={pot(g)} done={g.done} winnerIndices={g.winners} playerCount={g.players.length} />
+              <Table3D potValue={pot(g)} done={g.done} winnerIndices={g.winners} playerCount={g.players.length} chipToss={chipToss} />
               <div className="community">
                 <div className="pot-label">
                   {g.done ? "已派奖" : "底池总额"}{" "}

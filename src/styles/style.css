@@ -6873,7 +6873,7 @@ footer {
 .mode-details-button {
   position: absolute;
   top: 76px;
-  left: calc(50% + 50px);
+  left: calc(50% + 64px);
   right: auto;
   z-index: 2;
   width: 28px;
@@ -7130,7 +7130,7 @@ footer {
 @media (max-width: 760px) {
   .mode-details-button {
     top: 30px;
-    left: calc(50% + 44px);
+    left: calc(50% + 54px);
     right: auto;
     width: 26px;
     height: 26px;
@@ -7145,7 +7145,7 @@ footer {
 @media (max-width: 600px) {
   .mode-details-button {
     top: 21px;
-    left: calc(50% + 35px);
+    left: calc(50% + 45px);
     right: auto;
     width: 24px;
     height: 24px;
@@ -9320,7 +9320,7 @@ footer {
 
   .lobby-home .mode-details-button {
     top: 14px;
-    left: calc(50% + 37px);
+    left: calc(50% + 45px);
     width: 24px;
     height: 24px;
   }

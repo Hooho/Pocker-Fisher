@@ -672,12 +672,6 @@ function Card({
     </div>
   );
 }
-const OPTIMIZED_AVATAR_IDS = new Set([
-  0, 5, 23, 28, 31, 36, 49, 64, 65, 66, 82, 89, 98, 101, 121, 123,
-  124, 129, 130, 137, 143, 154, 156, 161, 166, 168, 169, 175, 176, 182,
-  185, 320,
-]);
-
 function Avatar({
   p,
   playerAvatar,
@@ -687,9 +681,7 @@ function Avatar({
   playerAvatar?: string | null;
   className?: string;
 }) {
-  const avatarSrc = OPTIMIZED_AVATAR_IDS.has(p.id)
-    ? publicAsset(`avatars-webp/${String(p.id).padStart(3, "0")}.webp`)
-    : publicAsset(`avatars/${p.id % 300}.svg`);
+  const avatarSrc = publicAsset(`avatars-webp/${String(p.id).padStart(3, "0")}.webp`);
 
   return p.id === -1 ? (
     <div className={`hero-avatar ${className}`.trim()}>

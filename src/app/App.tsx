@@ -1232,6 +1232,11 @@ export default function App() {
           ? { ...saved, tournament: { ...saved.tournament, autoSimulating: true } }
           : saved;
         setData(restored);
+        // A fresh extension host starts at the lobby route. If the save contains
+        // an active table, return the player to it after restoring the save.
+        if (restored.game && page === "lobby") {
+          setPage("table", { replace: true });
+        }
         setProfileNameDraft(restored.playerProfile.name);
         setProfileAvatarDraft(restored.playerProfile.avatar);
         setCharacters(chars);

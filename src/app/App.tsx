@@ -1096,6 +1096,13 @@ export default function App() {
     if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
     fireworksTimer.current = window.setTimeout(() => setShowFireworks(false), durationMs);
   }, []);
+  const triggerChampionCelebration = useCallback(() => {
+    triggerFireworks(9500);
+    if (!championSoundPlayed.current) {
+      championSoundPlayed.current = true;
+      playGameSound("champion", data.settings.sound);
+    }
+  }, [data.settings.sound, triggerFireworks]);
   // Keep the celebration replayable until the player confirms the championship.
   // That means refreshing the unconfirmed final hand can replay the moment too.
   useEffect(() => {
@@ -1104,12 +1111,8 @@ export default function App() {
       return;
     }
     if (!ready) return;
-    triggerFireworks(9500);
-    if (!championSoundPlayed.current) {
-      championSoundPlayed.current = true;
-      playGameSound("champion", data.settings.sound);
-    }
-  }, [championshipWon, ready, triggerFireworks]);
+    triggerChampionCelebration();
+  }, [championshipWon, ready, triggerChampionCelebration]);
   useEffect(() => {
     return () => {
       if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
@@ -1204,8 +1207,11 @@ export default function App() {
     );
     if (handEnded && next.winners.length) {
       setCelebrationDone(false);
-      if (localChampionWon) championSoundPlayed.current = true;
-      playGameSound(localChampionWon ? "champion" : "win", data.settings.sound);
+      if (localChampionWon) {
+        triggerChampionCelebration();
+      } else {
+        playGameSound("win", data.settings.sound);
+      }
     }
     setData((old) => {
       const ended = next.done && !old.game?.done;

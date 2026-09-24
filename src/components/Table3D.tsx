@@ -5,13 +5,11 @@ export default function Table3D({
   done,
   winnerIndices,
   playerCount,
-  chipToss,
 }: {
   potValue: number;
   done: boolean;
   winnerIndices: number[];
   playerCount: number;
-  chipToss?: { seat: number; token: number } | null;
 }) {
   const update = useRef<
     ((pot: number, done: boolean, winners: number[], players: number) => void) | null
@@ -19,17 +17,11 @@ export default function Table3D({
   useEffect(() => {
     update.current?.(potValue, done, winnerIndices, playerCount);
   }, [potValue, done, winnerIndices, playerCount]);
-  const toss = useRef<((seat: number, players: number) => void) | null>(null);
-  useEffect(() => {
-    if (chipToss) toss.current?.(chipToss.seat, playerCount);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chipToss?.token]);
   const host = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     if (!host.current) return;
     const el = host.current;
-    let unmounted = false;
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -168,54 +160,6 @@ export default function Table3D({
     ro.observe(el);
     resize();
     let frame = 0;
-    toss.current = (seatIndex, players) => {
-      const angle = Math.PI / 2 + (seatIndex * Math.PI * 2) / Math.max(1, players);
-      const start = new THREE.Vector3(
-        Math.cos(angle) * 4.25,
-        0.25,
-        Math.sin(angle) * 2.05 - 1.41,
-      );
-      const end = new THREE.Vector3(0, 0.22, 1.55);
-      const flyer = new THREE.Group();
-      const flyerColors = [0xb99863, 0xad5844, 0x59807f];
-      for (let h = 0; h < 3; h++) {
-        const chip = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.15, 0.15, 0.046, 24),
-          new THREE.MeshStandardMaterial({
-            color: flyerColors[h % flyerColors.length],
-            roughness: 0.42,
-            metalness: 0.18,
-          }),
-        );
-        chip.position.y = h * 0.052;
-        flyer.add(chip);
-      }
-      flyer.position.copy(start);
-      flyer.rotation.z = (Math.random() - 0.5) * 0.6;
-      scene.add(flyer);
-      const flyStart = performance.now();
-      const duration = 480;
-      const flyTick = () => {
-        if (unmounted) return;
-        const progress = Math.min(1, (performance.now() - flyStart) / duration);
-        const ease = 1 - (1 - progress) ** 2;
-        flyer.position.lerpVectors(start, end, ease);
-        flyer.position.y = start.y + Math.sin(progress * Math.PI) * 0.9;
-        flyer.rotation.x += 0.35;
-        renderer.render(scene, camera);
-        if (progress < 1) requestAnimationFrame(flyTick);
-        else {
-          scene.remove(flyer);
-          flyer.children.forEach((c) => {
-            const mesh = c as THREE.Mesh;
-            mesh.geometry.dispose();
-            (mesh.material as THREE.Material).dispose();
-          });
-          renderer.render(scene, camera);
-        }
-      };
-      flyTick();
-    };
     update.current = (pot, finished, winners, players) => {
       cancelAnimationFrame(frame);
       const start = performance.now();
@@ -274,10 +218,8 @@ export default function Table3D({
     };
     update.current(potValue, done, winnerIndices, playerCount);
     return () => {
-      unmounted = true;
       cancelAnimationFrame(frame);
       update.current = null;
-      toss.current = null;
       ro.disconnect();
       scene.traverse((obj) => {
         if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {

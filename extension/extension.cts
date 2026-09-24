@@ -3,6 +3,62 @@ import { join } from "node:path";
 import * as vscode from "vscode";
 
 const viewId = "riverClub.gameView";
+const saveGlobalStateKey = "riverClub.save";
+
+type PersistedSave = {
+  revision: number;
+  save: unknown;
+};
+
+type SaveStorageRequest = {
+  type: "riverClub.storage";
+  requestId: string;
+  operation: "load" | "revision" | "save";
+  expectedRevision?: number;
+  save?: unknown;
+};
+
+type SaveStorageResponse =
+  | {
+      type: "riverClub.storageResponse";
+      requestId: string;
+      ok: true;
+      value: unknown;
+    }
+  | {
+      type: "riverClub.storageResponse";
+      requestId: string;
+      ok: false;
+      error: string;
+      code?: "conflict";
+    };
+
+type SaveChangedMessage = {
+  type: "riverClub.saveChanged";
+  revision: number;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isSaveStorageRequest(value: unknown): value is SaveStorageRequest {
+  if (!isRecord(value)) return false;
+  return (
+    value.type === "riverClub.storage" &&
+    typeof value.requestId === "string" &&
+    (value.operation === "load" ||
+      value.operation === "revision" ||
+      value.operation === "save")
+  );
+}
+
+function isSaveConflictRequest(message: SaveStorageRequest): boolean {
+  return (
+    message.operation === "save" &&
+    typeof message.expectedRevision === "number"
+  );
+}
 
 function getNonce(): string {
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
@@ -97,6 +153,124 @@ class RiverClubViewProvider implements vscode.WebviewViewProvider {
 
 export function activate(context: vscode.ExtensionContext): void {
   let panel: vscode.WebviewPanel | undefined;
+  const saveWebviews = new Set<vscode.Webview>();
+  let saveWriteQueue: Promise<unknown> = Promise.resolve();
+
+  const readPersistedSave = (): PersistedSave => {
+    const value = context.globalState.get<PersistedSave>(saveGlobalStateKey);
+    if (
+      !value ||
+      typeof value.revision !== "number" ||
+      !Number.isInteger(value.revision) ||
+      value.revision < 0
+    ) {
+      return { revision: 0, save: null };
+    }
+    return value;
+  };
+
+  const postStorageResponse = (
+    webview: vscode.Webview,
+    response: SaveStorageResponse,
+  ): void => {
+    void webview.postMessage(response);
+  };
+
+  const broadcastSaveChanged = (revision: number): void => {
+    const message: SaveChangedMessage = {
+      type: "riverClub.saveChanged",
+      revision,
+    };
+    for (const webview of saveWebviews) {
+      void webview.postMessage(message);
+    }
+  };
+
+  const enqueueSave = <T,>(task: () => Promise<T>): Promise<T> => {
+    const result = saveWriteQueue.then(task, task);
+    saveWriteQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
+  };
+
+  const handleStorageMessage = async (
+    webview: vscode.Webview,
+    message: SaveStorageRequest,
+  ): Promise<void> => {
+    if (message.operation === "load") {
+      postStorageResponse(webview, {
+        type: "riverClub.storageResponse",
+        requestId: message.requestId,
+        ok: true,
+        value: readPersistedSave(),
+      });
+      return;
+    }
+
+    if (message.operation === "revision") {
+      postStorageResponse(webview, {
+        type: "riverClub.storageResponse",
+        requestId: message.requestId,
+        ok: true,
+        value: { revision: readPersistedSave().revision },
+      });
+      return;
+    }
+
+    if (!isSaveConflictRequest(message)) {
+      postStorageResponse(webview, {
+        type: "riverClub.storageResponse",
+        requestId: message.requestId,
+        ok: false,
+        error: "无效的存档写入请求",
+      });
+      return;
+    }
+
+    try {
+      const result = await enqueueSave(async () => {
+        const current = readPersistedSave();
+        if (current.revision !== message.expectedRevision) {
+          return { conflict: true as const, revision: current.revision };
+        }
+
+        const next: PersistedSave = {
+          revision: current.revision + 1,
+          save: message.save,
+        };
+        await context.globalState.update(saveGlobalStateKey, next);
+        return { conflict: false as const, revision: next.revision };
+      });
+
+      if (result.conflict) {
+        postStorageResponse(webview, {
+          type: "riverClub.storageResponse",
+          requestId: message.requestId,
+          ok: false,
+          code: "conflict",
+          error: "本地存档已被另一个 Webview 更新",
+        });
+        return;
+      }
+
+      postStorageResponse(webview, {
+        type: "riverClub.storageResponse",
+        requestId: message.requestId,
+        ok: true,
+        value: { revision: result.revision },
+      });
+      broadcastSaveChanged(result.revision);
+    } catch (error) {
+      postStorageResponse(webview, {
+        type: "riverClub.storageResponse",
+        requestId: message.requestId,
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  };
 
   const openGame = (): void => {
     if (panel) {
@@ -115,13 +289,24 @@ export function activate(context: vscode.ExtensionContext): void {
         localResourceRoots: [distUri],
       },
     );
+    const gamePanel = panel;
     try {
-      panel.webview.html = createWebviewHtml(panel.webview, context.extensionUri);
+      gamePanel.webview.html = createWebviewHtml(gamePanel.webview, context.extensionUri);
     } catch (error) {
-      panel.webview.html = showBuildHint(error);
+      gamePanel.webview.html = showBuildHint(error);
     }
-    panel.onDidDispose(() => {
-      panel = undefined;
+    saveWebviews.add(gamePanel.webview);
+    const storageSubscription = gamePanel.webview.onDidReceiveMessage(
+      (message: unknown) => {
+        if (isSaveStorageRequest(message)) {
+          void handleStorageMessage(gamePanel.webview, message);
+        }
+      },
+    );
+    gamePanel.onDidDispose(() => {
+      storageSubscription.dispose();
+      saveWebviews.delete(gamePanel.webview);
+      if (panel === gamePanel) panel = undefined;
     });
   };
 

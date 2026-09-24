@@ -1,16 +1,17 @@
 {
   "name": "moyu-dezhou",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "publisher": "river-club",
   "displayName": "摸鱼德州",
   "description": "在 VS Code 里玩本地德州扑克：单次赛、冠军之路和 AI 对手。",
+  "license": "MIT",
+  "icon": "media/marketplace-icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
-    "Games"
+    "Other"
   ],
   "main": "./dist-extension/extension.cjs",
   "activationEvents": [

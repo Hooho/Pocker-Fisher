@@ -17,8 +17,57 @@ type SaveChangeMessage = {
   revision: number;
 };
 
+type VsCodeStorageRequest = {
+  type: "riverClub.storage";
+  requestId: string;
+  operation: "load" | "revision" | "save";
+  expectedRevision?: number;
+  save?: Save;
+};
+
+type VsCodeStorageResponse =
+  | {
+      type: "riverClub.storageResponse";
+      requestId: string;
+      ok: true;
+      value: unknown;
+    }
+  | {
+      type: "riverClub.storageResponse";
+      requestId: string;
+      ok: false;
+      error: string;
+      code?: "conflict";
+    };
+
+type VsCodeSaveChangedMessage = {
+  type: "riverClub.saveChanged";
+  revision: number;
+};
+
+type VsCodeApi = {
+  postMessage(message: VsCodeStorageRequest): void;
+};
+
+type PendingStorageRequest = {
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+};
+
+declare global {
+  interface Window {
+    acquireVsCodeApi?: () => VsCodeApi;
+  }
+}
+
 let localRevision = 0;
+let knownRevision = 0;
 let saveChannel: BroadcastChannel | null = null;
+let vscodeApi: VsCodeApi | null | undefined;
+let vscodeRequestSequence = 0;
+let vscodeBridgeReady = false;
+const pendingStorageRequests = new Map<string, PendingStorageRequest>();
+const saveListeners = new Set<(revision: number) => void>();
 
 export class SaveConflictError extends Error {
   constructor() {
@@ -29,6 +78,86 @@ export class SaveConflictError extends Error {
 
 export function isSaveConflictError(error: unknown): error is SaveConflictError {
   return error instanceof SaveConflictError;
+}
+
+function emitSaveChanged(revision: number) {
+  for (const listener of saveListeners) listener(revision);
+}
+
+function isVsCodeStorageResponse(value: unknown): value is VsCodeStorageResponse {
+  if (!value || typeof value !== "object") return false;
+  const message = value as Record<string, unknown>;
+  return (
+    message.type === "riverClub.storageResponse" &&
+    typeof message.requestId === "string" &&
+    typeof message.ok === "boolean"
+  );
+}
+
+function isVsCodeSaveChangedMessage(value: unknown): value is VsCodeSaveChangedMessage {
+  if (!value || typeof value !== "object") return false;
+  const message = value as Record<string, unknown>;
+  return (
+    message.type === "riverClub.saveChanged" &&
+    typeof message.revision === "number"
+  );
+}
+
+function onVsCodeMessage(event: MessageEvent<unknown>) {
+  if (isVsCodeStorageResponse(event.data)) {
+    const pending = pendingStorageRequests.get(event.data.requestId);
+    if (!pending) return;
+    pendingStorageRequests.delete(event.data.requestId);
+    if (event.data.ok) {
+      pending.resolve(event.data.value);
+    } else if (event.data.code === "conflict") {
+      pending.reject(new SaveConflictError());
+    } else {
+      pending.reject(new Error(event.data.error));
+    }
+    return;
+  }
+
+  if (isVsCodeSaveChangedMessage(event.data)) {
+    knownRevision = event.data.revision;
+    emitSaveChanged(event.data.revision);
+  }
+}
+
+function getVsCodeApi(): VsCodeApi | null {
+  if (vscodeApi !== undefined) return vscodeApi;
+  if (typeof window === "undefined" || !window.acquireVsCodeApi) {
+    vscodeApi = null;
+    return null;
+  }
+
+  vscodeApi = window.acquireVsCodeApi();
+  if (!vscodeBridgeReady) {
+    window.addEventListener("message", onVsCodeMessage);
+    vscodeBridgeReady = true;
+  }
+  return vscodeApi;
+}
+
+function requestVsCodeStorage<T>(
+  request: Omit<VsCodeStorageRequest, "type" | "requestId">,
+): Promise<T> {
+  const api = getVsCodeApi();
+  if (!api) throw new Error("VS Code Webview 存储桥接不可用");
+
+  const requestId = `storage-${Date.now()}-${vscodeRequestSequence++}`;
+  return new Promise<T>((resolve, reject) => {
+    pendingStorageRequests.set(requestId, {
+      resolve: (value) => resolve(value as T),
+      reject,
+    });
+    try {
+      api.postMessage({ type: "riverClub.storage", requestId, ...request });
+    } catch (error) {
+      pendingStorageRequests.delete(requestId);
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
 }
 const money = z.number().int().min(0).max(1e9);
 const card = z.number().int().min(0).max(51);
@@ -496,7 +625,7 @@ function saveFingerprint(save: Save) {
   return stableSerialize(content);
 }
 
-function readStoredSave(): StoredSave {
+function readBrowserStoredSave(): StoredSave {
   const raw = localStorage.getItem(SAVE_STORAGE_KEY);
   if (!raw) return { revision: 0, save: blank };
 
@@ -514,6 +643,22 @@ function readStoredSave(): StoredSave {
   return { revision: 0, save: parseSave(parsed) };
 }
 
+async function readVsCodeStoredSave(): Promise<StoredSave> {
+  const stored = await requestVsCodeStorage<unknown>({ operation: "load" });
+  if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
+    return { revision: 0, save: blank };
+  }
+
+  const envelope = storedSaveSchema.safeParse(stored);
+  if (!envelope.success || envelope.data.save === null) {
+    return { revision: envelope.success ? envelope.data.revision : 0, save: blank };
+  }
+  return {
+    revision: envelope.data.revision,
+    save: parseSave(envelope.data.save),
+  };
+}
+
 function getSaveChannel(): BroadcastChannel | null {
   if (typeof BroadcastChannel === "undefined") return null;
   if (!saveChannel) saveChannel = new BroadcastChannel(SAVE_CHANNEL_NAME);
@@ -521,6 +666,8 @@ function getSaveChannel(): BroadcastChannel | null {
 }
 
 function notifySaveChanged(revision: number) {
+  knownRevision = revision;
+  emitSaveChanged(revision);
   getSaveChannel()?.postMessage({
     type: "save-changed",
     revision,
@@ -538,15 +685,68 @@ export function getSaveRevision() {
   return localRevision;
 }
 
+async function writeVsCodeSave(data: Save, expectedRevision: number) {
+  const result = await requestVsCodeStorage<{ revision: number }>({
+    operation: "save",
+    expectedRevision,
+    save: data,
+  });
+  if (!Number.isInteger(result.revision) || result.revision < 0) {
+    throw new Error("VS Code 返回了无效的存档版本");
+  }
+  return result.revision;
+}
+
+const loadVsCodeSave = async (): Promise<StoredSave> => {
+  const stored = await readVsCodeStoredSave();
+  if (stored.revision > 0) return stored;
+
+  // Migrate saves created by the browser/localStorage build once, so installing
+  // the extension does not silently reset a player's existing progress.
+  try {
+    const legacy = readBrowserStoredSave();
+    if (
+      legacy.revision > 0 ||
+      saveFingerprint(legacy.save) !== saveFingerprint(blank)
+    ) {
+      const revision = await writeVsCodeSave(legacy.save, 0);
+      return { revision, save: legacy.save };
+    }
+  } catch {
+    // A malformed or unavailable legacy store should not block the extension
+    // from starting with a clean, validated save.
+  }
+  return stored;
+};
+
 export const loadSave = async () => {
-  const stored = readStoredSave();
+  const stored = getVsCodeApi()
+    ? await loadVsCodeSave()
+    : readBrowserStoredSave();
   localRevision = stored.revision;
+  knownRevision = stored.revision;
   return stored.save;
 };
 
 export const saveData = async (data: Save) => {
+  if (getVsCodeApi()) {
+    const current = await readVsCodeStoredSave();
+    if (current.revision !== localRevision) {
+      throw new SaveConflictError();
+    }
+    if (saveFingerprint(current.save) === saveFingerprint(data)) {
+      return current.revision;
+    }
+
+    const save = { ...data, savedAt: new Date().toISOString() };
+    const revision = await writeVsCodeSave(save, current.revision);
+    localRevision = revision;
+    notifySaveChanged(revision);
+    return revision;
+  }
+
   return withSaveLock(() => {
-    const current = readStoredSave();
+    const current = readBrowserStoredSave();
     if (current.revision !== localRevision) {
       throw new SaveConflictError();
     }
@@ -570,9 +770,18 @@ export const saveData = async (data: Save) => {
 export function subscribeToSaveChanges(listener: (revision: number) => void) {
   if (typeof window === "undefined") return () => undefined;
 
+  const api = getVsCodeApi();
+  if (api) {
+    saveListeners.add(listener);
+    return () => {
+      saveListeners.delete(listener);
+    };
+  }
+
   const channel = getSaveChannel();
   const onMessage = (event: MessageEvent<SaveChangeMessage>) => {
     if (event.data?.type === "save-changed") {
+      knownRevision = event.data.revision;
       listener(event.data.revision);
     }
   };
@@ -596,7 +805,14 @@ export function subscribeToSaveChanges(listener: (revision: number) => void) {
 }
 
 export function checkSaveRevision() {
-  return readStoredSave().revision;
+  if (getVsCodeApi()) {
+    return requestVsCodeStorage<{ revision: number }>({ operation: "revision" })
+      .then((value) => {
+        knownRevision = value.revision;
+        return value.revision;
+      });
+  }
+  return Promise.resolve(readBrowserStoredSave().revision);
 }
 
 export function downloadSave(data: Save) {

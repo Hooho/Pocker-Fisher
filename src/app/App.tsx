@@ -1249,9 +1249,13 @@ export default function App() {
   useEffect(() => {
     if (!ready) return;
 
-    const checkForNewerSave = () => {
-      if (checkSaveRevision() !== getSaveRevision()) {
-        markSaveStale();
+    const checkForNewerSave = async () => {
+      try {
+        if ((await checkSaveRevision()) !== getSaveRevision()) {
+          markSaveStale();
+        }
+      } catch {
+        // The save effect will surface a write/read error with the backup action.
       }
     };
     const unsubscribe = subscribeToSaveChanges((revision) => {

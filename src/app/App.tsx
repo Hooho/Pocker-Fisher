@@ -1051,23 +1051,32 @@ export default function App() {
   const [showFireworks, setShowFireworks] = useState(false);
   const fireworksTimer = useRef<number | null>(null);
   const championSoundPlayed = useRef(false);
+  const championSoundRequest = useRef<Promise<boolean> | null>(null);
   const triggerFireworks = useCallback((durationMs: number) => {
     setShowFireworks(true);
     if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
     fireworksTimer.current = window.setTimeout(() => setShowFireworks(false), durationMs);
   }, []);
+  const playChampionSound = useCallback(() => {
+    if (championSoundPlayed.current || championSoundRequest.current) return;
+    const request = playGameSound("champion", data.settings.sound);
+    championSoundRequest.current = request;
+    void request.then((played) => {
+      if (championSoundRequest.current !== request) return;
+      championSoundRequest.current = null;
+      if (played) championSoundPlayed.current = true;
+    });
+  }, [data.settings.sound]);
   const triggerChampionCelebration = useCallback(() => {
     triggerFireworks(9500);
-    if (!championSoundPlayed.current) {
-      championSoundPlayed.current = true;
-      playGameSound("champion", data.settings.sound);
-    }
-  }, [data.settings.sound, triggerFireworks]);
+    playChampionSound();
+  }, [playChampionSound, triggerFireworks]);
   // Keep the celebration replayable until the player confirms the championship.
   // That means refreshing the unconfirmed final hand can replay the moment too.
   useEffect(() => {
     if (!championshipWon) {
       championSoundPlayed.current = false;
+      championSoundRequest.current = null;
       return;
     }
     if (!ready) return;
@@ -1075,14 +1084,14 @@ export default function App() {
   }, [championshipWon, ready, triggerChampionCelebration]);
   useEffect(() => {
     if (!championshipWon) return;
-    const replayChampionSound = () => playGameSound("champion", data.settings.sound, 4500);
+    const replayChampionSound = () => playChampionSound();
     window.addEventListener("pointerdown", replayChampionSound, { capture: true });
     window.addEventListener("keydown", replayChampionSound, { capture: true });
     return () => {
       window.removeEventListener("pointerdown", replayChampionSound, { capture: true });
       window.removeEventListener("keydown", replayChampionSound, { capture: true });
     };
-  }, [championshipWon, data.settings.sound]);
+  }, [championshipWon, playChampionSound]);
   useEffect(() => {
     return () => {
       if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);

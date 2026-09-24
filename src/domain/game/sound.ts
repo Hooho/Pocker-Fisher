@@ -1,7 +1,6 @@
 type SoundName = 'fold'|'check'|'call'|'raise'|'allin'|'deal'|'win'|'champion';
 
 let audio: AudioContext | undefined;
-const lastPlayedAt = new Map<SoundName, number>();
 
 function getAudio() {
   if (!audio) audio = new AudioContext();
@@ -113,27 +112,19 @@ function scheduleSound(ctx: AudioContext, name: SoundName) {
   }
 }
 
-export function playGameSound(name: SoundName, enabled: boolean, dedupeMs = 0) {
-  if (!enabled) return;
+export async function playGameSound(name: SoundName, enabled: boolean): Promise<boolean> {
+  if (!enabled) return false;
   try {
     const ctx = getAudio();
-    const play = () => {
-      const now = Date.now();
-      const previous = lastPlayedAt.get(name) || 0;
-      if (dedupeMs > 0 && now - previous < dedupeMs) return;
-      if (dedupeMs > 0) lastPlayedAt.set(name, now);
-      scheduleSound(ctx, name);
-    };
     if (ctx.state !== 'running') {
-      void ctx.resume().then(() => {
-        if (ctx.state === 'running') play();
-      }).catch(() => {
-        // The browser may reject autoplay until the next user gesture.
-      });
-      return;
+      await ctx.resume();
+      const resumedState = ctx.state as AudioContextState;
+      if (resumedState !== 'running') return false;
     }
-    play();
+    scheduleSound(ctx, name);
+    return true;
   } catch {
     // Sound stays optional if Web Audio is unavailable.
+    return false;
   }
 }

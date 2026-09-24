@@ -5,6 +5,14 @@
   "publisher": "river-fisher",
   "displayName": "摸鱼德州",
   "description": "在 VS Code 里玩本地德州扑克：单次赛、冠军之路和 AI 对手。",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hooho/Pocker-Fisher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Hooho/Pocker-Fisher/issues"
+  },
+  "homepage": "https://github.com/Hooho/Pocker-Fisher#readme",
   "license": "MIT",
   "icon": "media/marketplace-icon.png",
   "engines": {

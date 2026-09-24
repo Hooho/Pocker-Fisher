@@ -14,6 +14,7 @@ import { PlayersPage } from "../pages/PlayersPage";
 import { SettingsPage, type SettingsSection } from "../pages/SettingsPage";
 import { TablePage } from "../pages/TablePage";
 import Table3D from "../components/Table3D";
+import { getTableSeatPosition, type TableStageSize } from "../components/tableLayout";
 import { TournamentPage } from "../pages/TournamentPage";
 import { LeaderboardPage } from "../pages/LeaderboardPage";
 import { useEffect, useRef, useState, useMemo, useCallback, memo, type CSSProperties } from "react";
@@ -493,49 +494,6 @@ function formatTableDuration(totalSeconds: number) {
   const mm = String(m).padStart(2, "0");
   const ss = String(sec).padStart(2, "0");
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
-}
-type TableStageSize = { width: number; height: number };
-
-function clampNumber(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
-function getTableSeatPosition(
-  playerCount: number,
-  seatIndex: number,
-  stageSize: TableStageSize,
-) {
-  const angle = Math.PI / 2 + (seatIndex * Math.PI * 2) / Math.max(1, playerCount);
-  if (!stageSize.width || !stageSize.height) {
-    return {
-      left: `${50 + 43 * Math.cos(angle)}%`,
-      top: `${50 + (seatIndex === 0 ? 35 : 30) * Math.sin(angle)}%`,
-    };
-  }
-
-  const compact = stageSize.width <= 600;
-  const centerX = stageSize.width / 2;
-  const centerY = stageSize.height * (compact ? 0.54 : 0.55);
-  const tableRadiusX = stageSize.width * (compact ? 0.47 : 0.43);
-  const tableRadiusY = stageSize.height * (compact ? 0.18 : 0.2);
-  const seatHalfWidth = compact ? 45 : 62;
-  const seatHalfHeight = compact ? 38 : 58;
-  const gap = compact ? 8 : 14;
-  const edgePadding = compact ? 4 : 8;
-  const xRadius = tableRadiusX + seatHalfWidth + gap;
-  const yRadius = tableRadiusY + seatHalfHeight + gap;
-
-  const x = clampNumber(
-    centerX + xRadius * Math.cos(angle),
-    seatHalfWidth + edgePadding,
-    stageSize.width - seatHalfWidth - edgePadding,
-  );
-  const y = clampNumber(
-    centerY + yRadius * Math.sin(angle),
-    seatHalfHeight + edgePadding,
-    stageSize.height - seatHalfHeight - edgePadding,
-  );
-  return { left: `${x}px`, top: `${y}px` };
 }
 function bestResultLabel(place: number) {
   if (!place) return "—";

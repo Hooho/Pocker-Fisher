@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { getTableCameraLayout } from "./tableLayout";
 export default function Table3D({
   potValue,
   done,
@@ -151,8 +152,10 @@ export default function Table3D({
         h = el.clientHeight;
       renderer.setSize(w, h);
       camera.aspect = w / h;
-      camera.position.y = w / h < 1.4 ? 14 : 10;
-      camera.position.z = w / h < 1.4 ? 13.7 : 9.8;
+      const cameraLayout = getTableCameraLayout(w, h);
+      camera.position.y = cameraLayout.positionY;
+      camera.position.z = cameraLayout.positionZ;
+      camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
       renderer.render(scene, camera);
     };

@@ -73,22 +73,31 @@ export default function Table3D({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chipToss?.token]);
   const host = useRef<HTMLDivElement>(null);
+  const overlayHost = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
-    if (!host.current) return;
+    if (!host.current || !overlayHost.current) return;
     const el = host.current;
+    const overlayEl = overlayHost.current;
     let unmounted = false;
     let renderer: THREE.WebGLRenderer;
+    let overlayRenderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+      overlayRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     } catch {
       setFailed(true);
       return;
     }
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    overlayRenderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
+    overlayRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    overlayRenderer.setClearColor(0x000000, 0);
     el.appendChild(renderer.domElement);
+    overlayEl.appendChild(overlayRenderer.domElement);
     const scene = new THREE.Scene();
+    const overlayScene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
     camera.position.set(0, 10, 9.8);
     camera.lookAt(0, 0, 0);
@@ -99,6 +108,13 @@ export default function Table3D({
     const rim = new THREE.PointLight(0x5aa989, 35);
     rim.position.set(3, 3, -4);
     scene.add(rim);
+    overlayScene.add(new THREE.HemisphereLight(0xe0f3d8, 0x252117, 2.5));
+    const overlayKey = new THREE.DirectionalLight(0xffe5b8, 3);
+    overlayKey.position.set(-3, 8, 3);
+    overlayScene.add(overlayKey);
+    const overlayRim = new THREE.PointLight(0x5aa989, 35);
+    overlayRim.position.set(3, 3, -4);
+    overlayScene.add(overlayRim);
     const shape = (x: number, z: number) => {
       const s = new THREE.Shape();
       s.absellipse(0, 0, x, z, 0, Math.PI * 2, false, 0);
@@ -211,17 +227,22 @@ export default function Table3D({
     };
     scene.add(chips);
     const chipGroups = [chips];
+    const renderScenes = () => {
+      renderer.render(scene, camera);
+      overlayRenderer.render(overlayScene, camera);
+    };
     const resize = () => {
       const w = el.clientWidth,
         h = el.clientHeight;
       renderer.setSize(w, h);
+      overlayRenderer.setSize(w, h);
       camera.aspect = w / h;
       const cameraLayout = getTableCameraLayout(w, h);
       camera.position.y = cameraLayout.positionY;
       camera.position.z = cameraLayout.positionZ;
       camera.lookAt(0, 0, 0);
       camera.updateProjectionMatrix();
-      renderer.render(scene, camera);
+      renderScenes();
     };
     const ro = new ResizeObserver(resize);
     ro.observe(el);
@@ -279,7 +300,7 @@ export default function Table3D({
       }
       flyer.position.copy(start);
       flyer.rotation.z = (Math.random() - 0.5) * 0.6;
-      scene.add(flyer);
+      overlayScene.add(flyer);
       const flyStart = performance.now() + delay;
       const duration = 480;
       const flyTick = () => {
@@ -289,17 +310,17 @@ export default function Table3D({
         flyer.position.lerpVectors(start, end, ease);
         flyer.position.y = start.y + Math.sin(progress * Math.PI) * 0.9;
         flyer.rotation.x += 0.35;
-        renderer.render(scene, camera);
+        renderScenes();
         if (progress < 1) requestAnimationFrame(flyTick);
         else {
-          scene.remove(flyer);
+          overlayScene.remove(flyer);
           flyer.children.forEach((child) => {
             const mesh = child as THREE.Mesh;
             mesh.geometry.dispose();
             (mesh.material as THREE.Material).dispose();
           });
           onComplete?.();
-          renderer.render(scene, camera);
+          renderScenes();
         }
       };
       flyTick();
@@ -348,7 +369,7 @@ export default function Table3D({
         if (!contributors.length) {
           initialFlightHand = null;
           chips.visible = pot > 0;
-          renderer.render(scene, camera);
+          renderScenes();
           return;
         }
         onChipAnimationStart(
@@ -367,7 +388,7 @@ export default function Table3D({
               chips.position.set(0, 0, 0);
               setPoolChipCount(chips, latestPot, latestUnit);
               chips.visible = latestPot > 0 && !latestFinished;
-              renderer.render(scene, camera);
+              renderScenes();
             },
           );
         });
@@ -401,7 +422,7 @@ export default function Table3D({
         }
       });
       if (groupCount === 0) {
-        renderer.render(scene, camera);
+        renderScenes();
         return;
       }
       const tick = () => {
@@ -412,11 +433,11 @@ export default function Table3D({
           group.position.lerpVectors(starts[index], destinations[index], ease);
           group.scale.y = 1;
         });
-        renderer.render(scene, camera);
+        renderScenes();
         if (progress < 1) frame = requestAnimationFrame(tick);
         else if (movingToWinners) {
           chipGroups.forEach((group) => (group.visible = false));
-          renderer.render(scene, camera);
+          renderScenes();
         }
       };
       tick();
@@ -448,16 +469,30 @@ export default function Table3D({
           materials.forEach((m) => m.dispose());
         }
       });
+      overlayScene.traverse((obj) => {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Line) {
+          obj.geometry.dispose();
+          const materials = Array.isArray(obj.material)
+            ? obj.material
+            : [obj.material];
+          materials.forEach((m) => m.dispose());
+        }
+      });
       texture.dispose();
       renderer.dispose();
+      overlayRenderer.dispose();
       renderer.domElement.remove();
+      overlayRenderer.domElement.remove();
     };
   }, []);
   return (
-    <div
-      className={"three-scene" + (failed ? " fallback" : "")}
-      ref={host}
-      aria-hidden="true"
-    />
+    <>
+      <div
+        className={"three-scene" + (failed ? " fallback" : "")}
+        ref={host}
+        aria-hidden="true"
+      />
+      <div className="three-scene-overlay" ref={overlayHost} aria-hidden="true" />
+    </>
   );
 }

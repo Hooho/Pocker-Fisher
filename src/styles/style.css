@@ -901,6 +901,19 @@ footer>span:last-child {
   height: 100%;
 }
 
+.three-scene-overlay {
+  position: absolute;
+  inset: -30px -5% -10px;
+  z-index: 7;
+  pointer-events: none;
+}
+
+.three-scene-overlay canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
 .fallback {
   inset: 90px 3% 60px;
   border-radius: 50%;
@@ -3544,7 +3557,8 @@ footer {
   overflow: hidden
 }
 
-.three-scene {
+.three-scene,
+.three-scene-overlay {
   inset: -7% -3% -8%
 }
 
@@ -4428,7 +4442,8 @@ footer {
     min-height: 0
   }
 
-  .three-scene {
+  .three-scene,
+  .three-scene-overlay {
     inset: -1% -7% -2%
   }
 

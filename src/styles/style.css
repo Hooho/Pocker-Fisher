@@ -619,10 +619,14 @@ header {
   text-align: left;
   display: block;
   position: relative;
+  width: 100%;
+  color: inherit;
+  font: inherit;
   background: #19221b;
   padding: 24px 25px 18px;
   border-radius: 9px;
   border: 1px solid #34412f;
+  cursor: pointer;
 }
 
 .mode-card:hover {

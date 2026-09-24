@@ -47,64 +47,35 @@ export function LobbyPage({
       </div>
       <div className="mode-grid">
         <div className="mode-card-wrap">
-          <div
+          <button
+            type="button"
             className="mode-card home-mode-card"
-            role="button"
-            tabIndex={0}
             onClick={() => onNew("cash")}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onNew("cash");
-              }
-            }}
           >
             <div className="mode-title-row">
               <h3>单次赛</h3>
-              <button
-                type="button"
-                className="mode-details-button"
-                aria-label="查看单次赛说明"
-                title="查看单次赛说明"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onModeDetails("cash");
-                }}
-              >
-                <Info size={15} />
-              </button>
             </div>
             <p>开启一场独立牌局，与电脑选手对战。</p>
             <div className="mode-footer"><span>2–8 人牌桌 · 难度自选</span><ArrowUpRight size={20} /></div>
-          </div>
+          </button>
+          <button
+            type="button"
+            className="mode-details-button"
+            aria-label="查看单次赛说明"
+            title="查看单次赛说明"
+            onClick={() => onModeDetails("cash")}
+          >
+            <Info size={15} />
+          </button>
         </div>
         <div className="mode-card-wrap">
-          <div
+          <button
+            type="button"
             className="mode-card competition home-mode-card"
-            role="button"
-            tabIndex={0}
             onClick={onEnterChampionship}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                onEnterChampionship();
-              }
-            }}
           >
             <div className="mode-title-row">
               <h3>冠军之路</h3>
-              <button
-                type="button"
-                className="mode-details-button"
-                aria-label="查看冠军赛说明"
-                title="查看冠军赛说明"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onModeDetails("tournament");
-                }}
-              >
-                <Info size={15} />
-              </button>
             </div>
             <p>
               {isActiveTournament
@@ -125,7 +96,16 @@ export function LobbyPage({
               </span>
               <ArrowUpRight size={20} />
             </div>
-          </div>
+          </button>
+          <button
+            type="button"
+            className="mode-details-button"
+            aria-label="查看冠军赛说明"
+            title="查看冠军赛说明"
+            onClick={() => onModeDetails("tournament")}
+          >
+            <Info size={15} />
+          </button>
         </div>
       </div>
     </div>

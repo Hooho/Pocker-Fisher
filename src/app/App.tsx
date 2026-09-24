@@ -2650,7 +2650,7 @@ export default function App() {
                   <>
                     <div className="hand-result">
                       <span className={`eyebrow ${!t?.complete && !t?.out ? "hand-winner-eyebrow" : ""}`}>{t?.complete ? "CHAMPION" : t?.out ? "TOURNAMENT ENDED" : "本手赢家"}</span>
-                      {t?.complete ? <strong>{t.out ? "冠军赛模拟完成，最终冠军已产生" : "恭喜，你赢得了本届冠军！"}</strong> : t?.out ? <strong>你已出局，正在模拟其余比赛…</strong> : <div className="hand-winners">{g.winners.map(i => { const winner = g.players[i]; const amount = Math.max(0, winner.chips - winner.start + winner.total); return <div className="hand-winner" key={winner.profile.id}><Avatar p={winner.profile} playerAvatar={data.playerProfile.avatar} /><span><small>{g.winners.length > 1 ? "底池赢家" : "本手赢家"}</small><b>{winner.profile.name}</b></span><strong>+{amount.toLocaleString()}</strong>{g.board.length === 5 ? <em>{evaluate([...winner.cards, ...g.board]).name}</em> : null}</div> })}</div>}
+                      {t?.complete ? <strong>{t.out ? "冠军赛模拟完成，最终冠军已产生" : "恭喜，你赢得了本届冠军！"}</strong> : t?.out ? <strong>你已出局，正在模拟其余比赛…</strong> : <div className="hand-winners">{g.winners.map(i => { const winner = g.players[i]; const amount = Math.max(0, winner.chips - winner.start + winner.total); return <div className="hand-winner" key={winner.profile.id}><Avatar p={winner.profile} playerAvatar={data.playerProfile.avatar} /><span><b>{winner.profile.name}</b></span><strong>+{amount.toLocaleString()}</strong>{g.board.length === 5 ? <em>{evaluate([...winner.cards, ...g.board]).name}</em> : null}</div> })}</div>}
                       {waitingOnOtherTables ? (
                         <div className="advance-wait" aria-live="polite">
                           <span>{progress || "正在等待其他牌桌结束…"}</span>

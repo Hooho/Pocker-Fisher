@@ -10054,6 +10054,10 @@ footer {
   margin-bottom: calc(6px * var(--table-scale));
 }
 
+.table-stage .seat-cards:empty {
+  min-height: calc(48px * var(--table-scale));
+}
+
 .table-stage .seat {
   width: calc(118px * var(--table-scale));
   min-width: calc(118px * var(--table-scale));
@@ -10069,7 +10073,7 @@ footer {
   padding: calc(7px * var(--table-scale)) calc(10px * var(--table-scale));
   width: 100%;
   min-width: 0;
-  margin-top: calc(26px * var(--table-scale));
+  margin-top: 0;
   box-sizing: border-box;
 }
 
@@ -10098,21 +10102,18 @@ footer {
 }
 
 .table-stage .seat-action {
-  position: absolute;
-  top: calc(134px * var(--table-scale));
-  left: 0;
-  right: 0;
-  margin-top: 0;
+  position: static;
+  align-self: center;
+  margin-top: calc(6px * var(--table-scale));
   min-height: calc(14px * var(--table-scale));
   font-size: calc(9px * var(--table-scale));
 }
 
 .table-stage .seat-action-callout {
-  position: absolute;
-  top: calc(54px * var(--table-scale));
-  left: 0;
-  right: 0;
+  position: static;
+  align-self: center;
   width: max-content;
+  margin: 0 auto;
   gap: calc(6px * var(--table-scale));
   padding: calc(4px * var(--table-scale)) calc(10px * var(--table-scale));
   border-radius: calc(22px * var(--table-scale));
@@ -10124,10 +10125,9 @@ footer {
 }
 
 .table-stage .hand-name {
-  position: absolute;
-  top: calc(134px * var(--table-scale));
-  left: 0;
-  right: 0;
+  position: static;
+  align-self: center;
+  display: block;
   margin-top: calc(1px * var(--table-scale));
   font-size: calc(9px * var(--table-scale));
   line-height: 1.2;

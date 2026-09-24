@@ -2566,7 +2566,7 @@ export default function App() {
                 <strong>{tableRoundLabel}</strong>
                 <span>第 {g.hand} 手</span>
               </div>
-              <Table3D potValue={pot(g)} done={g.done} winnerIndices={g.winners} playerCount={g.players.length} chipToss={chipToss} />
+              <Table3D potValue={pot(g)} chipUnit={g.bb} done={g.done} winnerIndices={g.winners} playerCount={g.players.length} chipToss={chipToss} />
               <div className="community">
                 <div className="pot-label">
                   {g.done ? "已派奖" : "底池总额"}{" "}

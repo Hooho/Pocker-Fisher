@@ -6,23 +6,25 @@ type ScreenPoint = { x: number; y: number };
 
 export default function Table3D({
   potValue,
+  chipUnit,
   done,
   winnerIndices,
   playerCount,
   chipToss,
 }: {
   potValue: number;
+  chipUnit: number;
   done: boolean;
   winnerIndices: number[];
   playerCount: number;
   chipToss?: { seat: number; token: number; source: ScreenPoint | null } | null;
 }) {
   const update = useRef<
-    ((pot: number, done: boolean, winners: number[], players: number) => void) | null
+    ((pot: number, unit: number, done: boolean, winners: number[], players: number) => void) | null
   >(null);
   useEffect(() => {
-    update.current?.(potValue, done, winnerIndices, playerCount);
-  }, [potValue, done, winnerIndices, playerCount]);
+    update.current?.(potValue, chipUnit, done, winnerIndices, playerCount);
+  }, [potValue, chipUnit, done, winnerIndices, playerCount]);
   const toss = useRef<((seat: number, players: number, source: ScreenPoint | null) => void) | null>(null);
   useEffect(() => {
     if (chipToss) toss.current?.(chipToss.seat, playerCount, chipToss.source);
@@ -124,8 +126,13 @@ export default function Table3D({
     );
     const chips = new THREE.Group();
     const colors = [0xb99863, 0xad5844, 0x59807f];
-    for (let stack = 0; stack < 5; stack++) {
-      for (let h = 0; h < 2 + (stack % 2); h++) {
+    const maxPoolChips = 40;
+    for (let index = 0; index < maxPoolChips; index++) {
+      const stack = index % 5;
+      const height = Math.floor(index / 5);
+      const chipStack = new THREE.Group();
+      chipStack.position.set((stack - 2) * 0.23, 0, 1.9 + (stack % 2) * 0.12);
+      for (let h = 0; h < 1; h++) {
         const chip = new THREE.Mesh(
           new THREE.CylinderGeometry(0.15, 0.15, 0.042, 28),
           new THREE.MeshStandardMaterial({
@@ -134,12 +141,8 @@ export default function Table3D({
             metalness: 0.18,
           }),
         );
-        chip.position.set(
-          (stack - 2) * 0.23,
-          0.2 + h * 0.046,
-          1.9 + (stack % 2) * 0.12,
-        );
-        chips.add(chip);
+        chip.position.y = 0.2 + (height + h) * 0.046;
+        chipStack.add(chip);
         for (let k = 0; k < 6; k++) {
           const band = new THREE.Mesh(
             new THREE.BoxGeometry(0.028, 0.048, 0.037),
@@ -147,15 +150,23 @@ export default function Table3D({
           );
           const a = (k * Math.PI) / 3;
           band.position.set(
-            chip.position.x + Math.cos(a) * 0.12,
+            Math.cos(a) * 0.12,
             chip.position.y,
-            chip.position.z + Math.sin(a) * 0.12,
+            Math.sin(a) * 0.12,
           );
           band.rotation.y = -a;
-          chips.add(band);
+          chipStack.add(band);
         }
       }
+      chips.add(chipStack);
     }
+    const setPoolChipCount = (group: THREE.Group, pot: number, unit: number) => {
+      const visualUnit = Math.max(1, unit / 2);
+      const count = Math.min(maxPoolChips, Math.ceil(Math.max(0, pot) / visualUnit));
+      group.children.forEach((chipStack, index) => {
+        chipStack.visible = index < count;
+      });
+    };
     scene.add(chips);
     const chipGroups = [chips];
     const resize = () => {
@@ -237,8 +248,9 @@ export default function Table3D({
       };
       flyTick();
     };
-    update.current = (pot, finished, winners, players) => {
+    update.current = (pot, unit, finished, winners, players) => {
       cancelAnimationFrame(frame);
+      setPoolChipCount(chips, pot, unit);
       const start = performance.now();
       const movingToWinners = finished && winners.length > 0;
       const groupCount = finished ? winners.length : 1;
@@ -279,10 +291,7 @@ export default function Table3D({
         chipGroups.forEach((group, index) => {
           if (index >= groupCount) return;
           group.position.lerpVectors(starts[index], destinations[index], ease);
-          group.scale.y = Math.max(
-            0.7,
-            Math.min(1.5, Math.log2(1 + pot / 100) / 3.4),
-          );
+          group.scale.y = 1;
         });
         renderer.render(scene, camera);
         if (progress < 1) frame = requestAnimationFrame(tick);
@@ -293,7 +302,7 @@ export default function Table3D({
       };
       tick();
     };
-    update.current(potValue, done, winnerIndices, playerCount);
+    update.current(potValue, chipUnit, done, winnerIndices, playerCount);
     return () => {
       unmounted = true;
       cancelAnimationFrame(frame);

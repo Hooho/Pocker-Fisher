@@ -461,6 +461,21 @@ header {
   border-color: #e8d5ad;
 }
 
+.advance-button-copy {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.advance-button-target {
+  color: #15271b;
+  font-size: 1.28em;
+  font-weight: 800;
+  letter-spacing: .02em;
+}
+
 .hero-footnote {
   font-size: 9px;
   color: #8e9e86;

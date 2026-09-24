@@ -1955,9 +1955,9 @@ export default function App() {
   const waitingOnOtherTables = busy && !!t?.background && !t.background.done;
   const canAdvance = !!g?.done && alive <= threshold;
   const advancementTargetRound = t ? Math.min(t.round + 1, counts.length - 1) : 0;
-  const advancementButtonLabel = t
-    ? `确认晋级${roundLabel(advancementTargetRound)} ${counts[advancementTargetRound]}强`
-    : "确认晋级";
+  const advancementTargetLabel = t
+    ? `${roundLabel(advancementTargetRound)} ${counts[advancementTargetRound]}强`
+    : "";
   const selectedCurrent = selected ? profile(selected) : null;
   const selectedCareerStats = selectedCurrent
     ? data.playerStats[String(selectedCurrent.id)] || blankCareerStats
@@ -2672,7 +2672,12 @@ export default function App() {
                         {busy
                           ? "请稍候…"
                           : canAdvance && t
-                            ? advancementButtonLabel
+                            ? (
+                              <span className="advance-button-copy">
+                                <span>确认晋级</span>
+                                <strong className="advance-button-target">{advancementTargetLabel}</strong>
+                              </span>
+                            )
                             : g.players[0].chips === 0
                               ? "结算比赛"
                               : "下一手"}

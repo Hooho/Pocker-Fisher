@@ -2559,7 +2559,7 @@ export default function App() {
                       <span className="winner-confetti" aria-hidden="true">
                         {winnerPetals.map((petal, index) => (
                           <i
-                            className={"winner-confetti-piece " + (index % 4 === 0 ? "round" : "")}
+                            className={"winner-confetti-piece " + (index % 4 === 0 ? "confetti-round" : "")}
                             key={`${g.hand}-${p.profile.id}-petal-${index}`}
                             style={{
                               "--burst-x": `${petal.x}px`,

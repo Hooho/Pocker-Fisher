@@ -1347,7 +1347,7 @@ footer>span:last-child {
   animation-fill-mode: both;
 }
 
-.winner-confetti-piece.round {
+.winner-confetti-piece.confetti-round {
   width: 6px;
   height: 6px;
   border-radius: 50%;

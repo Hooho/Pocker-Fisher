@@ -2399,6 +2399,60 @@ export default function App() {
       </form>
     </>
   );
+  const infoSettingsContent = (
+    <section className="info-settings" aria-labelledby="info-settings-title">
+      <div className="settings-section-heading">
+        <h1 id="info-settings-title">说明</h1>
+        <p className="muted">了解游戏存档的保存位置、读取时机和备份方式。</p>
+      </div>
+      <div className="info-settings-grid">
+        <article className="info-settings-card info-settings-card-primary">
+          <div className="info-settings-card-heading">
+            <span className="info-settings-icon"><Info size={17} /></span>
+            <div>
+              <p className="eyebrow">VSCODE EXTENSION</p>
+              <h2>VS Code 扩展存档</h2>
+            </div>
+          </div>
+          <p>
+            游戏运行时会先快速保存到 Webview 的本地存储，同时在后台自动备份为 JSON 文件。
+          </p>
+          <dl className="info-settings-list">
+            <div>
+              <dt>文件名</dt>
+              <dd><code>river-club-save.json</code></dd>
+            </div>
+            <div>
+              <dt>默认位置</dt>
+              <dd><code>.vscode/river-club-save.json</code></dd>
+            </div>
+            <div>
+              <dt>读取时机</dt>
+              <dd>打开或重新加载游戏时，自动恢复较新的存档。</dd>
+            </div>
+          </dl>
+          <div className="notice info-settings-note">
+            JSON 备份会在游戏操作停止约 0.75 秒后写入，不会阻塞牌局操作。没有打开工作区时，会保存到扩展专属目录。
+          </div>
+        </article>
+        <article className="info-settings-card">
+          <div className="info-settings-card-heading">
+            <span className="info-settings-icon info-settings-icon-muted"><BookOpen size={17} /></span>
+            <div>
+              <p className="eyebrow">BROWSER MODE</p>
+              <h2>浏览器模式</h2>
+            </div>
+          </div>
+          <p>
+            普通浏览器使用 localStorage 自动保存，不会直接写入电脑目录。
+          </p>
+          <div className="info-settings-browser-actions">
+            <span>需要备份或迁移时，请使用游戏中的“导出存档”功能生成 JSON 文件。</span>
+          </div>
+        </article>
+      </div>
+    </section>
+  );
   const resetSettingsContent = (
     <section className="reset-settings" aria-labelledby="reset-settings-title">
       <div className="settings-section-heading">
@@ -3020,6 +3074,7 @@ export default function App() {
             aiContent={aiSettingsContent}
             playersContent={playerDirectoryContent}
             profileContent={profileSettingsContent}
+            infoContent={infoSettingsContent}
             resetContent={resetSettingsContent}
           />
         ) : page === "players" ? (

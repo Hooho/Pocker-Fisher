@@ -157,8 +157,28 @@ export default function Table3D({
     }> = [];
     let contributionSnapshot: number[] = [];
     let initialFlightFrame = 0;
+    let actionFlightFrame = 0;
     let initialFlightPot = 0;
     let initialFlightFinished = false;
+    const actionFlights: Array<{
+      group: THREE.Group;
+      from: THREE.Vector3;
+      to: THREE.Vector3;
+      startedAt: number;
+      spin: number;
+    }> = [];
+    const actionChipGeometry = new THREE.CylinderGeometry(0.16, 0.16, 0.045, 28);
+    const actionChipMaterial = new THREE.MeshStandardMaterial({
+      color: 0xc6a35d,
+      roughness: 0.36,
+      metalness: 0.2,
+    });
+    const actionChipEdgeGeometry = new THREE.TorusGeometry(0.125, 0.012, 8, 24);
+    const actionChipEdgeMaterial = new THREE.MeshStandardMaterial({
+      color: 0xf0db9a,
+      roughness: 0.3,
+      metalness: 0.25,
+    });
 
     const playerPosition = (index: number, players: number) => {
       const angle = Math.PI / 2 + (index * Math.PI * 2) / Math.max(1, players);
@@ -167,6 +187,52 @@ export default function Table3D({
         0,
         Math.sin(angle) * 2.05,
       );
+    };
+
+    const animateActionFlights = () => {
+      const now = performance.now();
+      for (let i = actionFlights.length - 1; i >= 0; i -= 1) {
+        const flight = actionFlights[i];
+        const progress = Math.min(1, (now - flight.startedAt) / 820);
+        const ease = 1 - (1 - progress) ** 3;
+        flight.group.position.lerpVectors(flight.from, flight.to, ease);
+        flight.group.position.y += Math.sin(Math.PI * progress) * 0.72;
+        flight.group.rotation.x = flight.spin + progress * Math.PI * 5;
+        flight.group.rotation.z = Math.sin(Math.PI * progress) * 0.22;
+        flight.group.scale.setScalar(0.82 + Math.sin(Math.PI * progress) * 0.16);
+        if (progress >= 1) {
+          scene.remove(flight.group);
+          actionFlights.splice(i, 1);
+        }
+      }
+      renderer.render(scene, camera);
+      actionFlightFrame = actionFlights.length
+        ? requestAnimationFrame(animateActionFlights)
+        : 0;
+    };
+
+    const queueActionFlight = (from: THREE.Vector3, to: THREE.Vector3) => {
+      const group = new THREE.Group();
+      const chip = new THREE.Mesh(actionChipGeometry, actionChipMaterial);
+      chip.position.y = 0.22;
+      group.add(chip);
+      const edge = new THREE.Mesh(actionChipEdgeGeometry, actionChipEdgeMaterial);
+      edge.rotation.x = Math.PI / 2;
+      edge.position.y = 0.246;
+      group.add(edge);
+      group.position.copy(from);
+      group.rotation.x = (Math.random() - 0.5) * 0.35;
+      scene.add(group);
+      actionFlights.push({
+        group,
+        from,
+        to,
+        startedAt: performance.now(),
+        spin: group.rotation.x,
+      });
+      if (actionFlights.length === 1) {
+        actionFlightFrame = requestAnimationFrame(animateActionFlights);
+      }
     };
 
     const animateInitialFlights = () => {
@@ -241,6 +307,14 @@ export default function Table3D({
         return;
       }
 
+      totals.forEach((amount, index) => {
+        if (amount > (previous[index] || 0)) {
+          const from = playerPosition(index, players);
+          from.y = 0.22;
+          queueActionFlight(from, new THREE.Vector3(0, 0.22, 0));
+        }
+      });
+
       cancelAnimationFrame(frame);
       const start = performance.now();
       const movingToWinners = finished && winners.length > 0;
@@ -301,7 +375,13 @@ export default function Table3D({
     return () => {
       cancelAnimationFrame(frame);
       cancelAnimationFrame(initialFlightFrame);
+      cancelAnimationFrame(actionFlightFrame);
       initialFlights.forEach(({ group }) => scene.remove(group));
+      actionFlights.forEach(({ group }) => scene.remove(group));
+      actionChipGeometry.dispose();
+      actionChipMaterial.dispose();
+      actionChipEdgeGeometry.dispose();
+      actionChipEdgeMaterial.dispose();
       update.current = null;
       ro.disconnect();
       scene.traverse((obj) => {

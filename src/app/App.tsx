@@ -87,6 +87,16 @@ import {
 } from "../domain/storage/storage";
 import { aiMove, reshape, requestAI } from "../domain/game/ai";
 import { playGameSound } from "../domain/game/sound";
+
+type CommunityCardDebugFunction = () => void;
+
+declare global {
+  interface Window {
+    showAllCommunityCards?: CommunityCardDebugFunction;
+    hideAllCommunityCards?: CommunityCardDebugFunction;
+  }
+}
+
 const levels = ["入门", "普通", "进阶", "专家", "大师"];
 const rounds = [
   "首轮",
@@ -927,6 +937,7 @@ export default function App() {
   const [seatAvatarPositions, setSeatAvatarPositions] = useState<Array<{ x: number; y: number } | null>>([]);
   const [tableStageSize, setTableStageSize] = useState<TableStageSize>({ width: 0, height: 0 });
   const [tableSeatSize, setTableSeatSize] = useState<TableSeatSize>({ width: 0, height: 0 });
+  const [showAllCommunityCards, setShowAllCommunityCards] = useState(false);
   const actionId = useRef(0);
   const file = useRef<HTMLInputElement>(null);
   const localLeaderboardRow = useRef<HTMLButtonElement>(null);
@@ -971,6 +982,34 @@ export default function App() {
   const backgroundWorker = useRef<Worker | null>(null);
   const eliminatedWorker = useRef<Worker | null>(null);
   const g = data.game;
+
+  useEffect(() => {
+    const previousShowAllCommunityCards = window.showAllCommunityCards;
+    const previousHideAllCommunityCards = window.hideAllCommunityCards;
+    const showAllCommunityCards: CommunityCardDebugFunction = () => {
+      setShowAllCommunityCards(true);
+      setToast("已通过控制台显示本手五张公共牌");
+    };
+    const hideAllCommunityCards: CommunityCardDebugFunction = () => {
+      setShowAllCommunityCards(false);
+      setToast("已恢复按流程显示公共牌");
+    };
+
+    window.showAllCommunityCards = showAllCommunityCards;
+    window.hideAllCommunityCards = hideAllCommunityCards;
+    console.info("[摸鱼德州] 控制台调试命令：window.showAllCommunityCards()");
+    return () => {
+      if (window.showAllCommunityCards === showAllCommunityCards) {
+        if (previousShowAllCommunityCards) window.showAllCommunityCards = previousShowAllCommunityCards;
+        else delete window.showAllCommunityCards;
+      }
+      if (window.hideAllCommunityCards === hideAllCommunityCards) {
+        if (previousHideAllCommunityCards) window.hideAllCommunityCards = previousHideAllCommunityCards;
+        else delete window.hideAllCommunityCards;
+      }
+    };
+  }, []);
+
   const t = data.tournament;
   const tablePlayerTotals = useMemo(() => g?.players.map((player) => player.total) ?? [], [g?.players]);
   const championshipWon = Boolean(
@@ -2190,19 +2229,6 @@ export default function App() {
             <option value="all">AI 增强 · 每次行动</option>
           </select>
         </label>
-        <label>
-          调试模式
-          <select
-            value={data.settings.debugFast ? "on" : "off"}
-            onChange={(e) => updateSettings({ debugFast: e.target.value === "on" })}
-          >
-            <option value="off">关闭</option>
-            <option value="on">开启 · 提前显示五张公共牌</option>
-          </select>
-        </label>
-        <div className="notice settings-wide">
-          调试模式只影响牌桌显示：牌局进行时提前显示本手全部五张公共牌，牌局结束时按正常流程摊牌，不改变发牌、行动、结算、淘汰或晋级逻辑。
-        </div>
         <div className="settings-wide provider-picker">
           <div className="provider-picker-heading">
             <span>快速配置模型</span>
@@ -2406,7 +2432,7 @@ export default function App() {
       </div>
     </section>
   );
-  const displayedBoard = g && data.settings.debugFast ? previewBoard(g) : g?.board ?? [];
+  const displayedBoard = g && showAllCommunityCards ? previewBoard(g) : g?.board ?? [];
   const tableSeatPositions = g
     ? getTableSeatPositions(g.players.length, tableStageSize, tableSeatSize)
     : [];
@@ -2630,8 +2656,8 @@ export default function App() {
                       key={`${g.hand}-${i}-${displayedBoard[i]}`}
                       value={displayedBoard[i]}
                       back={displayedBoard[i] === undefined}
-                      className={data.settings.debugFast ? "board-card-preview" : g.board[i] === undefined ? "board-card-deal" : "board-card-reveal"}
-                      style={{ animationDelay: data.settings.debugFast || g.board[i] === undefined ? `${i * 90}ms` : "0ms" }}
+                      className={showAllCommunityCards ? "board-card-preview" : g.board[i] === undefined ? "board-card-deal" : "board-card-reveal"}
+                      style={{ animationDelay: showAllCommunityCards || g.board[i] === undefined ? `${i * 90}ms` : "0ms" }}
                       highlight={
                         (g.done &&
                           g.winners.some((w) =>

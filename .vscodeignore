@@ -5,6 +5,8 @@
 .agents/**
 .codex/**
 node_modules/**
+artifacts/**
+**/*.tsbuildinfo
 src/**
 public/**
 scripts/**

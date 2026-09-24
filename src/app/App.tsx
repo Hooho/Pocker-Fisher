@@ -1090,26 +1090,15 @@ export default function App() {
   }, [tableTimerRunning]);
   const [showFireworks, setShowFireworks] = useState(false);
   const fireworksTimer = useRef<number | null>(null);
-  const championCelebrationInitialized = useRef(false);
-  const previousChampionReady = useRef(false);
   const triggerFireworks = useCallback((durationMs: number) => {
     setShowFireworks(true);
     if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
     fireworksTimer.current = window.setTimeout(() => setShowFireworks(false), durationMs);
   }, []);
-  // Trigger only when the real player wins the final hand. Advancing rounds or
-  // an automatically simulated championship should stay visually quiet.
+  // Keep the celebration replayable until the player confirms the championship.
+  // That means refreshing the unconfirmed final hand can replay the moment too.
   useEffect(() => {
-    if (!ready) return;
-    if (!championCelebrationInitialized.current) {
-      championCelebrationInitialized.current = true;
-      previousChampionReady.current = championshipWon;
-      return;
-    }
-    if (championshipWon && !previousChampionReady.current) {
-      triggerFireworks(9500);
-    }
-    previousChampionReady.current = championshipWon;
+    if (ready && championshipWon) triggerFireworks(9500);
   }, [championshipWon, ready, triggerFireworks]);
   useEffect(() => {
     return () => {

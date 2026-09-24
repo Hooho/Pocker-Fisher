@@ -6386,6 +6386,7 @@ footer {
     width: 100%;
     min-width: 0;
     max-width: none;
+    align-self: center;
   }
 
   .app.immersive .action-panel:not(.hand-complete) .action-buttons {

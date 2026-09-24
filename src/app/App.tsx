@@ -13,9 +13,10 @@ import { LobbyPage } from "../pages/LobbyPage";
 import { PlayersPage } from "../pages/PlayersPage";
 import { SettingsPage, type SettingsSection } from "../pages/SettingsPage";
 import { TablePage } from "../pages/TablePage";
+import Table3D from "../components/Table3D";
 import { TournamentPage } from "../pages/TournamentPage";
 import { LeaderboardPage } from "../pages/LeaderboardPage";
-import { useEffect, useRef, useState, useMemo, useCallback, memo, lazy, Suspense, type CSSProperties } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback, memo, type CSSProperties } from "react";
 import {
   ArrowUpRight,
   ChevronRight,
@@ -80,7 +81,6 @@ import {
   type PlayerCareerStats,
 } from "../domain/storage/storage";
 import { aiMove, reshape, requestAI } from "../domain/game/ai";
-const Table3D = lazy(() => import("../components/Table3D"));
 import { playGameSound } from "../domain/game/sound";
 const levels = ["入门", "普通", "进阶", "专家", "大师"];
 const rounds = [
@@ -2416,8 +2416,9 @@ export default function App() {
             onModeDetails={openModeDetails}
             onEnterChampionship={enterChampionship}
           />
-        ) : page === "table" && g ? (
-          <TablePage>
+        ) : page === "table" ? (
+          g ? (
+            <TablePage>
             <div className="table-heading">
               <div className="table-heading-title table-heading-left">
                 <button
@@ -2483,9 +2484,7 @@ export default function App() {
                 <strong>{tableRoundLabel}</strong>
                 <span>第 {g.hand} 手</span>
               </div>
-              <Suspense fallback={null}>
-                <Table3D potValue={pot(g)} done={g.done} winnerIndices={g.winners} playerCount={g.players.length} />
-              </Suspense>
+              <Table3D potValue={pot(g)} done={g.done} winnerIndices={g.winners} playerCount={g.players.length} />
               <div className="community">
                 <div className="pot-label">
                   {g.done ? "已派奖" : "底池总额"}{" "}
@@ -2837,7 +2836,10 @@ export default function App() {
                 )}
               </div>
             </div>
-          </TablePage>
+            </TablePage>
+          ) : (
+            <div className="loading">正在恢复牌局…</div>
+          )
         ) : page === "settings" ? (
           <SettingsPage
             section={settingsSection}

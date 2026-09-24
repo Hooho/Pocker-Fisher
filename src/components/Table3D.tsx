@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { getTableCameraLayout } from "./tableLayout";
+
+type ScreenPoint = { x: number; y: number };
+
 export default function Table3D({
   potValue,
   done,
@@ -12,7 +15,7 @@ export default function Table3D({
   done: boolean;
   winnerIndices: number[];
   playerCount: number;
-  chipToss?: { seat: number; token: number } | null;
+  chipToss?: { seat: number; token: number; source: ScreenPoint | null } | null;
 }) {
   const update = useRef<
     ((pot: number, done: boolean, winners: number[], players: number) => void) | null
@@ -20,9 +23,9 @@ export default function Table3D({
   useEffect(() => {
     update.current?.(potValue, done, winnerIndices, playerCount);
   }, [potValue, done, winnerIndices, playerCount]);
-  const toss = useRef<((seat: number, players: number) => void) | null>(null);
+  const toss = useRef<((seat: number, players: number, source: ScreenPoint | null) => void) | null>(null);
   useEffect(() => {
-    if (chipToss) toss.current?.(chipToss.seat, playerCount);
+    if (chipToss) toss.current?.(chipToss.seat, playerCount, chipToss.source);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chipToss?.token]);
   const host = useRef<HTMLDivElement>(null);
@@ -171,13 +174,28 @@ export default function Table3D({
     ro.observe(el);
     resize();
     let frame = 0;
-    toss.current = (seatIndex, players) => {
+    const screenRaycaster = new THREE.Raycaster();
+    const chipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.25);
+    const screenToTablePoint = (point: ScreenPoint) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      if (!rect.width || !rect.height) return null;
+      screenRaycaster.setFromCamera(
+        new THREE.Vector2(
+          ((point.x - rect.left) / rect.width) * 2 - 1,
+          1 - ((point.y - rect.top) / rect.height) * 2,
+        ),
+        camera,
+      );
+      return screenRaycaster.ray.intersectPlane(chipPlane, new THREE.Vector3());
+    };
+    toss.current = (seatIndex, players, source) => {
       const angle = Math.PI / 2 + (seatIndex * Math.PI * 2) / Math.max(1, players);
-      const start = new THREE.Vector3(
+      const fallbackStart = new THREE.Vector3(
         Math.cos(angle) * 4.25,
         0.25,
         Math.sin(angle) * 2.05 - 1.41,
       );
+      const start = source ? screenToTablePoint(source) ?? fallbackStart : fallbackStart;
       const end = new THREE.Vector3(0, 0.22, 1.55);
       const flyer = new THREE.Group();
       const flyerColors = [0xb99863, 0xad5844, 0x59807f];

@@ -1,4 +1,5 @@
 import { ArrowUpRight, Info } from "lucide-react";
+import { useEffect, useRef } from "react";
 import type { Save, Tournament } from "../domain/storage/storage";
 
 type LobbyPageProps = {
@@ -20,6 +21,37 @@ export function LobbyPage({
 }: LobbyPageProps) {
   const visibleTournament = tournament || pausedTournament?.tournament;
   const isActiveTournament = visibleTournament && !visibleTournament.complete;
+  const cashCardRef = useRef<HTMLButtonElement>(null);
+  const tournamentCardRef = useRef<HTMLButtonElement>(null);
+  const cashDetailsRef = useRef<HTMLButtonElement>(null);
+  const tournamentDetailsRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const cashCard = cashCardRef.current;
+    const tournamentCard = tournamentCardRef.current;
+    const cashDetails = cashDetailsRef.current;
+    const tournamentDetails = tournamentDetailsRef.current;
+    if (!cashCard || !tournamentCard || !cashDetails || !tournamentDetails) return;
+
+    const handleCashCardClick = () => onNew("cash");
+    const handleTournamentCardClick = () => onEnterChampionship();
+    const handleCashDetailsClick = () => onModeDetails("cash");
+    const handleTournamentDetailsClick = () => onModeDetails("tournament");
+
+    // Keep the primary actions wired directly to the DOM as well as to the
+    // native button semantics. This avoids relying only on React's delegated
+    // event listener inside editor webviews.
+    cashCard.addEventListener("click", handleCashCardClick);
+    tournamentCard.addEventListener("click", handleTournamentCardClick);
+    cashDetails.addEventListener("click", handleCashDetailsClick);
+    tournamentDetails.addEventListener("click", handleTournamentDetailsClick);
+    return () => {
+      cashCard.removeEventListener("click", handleCashCardClick);
+      tournamentCard.removeEventListener("click", handleTournamentCardClick);
+      cashDetails.removeEventListener("click", handleCashDetailsClick);
+      tournamentDetails.removeEventListener("click", handleTournamentDetailsClick);
+    };
+  }, [onEnterChampionship, onModeDetails, onNew]);
 
   return (
     <div className="lobby lobby-home">
@@ -50,7 +82,7 @@ export function LobbyPage({
           <button
             type="button"
             className="mode-card home-mode-card"
-            onClick={() => onNew("cash")}
+            ref={cashCardRef}
           >
             <div className="mode-title-row">
               <h3>单次赛</h3>
@@ -63,7 +95,7 @@ export function LobbyPage({
             className="mode-details-button"
             aria-label="查看单次赛说明"
             title="查看单次赛说明"
-            onClick={() => onModeDetails("cash")}
+            ref={cashDetailsRef}
           >
             <Info size={15} />
           </button>
@@ -72,7 +104,7 @@ export function LobbyPage({
           <button
             type="button"
             className="mode-card competition home-mode-card"
-            onClick={onEnterChampionship}
+            ref={tournamentCardRef}
           >
             <div className="mode-title-row">
               <h3>冠军之路</h3>
@@ -102,7 +134,7 @@ export function LobbyPage({
             className="mode-details-button"
             aria-label="查看冠军赛说明"
             title="查看冠军赛说明"
-            onClick={() => onModeDetails("tournament")}
+            ref={tournamentDetailsRef}
           >
             <Info size={15} />
           </button>

@@ -2765,9 +2765,9 @@ export default function App() {
                         <b>{p.chips.toLocaleString()}</b>
                       </div>
                     </div>
-                    <div className="seat-action">
-                      {!p.last && !g.done && g.turn === i
-                        ? i === 0
+                    {!p.last && !g.done && g.turn === i ? (
+                      <div className="seat-action">
+                        {i === 0
                           ? "轮到你行动"
                           : (
                             <span className="thinking">
@@ -2781,9 +2781,9 @@ export default function App() {
                                 }
                               />
                             </span>
-                          )
-                        : !p.last ? p.profile.style : ""}
-                    </div>
+                          )}
+                      </div>
+                    ) : null}
                     {g.done && show && g.board.length === 5 ? (
                       <small className="hand-name">
                         {evaluate([...p.cards, ...g.board]).name}

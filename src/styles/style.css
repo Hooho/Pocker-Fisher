@@ -3769,15 +3769,15 @@ footer {
 
 .winner-chip-stack {
   position: absolute;
-  left: 50%;
-  top: 8px;
+  left: var(--chip-to-x, 50%);
+  top: var(--chip-to-y, 55%);
   z-index: 6;
   display: flex;
   flex-direction: column-reverse;
   align-items: center;
   width: 42px;
   pointer-events: none;
-  transform: translate(-50%, -26px) scale(.65);
+  transform: translate(-50%, -50%) scale(1);
   opacity: 0;
   filter: drop-shadow(0 8px 5px #050805aa)
 }
@@ -3967,21 +3967,29 @@ footer {
 @keyframes chips-arrive {
   0% {
     opacity: 0;
-    transform: translate(-50%, -55px) scale(.5) rotate(-18deg)
+    left: var(--chip-from-x, 50%);
+    top: var(--chip-from-y, 48%);
+    transform: translate(-50%, -50%) scale(.5) rotate(-18deg)
   }
 
   47% {
     opacity: 1;
-    transform: translate(-50%, 7px) scale(1.2) rotate(4deg)
+    left: var(--chip-to-x, 50%);
+    top: var(--chip-to-y, 55%);
+    transform: translate(-50%, -50%) scale(1.2) rotate(4deg)
   }
 
   73% {
-    transform: translate(-50%, -4px) scale(.95)
+    left: var(--chip-to-x, 50%);
+    top: var(--chip-to-y, 55%);
+    transform: translate(-50%, -50%) scale(.95)
   }
 
   100% {
     opacity: 1;
-    transform: translate(-50%, 0) scale(1)
+    left: var(--chip-to-x, 50%);
+    top: var(--chip-to-y, 55%);
+    transform: translate(-50%, -50%) scale(1)
   }
 }
 
@@ -4570,10 +4578,6 @@ footer {
     font-size: 6px
   }
 
-  .winner-chip-stack {
-    top: 1px
-  }
-
   .winner-chip-stack span {
     width: 24px;
     height: 7px
@@ -4757,22 +4761,6 @@ footer {
   animation: action-punch .58s cubic-bezier(.15, .85, .2, 1.08) both
 }
 
-.winner-chip-stack {
-  left: calc(50% + 43px);
-  top: 45px
-}
-
-.winner-chip-stack.arrive {
-  animation: chips-arrive 1.15s cubic-bezier(.14, .82, .2, 1) forwards
-}
-
-@media(max-width:600px) {
-  .winner-chip-stack {
-    left: calc(50% + 26px);
-    top: 32px
-  }
-}
-
 .hand-result {
   min-width: 0
 }
@@ -4909,9 +4897,6 @@ footer {
     font-size: 8px
   }
 
-  .winner-chip-stack {
-    left: calc(50% + 24px)
-  }
 }
 
 .card-face {

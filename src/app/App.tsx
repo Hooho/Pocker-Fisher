@@ -2363,6 +2363,15 @@ export default function App() {
   const tableSeatPositions = g
     ? getTableSeatPositions(g.players.length, tableStageSize, tableSeatSize)
     : [];
+  const winnerChipAnimationStyle = (winnerIndex: number): CSSProperties => {
+    const target = tableSeatPositions[winnerIndex] || { left: "50%", top: "55%" };
+    return {
+      "--chip-from-x": "50%",
+      "--chip-from-y": "48%",
+      "--chip-to-x": target.left,
+      "--chip-to-y": target.top,
+    } as CSSProperties;
+  };
   return (
     <div className={`app ${page === "table" ? "immersive" : ""} ${page === "lobby" ? "home-screen" : ""}`}>
       <aside className="sidebar">
@@ -2638,7 +2647,6 @@ export default function App() {
                       ))}
                     </div>
                     {p.last ? <div className={`seat-action-callout ${actionType} ${lastAction?.player === p.profile.id ? "new-action" : ""}`} key={`${g.hand}-${p.profile.id}-${p.last}`}><b>{actionText}</b>{["raise", "allin", "call"].includes(actionType) ? <span className="action-chips"><i /><i /><i /></span> : null}</div> : null}
-                    {g.done && g.winners.includes(i) ? <div className="winner-chip-stack arrive" key={`${g.hand}-${p.profile.id}-${g.result}`} aria-label={`${p.profile.name} 获得筹码`}><span /><span /><span /><span /><b>+{Math.max(0, p.chips - p.start + p.total).toLocaleString()}</b></div> : null}
                     {g.done && !celebrationDone && g.winners.includes(i) ? (
                       <span className="winner-confetti" aria-hidden="true">
                         {winnerPetals.map((petal, index) => (
@@ -2700,6 +2708,20 @@ export default function App() {
                         {evaluate([...p.cards, ...g.board]).name}
                       </small>
                     ) : null}
+                  </div>
+                );
+              })}
+              {g.done && g.winners.map((winnerIndex) => {
+                const winner = g.players[winnerIndex];
+                return (
+                  <div
+                    className="winner-chip-stack arrive"
+                    key={`${g.hand}-${winner.profile.id}-${g.result}`}
+                    aria-label={`${winner.profile.name} 获得筹码`}
+                    style={winnerChipAnimationStyle(winnerIndex)}
+                  >
+                    <span /><span /><span /><span />
+                    <b>+{Math.max(0, winner.chips - winner.start + winner.total).toLocaleString()}</b>
                   </div>
                 );
               })}

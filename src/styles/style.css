@@ -8694,9 +8694,7 @@ footer {
     inset 0 0 34px #000b;
 }
 
-.champion-plaque::before,
-.champion-plaque::after {
-  content: "✦";
+.champion-plaque-emblem {
   position: absolute;
   top: 50%;
   display: grid;
@@ -8711,12 +8709,17 @@ footer {
   box-shadow: 0 0 0 3px #573918, 0 0 18px #f4cf6e88;
 }
 
-.champion-plaque::before {
+.champion-plaque-emblem svg {
+  transform: rotate(-45deg);
+  filter: drop-shadow(0 0 5px #fff0a3);
+}
+
+.champion-plaque-emblem-left {
   left: -29px;
   transform: translateY(-50%) rotate(45deg);
 }
 
-.champion-plaque::after {
+.champion-plaque-emblem-right {
   right: -29px;
   transform: translateY(-50%) rotate(45deg);
 }
@@ -8908,18 +8911,16 @@ footer {
     padding: 22px 24px 19px;
   }
 
-  .champion-plaque::before,
-  .champion-plaque::after {
+  .champion-plaque-emblem {
     width: 28px;
     height: 28px;
-    font-size: 18px;
   }
 
-  .champion-plaque::before {
+  .champion-plaque-emblem-left {
     left: -21px;
   }
 
-  .champion-plaque::after {
+  .champion-plaque-emblem-right {
     right: -21px;
   }
 

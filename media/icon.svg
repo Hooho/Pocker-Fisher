@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="#173a2b" stroke="#d7b967" stroke-width="6"/>
+  <rect x="25" y="17" width="54" height="72" rx="7" fill="#fffaf0" transform="rotate(-12 52 53)"/>
+  <rect x="51" y="23" width="54" height="72" rx="7" fill="#fffaf0" transform="rotate(12 78 59)"/>
+  <text x="38" y="49" font-family="Georgia,serif" font-size="25" font-weight="700" fill="#be433c">K</text>
+  <text x="66" y="58" font-family="Georgia,serif" font-size="25" font-weight="700" fill="#17201a">A</text>
+  <text x="38" y="74" font-size="20" fill="#be433c">♦</text>
+  <text x="67" y="83" font-size="20" fill="#17201a">♠</text>
+  <circle cx="64" cy="106" r="14" fill="#d7b967" stroke="#8b6d2e" stroke-width="3"/>
+  <path d="M76 103c-8-9-22-4-29 2 7 6 21 11 29 2l13 8-6-10 6-10z" fill="#f3a34f" stroke="#a9632d" stroke-width="2"/>
+  <circle cx="76" cy="103" r="2" fill="#17201a"/>
+</svg>

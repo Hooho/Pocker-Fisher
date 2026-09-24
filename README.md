@@ -1,4 +1,4 @@
-# RIVER CLUB · 河牌俱乐部
+# RIVER CLUB · 摸鱼德州
 
 本地运行的德州扑克游戏：React / TypeScript / Three.js，无业务后端。
 
@@ -10,6 +10,15 @@ npm run dev
 ```
 
 打开终端输出的本地地址。`npm run build` 生成静态站点到 `dist`；`npm test` 验证规则。
+
+## 在 VS Code 中测试扩展
+
+1. 在 VS Code 中打开项目根目录，并执行 `npm install`。
+2. 首次运行或修改前执行 `npm run build:vscode`，生成 Webview 和扩展宿主代码。
+3. 打开“运行和调试”，选择“运行摸鱼德州扩展”，按 F5。
+4. VS Code 会打开一个 Extension Development Host 窗口；点击活动栏的摸鱼德州图标，或执行“摸鱼德州：打开游戏”。
+
+扩展构建命令为 `npm run build:vscode`。它会先构建 React Webview，再编译 VS Code 扩展宿主；`.vscode/tasks.json` 也提供了同名构建任务。扩展开发宿主关闭后，游戏源码不会被安装到当前 VS Code，只会在测试窗口中运行。
 
 ## 单应用路由
 

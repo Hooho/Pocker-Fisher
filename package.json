@@ -3,25 +3,70 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "publisher": "river-club",
+  "displayName": "摸鱼德州",
+  "description": "在 VS Code 里玩本地德州扑克：单次赛、冠军之路和 AI 对手。",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Games"
+  ],
+  "main": "./dist-extension/extension.cjs",
+  "activationEvents": [
+    "*"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "riverClub.openGame",
+        "title": "摸鱼德州：打开游戏",
+        "icon": "$(play)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "riverClub",
+          "title": "摸鱼德州",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "riverClub": [
+        {
+          "id": "riverClub.gameView",
+          "name": "开始游戏",
+          "type": "webview"
+        }
+      ]
+    }
+  },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b && vite build",
+    "build:web": "tsc -b && vite build",
+    "build:extension": "tsc -p tsconfig.extension.json",
+    "build:vscode": "npm run build:web && npm run build:extension",
+    "build": "npm run build:vscode",
+    "vscode:prepublish": "npm run build:vscode",
     "test": "node --import tsx --test src/tests/*.test.ts"
   },
   "dependencies": {
+    "lucide-react": "^0.468.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "three": "^0.180.0",
-    "lucide-react": "^0.468.0",
     "zod": "^3.24.0"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.180.0",
-    "typescript": "^5.7.0",
-    "vite": "^6.1.0",
+    "@types/vscode": "^1.138.0",
     "tsx": "^4.19.0",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.7.0",
+    "vite": "^6.1.0"
   }
 }

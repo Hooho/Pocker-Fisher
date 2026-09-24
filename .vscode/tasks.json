@@ -1,0 +1,13 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build:vscode",
+      "type": "process",
+      "command": "npm",
+      "args": ["run", "build:vscode"],
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}

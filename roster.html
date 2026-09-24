@@ -1,0 +1,921 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>RIVER CLUB · 63 人物志</title>
+<style>
+  :root {
+    --bg: #0d1311; --panel: #161e1b; --line: #2a3530;
+    --text: #e8e4d6; --muted: #98a39b; --gold: #d8b968;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue","PingFang SC",sans-serif}
+  header{padding:24px 36px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:#0d1311e8;backdrop-filter:blur(8px);z-index:5}
+  h1{margin:0;font-size:22px;letter-spacing:1px}
+  h1 small{color:var(--gold);font-weight:400;margin-left:10px;font-size:13px;letter-spacing:2px}
+  .sub{color:var(--muted);margin:6px 0 14px;font-size:13px}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{background:transparent;border:1px solid var(--line);color:var(--muted);padding:5px 12px;border-radius:999px;font-size:12px;cursor:pointer;transition:.15s}
+  .chip:hover{border-color:var(--gold);color:var(--text)}
+  .chip.active{background:var(--gold);color:#1a1810;border-color:var(--gold);font-weight:600}
+  .group-label{font-size:11px;color:var(--muted);margin-right:4px;align-self:center;letter-spacing:1px}
+  .count{margin-left:auto;color:var(--muted);font-size:12px}
+  .count b{color:var(--gold)}
+  main{padding:24px 36px 60px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:.18s;cursor:pointer}
+  .card:hover{border-color:var(--gold);transform:translateY(-2px)}
+  .card.hidden{display:none}
+  .card img{width:100%;aspect-ratio:1/1;display:block;background:#222;object-fit:cover}
+  .meta{padding:8px 12px}
+  .title{display:flex;justify-content:space-between;align-items:baseline}
+  .name{font-size:14px;font-weight:600}
+  .id{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+  .tags{display:flex;gap:5px;margin-top:5px}
+  .tag{font-size:10px;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted)}
+  .tag-lv{color:var(--gold);border-color:#3a3320}
+  .tag-style{color:#a8c0a8;border-color:#2c3a2c}
+</style>
+</head>
+<body>
+<header>
+  <h1>RIVER CLUB <small>人物志 · 大头版</small></h1>
+  <p class="sub">63 名预制角色 · 大头 chibi 风格 · 1K 输出 · 用于本地对局</p>
+  <div class="controls">
+    <span class="group-label">水平</span>
+    <div class="chips" id="lv-chips">
+      <button class="chip active" data-level="0">全部</button>
+      <button class="chip" data-level="1">L1</button>
+      <button class="chip" data-level="2">L2</button>
+      <button class="chip" data-level="3">L3</button>
+      <button class="chip" data-level="4">L4</button>
+      <button class="chip" data-level="5">L5</button>
+    </div>
+    <span class="count" id="count">显示 <b>63</b> / 63</span>
+  </div>
+  <div class="controls" style="margin-top:8px">
+    <span class="group-label">风格</span>
+    <div class="chips" id="style-chips">
+      <button class="chip active" data-style="0">全部</button>
+      <button class="chip" data-style="紧手稳健">紧手稳健</button>
+      <button class="chip" data-style="松手激进">松手激进</button>
+      <button class="chip" data-style="松手被动">松手被动</button>
+      <button class="chip" data-style="紧手被动">紧手被动</button>
+      <button class="chip" data-style="均衡多变">均衡多变</button>
+      <button class="chip" data-style="善于适应">善于适应</button>
+    </div>
+  </div>
+</header>
+<main><div class="grid" id="grid">
+<article class="card" data-style="紧手稳健" data-level="1">
+  <img src="public/avatars-png/000.jpg" alt="女娲" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">女娲</span>
+      <span class="id">#000</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="1">
+  <img src="public/avatars-png/005.png" alt="赵云" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">赵云</span>
+      <span class="id">#005</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="4">
+  <img src="public/avatars-png/023.jpg" alt="普京" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">普京</span>
+      <span class="id">#023</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="4">
+  <img src="public/avatars-png/028.jpg" alt="牛顿" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">牛顿</span>
+      <span class="id">#028</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="2">
+  <img src="public/avatars-png/031.png" alt="李白" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">李白</span>
+      <span class="id">#031</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手稳健" data-level="2">
+  <img src="public/avatars-png/036.png" alt="C罗" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">C罗</span>
+      <span class="id">#036</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="5">
+  <img src="public/avatars-png/049.jpg" alt="马云" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">马云</span>
+      <span class="id">#049</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="5">
+  <img src="public/avatars-png/064.jpg" alt="鲁迅" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">鲁迅</span>
+      <span class="id">#064</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="1">
+  <img src="public/avatars-png/065.jpg" alt="苏轼" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">苏轼</span>
+      <span class="id">#065</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手稳健" data-level="2">
+  <img src="public/avatars-png/066.jpg" alt="周杰伦" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">周杰伦</span>
+      <span class="id">#066</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="3">
+  <img src="public/avatars-png/082.jpg" alt="张国荣" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">张国荣</span>
+      <span class="id">#082</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="5">
+  <img src="public/avatars-png/089.jpg" alt="雷军" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">雷军</span>
+      <span class="id">#089</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手被动" data-level="4">
+  <img src="public/avatars-png/098.jpg" alt="巴菲特" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">巴菲特</span>
+      <span class="id">#098</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="2">
+  <img src="public/avatars-png/101.jpg" alt="马斯克" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">马斯克</span>
+      <span class="id">#101</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="2">
+  <img src="public/avatars-png/121.jpg" alt="比尔·盖茨" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">比尔·盖茨</span>
+      <span class="id">#121</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手被动" data-level="4">
+  <img src="public/avatars-png/123.png" alt="王维" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">王维</span>
+      <span class="id">#123</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="5">
+  <img src="public/avatars-png/124.jpg" alt="武则天" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">武则天</span>
+      <span class="id">#124</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手被动" data-level="5">
+  <img src="public/avatars-png/129.png" alt="刘备" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">刘备</span>
+      <span class="id">#129</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="1">
+  <img src="public/avatars-png/130.jpg" alt="贝多芬" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">贝多芬</span>
+      <span class="id">#130</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="3">
+  <img src="public/avatars-png/137.jpg" alt="王菲" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">王菲</span>
+      <span class="id">#137</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="4">
+  <img src="public/avatars-png/143.jpg" alt="迈克尔·乔丹" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">迈克尔·乔丹</span>
+      <span class="id">#143</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手被动" data-level="4">
+  <img src="public/avatars-png/153.jpg" alt="唐僧" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">唐僧</span>
+      <span class="id">#153</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="5">
+  <img src="public/avatars-png/154.jpg" alt="梅西" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">梅西</span>
+      <span class="id">#154</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手稳健" data-level="2">
+  <img src="public/avatars-png/156.png" alt="勒布朗·詹姆斯" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">勒布朗·詹姆斯</span>
+      <span class="id">#156</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="2">
+  <img src="public/avatars-png/161.png" alt="莫扎特" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">莫扎特</span>
+      <span class="id">#161</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="2">
+  <img src="public/avatars-png/166.jpg" alt="周星驰" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">周星驰</span>
+      <span class="id">#166</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手稳健" data-level="4">
+  <img src="public/avatars-png/168.jpg" alt="章子怡" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">章子怡</span>
+      <span class="id">#168</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="5">
+  <img src="public/avatars-png/169.png" alt="李嘉诚" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">李嘉诚</span>
+      <span class="id">#169</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="1">
+  <img src="public/avatars-png/175.png" alt="杜甫" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">杜甫</span>
+      <span class="id">#175</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手被动" data-level="2">
+  <img src="public/avatars-png/176.png" alt="爱因斯坦" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">爱因斯坦</span>
+      <span class="id">#176</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手被动" data-level="3">
+  <img src="public/avatars-png/182.jpg" alt="斯蒂芬·库里" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">斯蒂芬·库里</span>
+      <span class="id">#182</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="1">
+  <img src="public/avatars-png/185.jpg" alt="白居易" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">白居易</span>
+      <span class="id">#185</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="4">
+  <img src="public/avatars-png/193.jpg" alt="孙悟空" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">孙悟空</span>
+      <span class="id">#193</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="5">
+  <img src="public/avatars-png/209.jpg" alt="孔子" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">孔子</span>
+      <span class="id">#209</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="5">
+  <img src="public/avatars-png/214.jpg" alt="诸葛亮" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">诸葛亮</span>
+      <span class="id">#214</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手被动" data-level="4">
+  <img src="public/avatars-png/218.jpg" alt="成龙" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">成龙</span>
+      <span class="id">#218</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="1">
+  <img src="public/avatars-png/220.jpg" alt="屈原" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">屈原</span>
+      <span class="id">#220</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="3">
+  <img src="public/avatars-png/227.jpg" alt="科比·布莱恩特" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">科比·布莱恩特</span>
+      <span class="id">#227</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="1">
+  <img src="public/avatars-png/235.png" alt="梵高" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">梵高</span>
+      <span class="id">#235</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="4">
+  <img src="public/avatars-png/238.jpg" alt="迈克尔·杰克逊" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">迈克尔·杰克逊</span>
+      <span class="id">#238</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手被动" data-level="3">
+  <img src="public/avatars-png/242.jpg" alt="乔布斯" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">乔布斯</span>
+      <span class="id">#242</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手被动" data-level="4">
+  <img src="public/avatars-png/243.jpg" alt="项羽" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">项羽</span>
+      <span class="id">#243</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="3">
+  <img src="public/avatars-png/247.jpg" alt="莎士比亚" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">莎士比亚</span>
+      <span class="id">#247</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="4">
+  <img src="public/avatars-png/268.jpg" alt="特朗普" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">特朗普</span>
+      <span class="id">#268</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手被动" data-level="5">
+  <img src="public/avatars-png/279.jpg" alt="关羽" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">关羽</span>
+      <span class="id">#279</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="2">
+  <img src="public/avatars-png/281.jpg" alt="周润发" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">周润发</span>
+      <span class="id">#281</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手稳健" data-level="3">
+  <img src="public/avatars-png/282.png" alt="秦始皇" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">秦始皇</span>
+      <span class="id">#282</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手被动" data-level="5">
+  <img src="public/avatars-png/284.jpg" alt="朱元璋" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">朱元璋</span>
+      <span class="id">#284</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L5</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="3">
+  <img src="public/avatars-png/292.jpg" alt="奥巴马" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">奥巴马</span>
+      <span class="id">#292</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="1">
+  <img src="public/avatars-png/295.jpg" alt="刘德华" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">刘德华</span>
+      <span class="id">#295</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手稳健" data-level="2">
+  <img src="public/avatars-png/300.jpg" alt="李清照" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">李清照</span>
+      <span class="id">#300</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="3">
+  <img src="public/avatars-png/307.jpg" alt="李连杰" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">李连杰</span>
+      <span class="id">#307</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="2">
+  <img src="public/avatars-png/308.jpg" alt="金城武" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">金城武</span>
+      <span class="id">#308</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="3">
+  <img src="public/avatars-png/309.jpg" alt="谢霆锋" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">谢霆锋</span>
+      <span class="id">#309</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手被动" data-level="1">
+  <img src="public/avatars-png/310.jpg" alt="陈冠希" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">陈冠希</span>
+      <span class="id">#310</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手被动" data-level="4">
+  <img src="public/avatars-png/311.jpg" alt="王力宏" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">王力宏</span>
+      <span class="id">#311</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="3">
+  <img src="public/avatars-png/313.jpg" alt="高市早苗" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">高市早苗</span>
+      <span class="id">#313</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="善于适应" data-level="2">
+  <img src="public/avatars-png/314.jpg" alt="朱棣" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">朱棣</span>
+      <span class="id">#314</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">善于适应</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手激进" data-level="3">
+  <img src="public/avatars-png/315.jpg" alt="朱允炆" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">朱允炆</span>
+      <span class="id">#315</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">松手激进</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手被动" data-level="1">
+  <img src="public/avatars-png/316.png" alt="林青霞" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">林青霞</span>
+      <span class="id">#316</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L1</span>
+      <span class="tag tag-style">紧手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="松手被动" data-level="4">
+  <img src="public/avatars-png/317.jpg" alt="张曼玉" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">张曼玉</span>
+      <span class="id">#317</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L4</span>
+      <span class="tag tag-style">松手被动</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="紧手稳健" data-level="2">
+  <img src="public/avatars-png/320.png" alt="泰勒·斯威夫特" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">泰勒·斯威夫特</span>
+      <span class="id">#320</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L2</span>
+      <span class="tag tag-style">紧手稳健</span>
+    </div>
+  </div>
+</article>
+<article class="card" data-style="均衡多变" data-level="3">
+  <img src="public/avatars-png/321.jpg" alt="马化腾" loading="lazy" />
+  <div class="meta">
+    <div class="title">
+      <span class="name">马化腾</span>
+      <span class="id">#321</span>
+    </div>
+    <div class="tags">
+      <span class="tag tag-lv">L3</span>
+      <span class="tag tag-style">均衡多变</span>
+    </div>
+  </div>
+</article>
+
+</div></main>
+<script>
+  const lvChips = document.querySelectorAll('#lv-chips .chip');
+  const stChips = document.querySelectorAll('#style-chips .chip');
+  const cards = document.querySelectorAll('.card');
+  const count = document.getElementById('count');
+  let lv = 0, st = '0';
+  function apply() {
+    let n = 0;
+    cards.forEach(c => {
+      const cl = +c.dataset.level, cs = c.dataset.style;
+      const matchLv = lv === 0 || cl === lv;
+      const matchSt = st === '0' || cs === st;
+      const show = matchLv && matchSt;
+      c.classList.toggle('hidden', !show);
+      if (show) n++;
+    });
+    count.innerHTML = '显示 <b>' + n + '</b> / 63';
+  }
+  lvChips.forEach(b => b.addEventListener('click', () => {
+    lvChips.forEach(x => x.classList.remove('active')); b.classList.add('active');
+    lv = +b.dataset.level; apply();
+  }));
+  stChips.forEach(b => b.addEventListener('click', () => {
+    stChips.forEach(x => x.classList.remove('active')); b.classList.add('active');
+    st = b.dataset.style; apply();
+  }));
+</script>
+</body>
+</html>

@@ -212,6 +212,10 @@ const tournamentSchema = z.object({
       complete: z.boolean(),
       results: z.array(z.string().max(500)).max(20),
     });
+const chipAnimationSchema = z.object({
+  hand: money,
+  settledTotals: z.record(money),
+});
 const schema = z.object({
   version: z.literal(1),
   savedAt: z.string(),
@@ -219,6 +223,7 @@ const schema = z.object({
   game: gameSchema.nullable(),
   tournament: tournamentSchema.nullable(),
   pausedTournament: z.object({ game: gameSchema, tournament: tournamentSchema }).optional(),
+  chipAnimation: chipAnimationSchema.optional(),
   tournamentRecords: z.array(z.object({
     id: z.string().max(100),
     playedAt: z.string().max(40),
@@ -269,6 +274,10 @@ export type Save = {
   game: Game | null;
   tournament: Tournament | null;
   pausedTournament?: SuspendedTournament;
+  chipAnimation?: {
+    hand: number;
+    settledTotals: Record<string, number>;
+  };
   tournamentRecords: ChampionshipRecord[];
   overrides: Record<string, Character>;
   previous: Record<string, Character>;

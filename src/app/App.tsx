@@ -611,6 +611,7 @@ function startNextTournamentRound(save: Save, localQualified: Character[]): Save
     ...save,
     game,
     tournament: nextTournament,
+    chipAnimation: undefined,
   };
   return recordAdvancement(nextSave, field, field.length);
 }
@@ -931,6 +932,9 @@ export default function App() {
   const [chipToss, setChipToss] = useState<{
     seat: number;
     token: number;
+    hand: number;
+    playerId: number;
+    total: number;
     source: { x: number; y: number } | null;
   } | null>(null);
   const [celebrationDone, setCelebrationDone] = useState(false);
@@ -1015,6 +1019,24 @@ export default function App() {
 
   const t = data.tournament;
   const tablePlayerTotals = useMemo(() => g?.players.map((player) => player.total) ?? [], [g?.players]);
+  const tablePlayerIds = useMemo(() => g?.players.map((player) => player.profile.id) ?? [], [g?.players]);
+  const markChipAnimationStarted = useCallback(
+    (hand: number, updates: Record<string, number>) => {
+      setData((old) => {
+        const previous = old.chipAnimation?.hand === hand ? old.chipAnimation.settledTotals : {};
+        const settledTotals = { ...previous };
+        let changed = old.chipAnimation?.hand !== hand;
+        Object.entries(updates).forEach(([playerId, total]) => {
+          const nextTotal = Math.max(settledTotals[playerId] || 0, total);
+          if (settledTotals[playerId] !== nextTotal) changed = true;
+          settledTotals[playerId] = nextTotal;
+        });
+        if (!changed) return old;
+        return { ...old, chipAnimation: { hand, settledTotals } };
+      });
+    },
+    [],
+  );
   const championshipWon = Boolean(
     t &&
     !t.complete &&
@@ -1282,7 +1304,7 @@ export default function App() {
     const previous = g?.log[0] || "";
     if (top !== previous && !top.startsWith("第 ") && !top.includes("赢得")) {
       const player = next.players.find(p => top.startsWith(`${p.profile.name} · `));
-      if (player) { const label = player.last; const type = label.includes("弃牌") ? "fold" : label.includes("全下") ? "allin" : label.includes("加注") ? "raise" : label.includes("跟注") ? "call" : "check"; actionId.current++; setLastAction({ id: actionId.current, player: player.profile.id }); if (["raise", "allin", "call"].includes(type)) { const seatIndex = next.players.indexOf(player); if (seatIndex >= 0) { const rect = seatCardRefs.current[seatIndex]?.getBoundingClientRect(); setChipToss({ seat: seatIndex, token: actionId.current, source: rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null }) } } playGameSound(type, data.settings.sound) }
+      if (player) { const label = player.last; const type = label.includes("弃牌") ? "fold" : label.includes("全下") ? "allin" : label.includes("加注") ? "raise" : label.includes("跟注") ? "call" : "check"; actionId.current++; setLastAction({ id: actionId.current, player: player.profile.id }); if (["raise", "allin", "call"].includes(type)) { const seatIndex = next.players.indexOf(player); if (seatIndex >= 0) { const rect = seatCardRefs.current[seatIndex]?.getBoundingClientRect(); setChipToss({ seat: seatIndex, token: actionId.current, hand: next.hand, playerId: player.profile.id, total: player.total, source: rect ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 } : null }) } } playGameSound(type, data.settings.sound) }
     }
     if (top.startsWith("第 ")) setLastAction(null);
     if (next.board.length > (g?.board.length || 0)) playGameSound("deal", data.settings.sound);
@@ -1628,6 +1650,7 @@ export default function App() {
         ...registered,
         game,
         tournament,
+        chipAnimation: undefined,
         pausedTournament,
         stats: {
           ...registered.stats,
@@ -2639,8 +2662,11 @@ export default function App() {
                 chipUnit={g.bb}
                 hand={g.hand}
                 playerTotals={tablePlayerTotals}
+                playerIds={tablePlayerIds}
                 playerCardPositions={seatCardPositions}
                 playerAvatarPositions={seatAvatarPositions}
+                chipAnimation={data.chipAnimation ?? null}
+                onChipAnimationStart={markChipAnimationStarted}
                 done={g.done}
                 winnerIndices={g.winners}
                 playerCount={g.players.length}
@@ -3144,7 +3170,7 @@ export default function App() {
                 </p>
                 {newMode === "cash" ? (
                   <label>
-                    牌桌人数
+                    牌桌人数 
                     <select
                       value={seatCount}
                       onChange={(e) => setSeatCount(+e.target.value)}

@@ -3,14 +3,18 @@ import * as THREE from "three";
 import { getTableCameraLayout } from "./tableLayout";
 
 type ScreenPoint = { x: number; y: number };
+type ChipAnimationProgress = { hand: number; settledTotals: Record<string, number> };
 
 export default function Table3D({
   potValue,
   chipUnit,
   hand,
   playerTotals,
+  playerIds,
   playerCardPositions,
   playerAvatarPositions,
+  chipAnimation,
+  onChipAnimationStart,
   done,
   winnerIndices,
   playerCount,
@@ -20,12 +24,22 @@ export default function Table3D({
   chipUnit: number;
   hand: number;
   playerTotals: number[];
+  playerIds: number[];
   playerCardPositions: Array<ScreenPoint | null>;
   playerAvatarPositions: Array<ScreenPoint | null>;
+  chipAnimation: ChipAnimationProgress | null;
+  onChipAnimationStart: (hand: number, updates: Record<string, number>) => void;
   done: boolean;
   winnerIndices: number[];
   playerCount: number;
-  chipToss?: { seat: number; token: number; source: ScreenPoint | null } | null;
+  chipToss?: {
+    seat: number;
+    token: number;
+    hand: number;
+    playerId: number;
+    total: number;
+    source: ScreenPoint | null;
+  } | null;
 }) {
   const update = useRef<
     ((
@@ -33,8 +47,10 @@ export default function Table3D({
       unit: number,
       hand: number,
       totals: number[],
+      ids: number[],
       cardPositions: Array<ScreenPoint | null>,
       avatarPositions: Array<ScreenPoint | null>,
+      animationProgress: ChipAnimationProgress | null,
       done: boolean,
       winners: number[],
       players: number,
@@ -46,16 +62,18 @@ export default function Table3D({
       chipUnit,
       hand,
       playerTotals,
+      playerIds,
       playerCardPositions,
       playerAvatarPositions,
+      chipAnimation,
       done,
       winnerIndices,
       playerCount,
     );
-  }, [potValue, chipUnit, hand, playerTotals, playerCardPositions, playerAvatarPositions, done, winnerIndices, playerCount]);
-  const toss = useRef<((seat: number, players: number, source: ScreenPoint | null) => void) | null>(null);
+  }, [potValue, chipUnit, hand, playerTotals, playerIds, playerCardPositions, playerAvatarPositions, chipAnimation, done, winnerIndices, playerCount]);
+  const toss = useRef<((seat: number, players: number, source: ScreenPoint | null, hand: number, playerId: number, total: number) => void) | null>(null);
   useEffect(() => {
-    if (chipToss) toss.current?.(chipToss.seat, playerCount, chipToss.source);
+    if (chipToss) toss.current?.(chipToss.seat, playerCount, chipToss.source, chipToss.hand, chipToss.playerId, chipToss.total);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chipToss?.token]);
   const host = useRef<HTMLDivElement>(null);
@@ -290,7 +308,8 @@ export default function Table3D({
       };
       flyTick();
     };
-    toss.current = (seatIndex, players, source) => {
+    toss.current = (seatIndex, players, source, handNumber, playerId, total) => {
+      onChipAnimationStart(handNumber, { [String(playerId)]: total });
       createFlyer(playerStart(seatIndex, players, source));
     };
     let displayedHand: number | null = null;
@@ -299,7 +318,19 @@ export default function Table3D({
     let latestPot = 0;
     let latestUnit = 1;
     let latestFinished = false;
-    update.current = (pot, unit, handNumber, totals, cardPositions, avatarPositions, finished, winners, players) => {
+    update.current = (
+      pot,
+      unit,
+      handNumber,
+      totals,
+      ids,
+      cardPositions,
+      avatarPositions,
+      animationProgress,
+      finished,
+      winners,
+      players,
+    ) => {
       cancelAnimationFrame(frame);
       latestPot = pot;
       latestUnit = unit;
@@ -317,13 +348,18 @@ export default function Table3D({
         chips.visible = false;
         setPoolChipCount(chips, pot, unit);
         const contributors = totals
-          .map((amount, index) => ({ amount, index }))
-          .filter(({ amount }) => amount > 0);
+          .map((amount, index) => ({ amount, index, playerId: String(ids[index] ?? index) }))
+          .filter(({ amount, playerId }) => amount > (animationProgress?.hand === handNumber ? animationProgress.settledTotals[playerId] || 0 : 0));
         if (!contributors.length) {
           initialFlightHand = null;
+          chips.visible = pot > 0;
           renderer.render(scene, camera);
           return;
         }
+        onChipAnimationStart(
+          handNumber,
+          Object.fromEntries(contributors.map(({ amount, playerId }) => [playerId, amount])),
+        );
         let remaining = contributors.length;
         contributors.forEach(({ index }, sequence) => {
           createFlyer(
@@ -395,8 +431,10 @@ export default function Table3D({
       chipUnit,
       hand,
       playerTotals,
+      playerIds,
       playerCardPositions,
       playerAvatarPositions,
+      chipAnimation,
       done,
       winnerIndices,
       playerCount,

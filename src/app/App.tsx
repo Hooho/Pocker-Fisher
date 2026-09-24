@@ -87,6 +87,9 @@ import {
 } from "../domain/storage/storage";
 import { aiMove, reshape, requestAI } from "../domain/game/ai";
 import { playGameSound } from "../domain/game/sound";
+import BotWorker from "../workers/bot.worker.ts?worker&inline";
+import TournamentWorker from "../workers/tournament.worker.ts?worker&inline";
+import ChampionshipWorker from "../workers/championship.worker.ts?worker&inline";
 
 type CommunityCardDebugFunction = () => void;
 
@@ -1338,9 +1341,7 @@ export default function App() {
       );
       if (t) o.qualify = t.round < 3 ? 4 : 1;
       const fallback = () => {
-        worker = new Worker(new URL("../workers/bot.worker.ts", import.meta.url), {
-          type: "module",
-        });
+        worker = new BotWorker();
         worker.onmessage = (e: MessageEvent<Move>) => {
           if (!controller.signal.aborted) commit(act(g, e.data));
           worker?.terminate();
@@ -1398,7 +1399,7 @@ export default function App() {
       backgroundWorker.current.postMessage({ type: "resume" });
       return;
     }
-    const worker = new Worker(new URL("../workers/tournament.worker.ts", import.meta.url), { type: "module" });
+    const worker = new TournamentWorker();
     backgroundWorker.current = worker;
     worker.onmessage = (event: MessageEvent<{
       table?: {
@@ -1499,7 +1500,7 @@ export default function App() {
       completedTables: checkpoint?.nextTableIndex ?? 0,
       totalTables: checkpoint ? Math.ceil(checkpoint.field.length / 8) : 0,
     });
-    const worker = new Worker(new URL("../workers/championship.worker.ts", import.meta.url), { type: "module" });
+    const worker = new ChampionshipWorker();
     eliminatedWorker.current = worker;
     worker.onmessage = (event: MessageEvent<{
       progress?: ChampionshipSimulationProgress;
@@ -1838,7 +1839,7 @@ export default function App() {
       });
     };
     if (q.tied.length) {
-      const worker = new Worker(new URL("../workers/tournament.worker.ts", import.meta.url), { type: "module" });
+      const worker = new TournamentWorker();
       worker.onmessage = (event: MessageEvent<{
         tieQualified?: Character[];
         qualifiedStacks?: Record<string, number>;

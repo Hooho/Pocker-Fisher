@@ -153,7 +153,7 @@ export function getTableSeatPositions(
       const laneStep = sideSeatCount > 1 ? laneSpan / (sideSeatCount - 1) : 0;
       for (let seatIndex = 1; seatIndex < count / 2; seatIndex += 1) {
         const order = seatIndex - 1;
-        coordinates[seatIndex].y = laneCenter - laneSpan / 2 + order * laneStep;
+        coordinates[seatIndex].y = laneCenter + laneSpan / 2 - order * laneStep;
         const oppositeIndex = count - seatIndex;
         coordinates[oppositeIndex].y = coordinates[seatIndex].y;
       }

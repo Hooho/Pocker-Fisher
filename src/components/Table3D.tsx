@@ -6,18 +6,20 @@ export default function Table3D({
   done,
   winnerIndices,
   playerCount,
+  playerTotals,
 }: {
   potValue: number;
   done: boolean;
   winnerIndices: number[];
   playerCount: number;
+  playerTotals: number[];
 }) {
   const update = useRef<
-    ((pot: number, done: boolean, winners: number[], players: number) => void) | null
+    ((pot: number, done: boolean, winners: number[], players: number, totals: number[]) => void) | null
   >(null);
   useEffect(() => {
-    update.current?.(potValue, done, winnerIndices, playerCount);
-  }, [potValue, done, winnerIndices, playerCount]);
+    update.current?.(potValue, done, winnerIndices, playerCount, playerTotals);
+  }, [potValue, done, winnerIndices, playerCount, playerTotals]);
   const host = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
@@ -146,7 +148,53 @@ export default function Table3D({
       }
     }
     scene.add(chips);
-    const chipGroups = [chips];
+    chips.visible = false;
+    const center = new THREE.Vector3(0, 0, 0);
+    const flights: Array<{
+      group: THREE.Group;
+      from: THREE.Vector3;
+      to: THREE.Vector3;
+      startedAt: number;
+    }> = [];
+    let frame = 0;
+    let contributionSnapshot: number[] = [];
+
+    const playerPosition = (index: number, players: number) => {
+      const angle = Math.PI / 2 + (index * Math.PI * 2) / Math.max(1, players);
+      return new THREE.Vector3(
+        Math.cos(angle) * 4.25,
+        0,
+        Math.sin(angle) * 2.05,
+      );
+    };
+
+    const animateFlights = () => {
+      const now = performance.now();
+      for (let i = flights.length - 1; i >= 0; i -= 1) {
+        const flight = flights[i];
+        const progress = Math.min(1, (now - flight.startedAt) / 720);
+        const ease = 1 - (1 - progress) ** 3;
+        flight.group.position.lerpVectors(flight.from, flight.to, ease);
+        flight.group.scale.setScalar(0.72 + ease * 0.28);
+        if (progress >= 1) {
+          scene.remove(flight.group);
+          flights.splice(i, 1);
+        }
+      }
+      renderer.render(scene, camera);
+      frame = flights.length ? requestAnimationFrame(animateFlights) : 0;
+    };
+
+    const queueFlight = (from: THREE.Vector3, to: THREE.Vector3) => {
+      const group = chips.clone(true);
+      group.visible = true;
+      group.position.copy(from);
+      group.scale.setScalar(0.72);
+      scene.add(group);
+      flights.push({ group, from, to, startedAt: performance.now() });
+      if (flights.length === 1) frame = requestAnimationFrame(animateFlights);
+    };
+
     const resize = () => {
       const w = el.clientWidth,
         h = el.clientHeight;
@@ -162,66 +210,23 @@ export default function Table3D({
     const ro = new ResizeObserver(resize);
     ro.observe(el);
     resize();
-    let frame = 0;
-    update.current = (pot, finished, winners, players) => {
-      cancelAnimationFrame(frame);
-      const start = performance.now();
-      const movingToWinners = finished && winners.length > 0;
-      const groupCount = finished ? winners.length : 1;
-      while (chipGroups.length < groupCount) {
-        const copy = chips.clone(true);
-        copy.position.set(0, 0, 0);
-        copy.scale.set(1, 1, 1);
-        scene.add(copy);
-        chipGroups.push(copy);
-      }
-      const starts: THREE.Vector3[] = [];
-      const destinations: THREE.Vector3[] = [];
-      chipGroups.forEach((group, index) => {
-        if (index >= groupCount) {
-          group.visible = false;
-          return;
-        }
-        group.visible = true;
-        starts[index] = group.position.clone();
-        if (movingToWinners) {
-          const angle = Math.PI / 2 + (winners[index] * Math.PI * 2) / Math.max(1, players);
-          destinations[index] = new THREE.Vector3(
-            Math.cos(angle) * 4.25,
-            0,
-            Math.sin(angle) * 2.05,
-          );
-        } else {
-          destinations[index] = new THREE.Vector3(0, 0, 0);
-        }
+    update.current = (pot, finished, _winners, players, totals) => {
+      const previous = contributionSnapshot;
+      const handRestarted = totals.some((amount, index) => amount < (previous[index] || 0));
+      const baseline = handRestarted ? totals.map(() => 0) : previous;
+      contributionSnapshot = [...totals];
+      totals.forEach((amount, index) => {
+        const increase = amount - (baseline[index] || 0);
+        if (increase > 0) queueFlight(playerPosition(index, players), center.clone());
       });
-      if (groupCount === 0) {
-        renderer.render(scene, camera);
-        return;
-      }
-      const tick = () => {
-        const progress = Math.min(1, (performance.now() - start) / 1500);
-        const ease = 1 - (1 - progress) ** 3;
-        chipGroups.forEach((group, index) => {
-          if (index >= groupCount) return;
-          group.position.lerpVectors(starts[index], destinations[index], ease);
-          group.scale.y = Math.max(
-            0.7,
-            Math.min(1.5, Math.log2(1 + pot / 100) / 3.4),
-          );
-        });
-        renderer.render(scene, camera);
-        if (progress < 1) frame = requestAnimationFrame(tick);
-        else if (movingToWinners) {
-          chipGroups.forEach((group) => (group.visible = false));
-          renderer.render(scene, camera);
-        }
-      };
-      tick();
+      chips.visible = !finished && pot > 0;
+      chips.scale.y = Math.max(0.7, Math.min(1.5, Math.log2(1 + pot / 100) / 3.4));
+      renderer.render(scene, camera);
     };
-    update.current(potValue, done, winnerIndices, playerCount);
+    update.current(potValue, done, winnerIndices, playerCount, playerTotals);
     return () => {
       cancelAnimationFrame(frame);
+      flights.forEach(({ group }) => scene.remove(group));
       update.current = null;
       ro.disconnect();
       scene.traverse((obj) => {

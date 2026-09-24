@@ -2363,6 +2363,10 @@ export default function App() {
   const tableSeatPositions = g
     ? getTableSeatPositions(g.players.length, tableStageSize, tableSeatSize)
     : [];
+  const playerTotals = useMemo(
+    () => g?.players.map((player) => player.total) || [],
+    [g?.players],
+  );
   const winnerChipAnimationStyle = (winnerIndex: number): CSSProperties => {
     const target = tableSeatPositions[winnerIndex] || { left: "50%", top: "55%" };
     return {
@@ -2569,7 +2573,13 @@ export default function App() {
                 <strong>{tableRoundLabel}</strong>
                 <span>第 {g.hand} 手</span>
               </div>
-              <Table3D potValue={pot(g)} done={g.done} winnerIndices={g.winners} playerCount={g.players.length} />
+              <Table3D
+                potValue={pot(g)}
+                done={g.done}
+                winnerIndices={g.winners}
+                playerCount={g.players.length}
+                playerTotals={playerTotals}
+              />
               <div className="community">
                 <div className="pot-label">
                   {g.done ? "已派奖" : "底池总额"}{" "}

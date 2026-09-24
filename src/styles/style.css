@@ -1337,7 +1337,7 @@ footer>span:last-child {
   opacity: 0;
   transform-origin: center;
   animation-name: winner-petal-burst;
-  animation-duration: 2.4s;
+  animation-duration: 4.8s;
   animation-timing-function: cubic-bezier(.16, .7, .25, 1);
   animation-delay: var(--petal-delay);
   animation-fill-mode: both;

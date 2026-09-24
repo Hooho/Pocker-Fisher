@@ -113,17 +113,29 @@ const handRankExamples = [
 ];
 const winnerPetals = [
   { x: -68, y: -54, twist: "-150deg", drift: "-12px", color: "#e7c970" },
+  { x: -58, y: -68, twist: "-95deg", drift: "-10px", color: "#a9bc91" },
   { x: -42, y: -77, twist: "135deg", drift: "-8px", color: "#f0e3bb" },
+  { x: -25, y: -86, twist: "175deg", drift: "-6px", color: "#ca8d7b" },
   { x: -10, y: -68, twist: "210deg", drift: "9px", color: "#d9b75d" },
+  { x: 10, y: -95, twist: "-155deg", drift: "8px", color: "#e9d9a1" },
   { x: 28, y: -80, twist: "-120deg", drift: "12px", color: "#c98b79" },
+  { x: 45, y: -76, twist: "145deg", drift: "14px", color: "#e7c970" },
   { x: 63, y: -60, twist: "155deg", drift: "14px", color: "#e8dcae" },
+  { x: 88, y: -45, twist: "-175deg", drift: "12px", color: "#d7b85f" },
   { x: 78, y: -25, twist: "-195deg", drift: "8px", color: "#a9bc91" },
+  { x: 90, y: -3, twist: "120deg", drift: "15px", color: "#f0e3bb" },
   { x: 73, y: 18, twist: "125deg", drift: "15px", color: "#e7c970" },
+  { x: 83, y: 38, twist: "-140deg", drift: "13px", color: "#ca8d7b" },
   { x: 54, y: 55, twist: "-155deg", drift: "11px", color: "#f0e3bb" },
+  { x: 42, y: 84, twist: "170deg", drift: "10px", color: "#a9bc91" },
   { x: 23, y: 75, twist: "195deg", drift: "-6px", color: "#d7b85f" },
+  { x: 2, y: 91, twist: "-120deg", drift: "-8px", color: "#e9d9a1" },
   { x: -18, y: 72, twist: "-135deg", drift: "-12px", color: "#ca8d7b" },
+  { x: -38, y: 84, twist: "150deg", drift: "-10px", color: "#e7c970" },
   { x: -53, y: 56, twist: "175deg", drift: "-15px", color: "#e9d9a1" },
+  { x: -88, y: 40, twist: "-165deg", drift: "-13px", color: "#a9bc91" },
   { x: -77, y: 19, twist: "-205deg", drift: "-8px", color: "#a9bc91" },
+  { x: -90, y: -17, twist: "135deg", drift: "-12px", color: "#f0e3bb" },
   { x: -35, y: -12, twist: "145deg", drift: "-14px", color: "#e4c365" },
   { x: 39, y: 7, twist: "-170deg", drift: "12px", color: "#f0e3bb" },
 ];
@@ -1163,9 +1175,9 @@ export default function App() {
       };
       return ended ? recordHandResult(updated, next, !!tournament) : updated;
     });
-    if (handEnded && next.winners.length) { const timer = window.setTimeout(() => setCelebrationDone(true), 3200); return () => window.clearTimeout(timer) }
+    if (handEnded && next.winners.length) { const timer = window.setTimeout(() => setCelebrationDone(true), 5200); return () => window.clearTimeout(timer) }
   };
-  useEffect(() => { if (!g?.done || !g.winners.length) { setCelebrationDone(false); return } setCelebrationDone(false); const timer = window.setTimeout(() => setCelebrationDone(true), 3300); return () => window.clearTimeout(timer) }, [g?.done, g?.hand, g?.result]);
+  useEffect(() => { if (!g?.done || !g.winners.length) { setCelebrationDone(false); return } setCelebrationDone(false); const timer = window.setTimeout(() => setCelebrationDone(true), 5200); return () => window.clearTimeout(timer) }, [g?.done, g?.hand, g?.result]);
   useEffect(() => {
     if (!g || g.done || g.turn === 0 || paused || page !== "table") return;
     const controller = new AbortController();

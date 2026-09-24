@@ -38,8 +38,6 @@ export default function Table3D({
       return;
     }
     renderer.setPixelRatio(Math.min(devicePixelRatio, 1.7));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
@@ -49,8 +47,6 @@ export default function Table3D({
     scene.add(new THREE.HemisphereLight(0xe0f3d8, 0x252117, 2.5));
     const key = new THREE.DirectionalLight(0xffe5b8, 3);
     key.position.set(-3, 8, 3);
-    key.castShadow = true;
-    key.shadow.mapSize.set(1024, 1024);
     scene.add(key);
     const rim = new THREE.PointLight(0x5aa989, 35);
     rim.position.set(3, 3, -4);
@@ -87,8 +83,6 @@ export default function Table3D({
         }),
       );
       mesh.position.y = y;
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
       scene.add(mesh);
       return mesh;
     };
@@ -141,7 +135,6 @@ export default function Table3D({
           0.2 + h * 0.046,
           1.9 + (stack % 2) * 0.12,
         );
-        chip.castShadow = true;
         chips.add(chip);
         for (let k = 0; k < 6; k++) {
           const band = new THREE.Mesh(
@@ -161,14 +154,6 @@ export default function Table3D({
     }
     scene.add(chips);
     const chipGroups = [chips];
-    const floor = new THREE.Mesh(
-      new THREE.PlaneGeometry(100, 100),
-      new THREE.ShadowMaterial({ opacity: 0.4 }),
-    );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.y = -0.65;
-    floor.receiveShadow = true;
-    scene.add(floor);
     const resize = () => {
       const w = el.clientWidth,
         h = el.clientHeight;
@@ -203,7 +188,6 @@ export default function Table3D({
           }),
         );
         chip.position.y = h * 0.052;
-        chip.castShadow = true;
         flyer.add(chip);
       }
       flyer.position.copy(start);

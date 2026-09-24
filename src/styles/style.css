@@ -10057,11 +10057,20 @@ footer {
 .table-stage .seat {
   width: calc(118px * var(--table-scale));
   min-width: calc(118px * var(--table-scale));
+  height: calc(154px * var(--table-scale));
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .table-stage .seat-info {
   gap: calc(9px * var(--table-scale));
   padding: calc(7px * var(--table-scale)) calc(10px * var(--table-scale));
+  width: 100%;
+  min-width: 0;
+  margin-top: calc(26px * var(--table-scale));
+  box-sizing: border-box;
 }
 
 .table-stage .seat-info img,
@@ -10078,15 +10087,48 @@ footer {
   font-size: calc(15px * var(--table-scale));
 }
 
+.table-stage .seat-info>div {
+  min-width: 0;
+}
+
+.table-stage .seat-info strong {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .table-stage .seat-action {
-  margin-top: calc(6px * var(--table-scale));
+  position: absolute;
+  top: calc(134px * var(--table-scale));
+  left: 0;
+  right: 0;
+  margin-top: 0;
   min-height: calc(14px * var(--table-scale));
   font-size: calc(9px * var(--table-scale));
 }
 
 .table-stage .seat-action-callout {
+  position: absolute;
+  top: calc(54px * var(--table-scale));
+  left: 0;
+  right: 0;
+  width: max-content;
   gap: calc(6px * var(--table-scale));
   padding: calc(4px * var(--table-scale)) calc(10px * var(--table-scale));
   border-radius: calc(22px * var(--table-scale));
   font-size: calc(11px * var(--table-scale));
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.table-stage .hand-name {
+  position: absolute;
+  top: calc(134px * var(--table-scale));
+  left: 0;
+  right: 0;
+  margin-top: calc(1px * var(--table-scale));
+  font-size: calc(9px * var(--table-scale));
+  line-height: 1.2;
 }

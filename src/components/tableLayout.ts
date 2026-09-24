@@ -29,6 +29,8 @@ const TABLE_CAMERA_FOV_DEGREES = 36;
 const TABLE_REFERENCE_WIDTH = 1120;
 const TABLE_REFERENCE_HEIGHT = 580;
 const TABLE_UI_MIN_SCALE = 0.62;
+const TABLE_SEAT_DESIGN_WIDTH = 118;
+const TABLE_SEAT_DESIGN_HEIGHT = 154;
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -77,18 +79,18 @@ function getProjectedTableRadiusX(stageSize: TableStageSize) {
   return (TABLE_WORLD_RADIUS_X * focalScale * sceneSize.height) / (2 * cameraDistance);
 }
 
-function getTableSeatSize(stageSize: TableStageSize, measured: TableSeatSize) {
-  const compact = stageSize.width <= 600;
+export function getTableSeatFootprint(stageSize: TableStageSize): TableSeatSize {
+  const scale = getTableUiScale(stageSize);
   return {
-    width: measured.width || (compact ? 78 : 118),
-    height: measured.height || (compact ? 72 : 80),
+    width: TABLE_SEAT_DESIGN_WIDTH * scale,
+    height: TABLE_SEAT_DESIGN_HEIGHT * scale,
   };
 }
 
 export function getTableSeatPositions(
   playerCount: number,
   stageSize: TableStageSize,
-  measuredSeatSize: TableSeatSize = { width: 0, height: 0 },
+  seatSize: TableSeatSize = getTableSeatFootprint(stageSize),
 ): TableSeatPosition[] {
   const count = Math.max(1, playerCount);
   const angles = Array.from(
@@ -103,7 +105,6 @@ export function getTableSeatPositions(
   }
 
   const compact = stageSize.width <= 600;
-  const seatSize = getTableSeatSize(stageSize, measuredSeatSize);
   const centerX = stageSize.width / 2;
   const centerY = stageSize.height * (compact ? 0.54 : 0.55);
   const tableRadiusX = Math.min(
@@ -144,7 +145,7 @@ export function getTableSeatPositions(
     }));
 
     // When an even table has several seats on each side, keep that side in a
-    // vertical lane if the ellipse cannot provide the measured seat height.
+    // vertical lane if the fixed seat footprints would overlap.
     // The lane is derived from the count and available height, not from a
     // special case for a particular player count.
     const sideSeatCount = Math.floor(count / 2) - 1;
@@ -174,9 +175,9 @@ export function getTableSeatPositions(
     return coordinates;
   };
 
-  // Grow the ellipse only when the measured seat boxes would overlap. This
+  // Grow the ellipse only when the fixed seat footprints would overlap. This
   // keeps small tables close to the felt while giving 8+ seat tables enough
-  // room on both axes, based on the real rendered card height and width.
+  // room on both axes without letting state-dependent content move seats.
   for (let attempt = 0; attempt < 24; attempt += 1) {
     const coordinates = getCoordinates();
     const overlap = coordinates.some((current, index) =>

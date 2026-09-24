@@ -35,6 +35,8 @@ export type Game = {
   result: string;
   winners: number[];
 };
+
+const GAME_LOG_LIMIT = 15;
 export type Move = { type: "fold" | "call" | "raise"; amount?: number };
 export const hero: Character = {
   id: -1,
@@ -227,7 +229,7 @@ export function startHand(
     p.last = i === sb ? "小盲" : "大盲";
   }
   g.turn = big;
-  g.log = [`第 ${g.hand} 手 · 盲注 ${bb / 2} / ${bb}`, ...g.log].slice(0, 60);
+  g.log = [`第 ${g.hand} 手 · 盲注 ${bb / 2} / ${bb}`, ...g.log].slice(0, GAME_LOG_LIMIT);
   advance(g);
   return g;
 }
@@ -281,7 +283,7 @@ export function act(old: Game, move: Move): Game {
   }
   p.acted = true;
   p.raiseAt = g.current;
-  g.log = [`${p.profile.name} · ${p.last}`, ...g.log].slice(0, 60);
+  g.log = [`${p.profile.name} · ${p.last}`, ...g.log].slice(0, GAME_LOG_LIMIT);
   advance(g);
   return g;
 }
@@ -383,7 +385,7 @@ export function settle(g: Game) {
         `${g.players[i].profile.name} 赢得 ${n.toLocaleString()}${g.board.length === 5 ? " · " + evaluate([...g.players[i].cards, ...g.board]).name : ""}`,
     )
     .join(" / ");
-  g.log = [g.result, ...g.log].slice(0, 60);
+  g.log = [g.result, ...g.log].slice(0, GAME_LOG_LIMIT);
   g.done = true;
 }
 export type Observation = {
@@ -402,7 +404,6 @@ export type Observation = {
   stacks: number[];
   stack: number;
   qualify?: number;
-  memory?: string[];
 };
 export function observe(g: Game): Observation {
   const p = g.players[g.turn];
@@ -459,20 +460,13 @@ export function decide(o: Observation, options: { fast?: boolean } = {}): Move {
     }
     strength = won / iterations;
   }
-  const memory = o.memory || [];
-  const observed = memory.filter((x) => x.startsWith("你 ·"));
-  const foldRate =
-    observed.filter((x) => x.includes("弃牌")).length /
-    Math.max(1, observed.length);
-  const adaptation =
-    o.profile.level >= 3 && observed.length >= 8 ? (foldRate - 0.3) * 0.1 : 0;
   const bubble = !!o.qualify && o.stacks.length <= o.qualify + 1;
   const middle =
     bubble &&
     o.stack > Math.min(...o.stacks) &&
     o.stack < Math.max(...o.stacks);
   const noise = (Math.random() - 0.5) * (0.3 - o.profile.level * 0.045);
-  strength += noise + adaptation + (o.position === 0 ? 0.025 : 0);
+  strength += noise + (o.position === 0 ? 0.025 : 0);
   if (middle) strength -= 0.09;
   if (o.stack < o.bb * 8 && strength > 0.48) strength += 0.1;
   const odds = o.call / (o.pot + o.call || 1);

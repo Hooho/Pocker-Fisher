@@ -5,6 +5,7 @@ import type { ChampionshipSimulationCheckpoint } from "../tournament/tournament"
 const SAVE_STORAGE_KEY = "river-save";
 const SAVE_LOCK_NAME = "river-save-write";
 const SAVE_CHANNEL_NAME = "river-save-sync";
+const GAME_LOG_LIMIT = 15;
 
 type StoredSave = {
   revision: number;
@@ -74,7 +75,7 @@ const gameSchema = z
     bb: money.positive(),
     hand: money,
     done: z.boolean(),
-    log: z.array(z.string().max(2000)).max(60),
+    log: z.array(z.string().max(2000)).max(GAME_LOG_LIMIT),
     result: z.string().max(2000),
     winners: z.array(z.number().int().min(0).max(7)).max(8),
   })
@@ -237,7 +238,6 @@ const schema = z.object({
   })).max(1000).default([]),
   overrides: z.record(characterSchema),
   previous: z.record(characterSchema),
-  memories: z.record(z.array(z.string().max(2000)).max(60)).default({}),
   playerStats: z.record(z.object({
     matches: money,
     advances: money,
@@ -281,7 +281,6 @@ export type Save = {
   tournamentRecords: ChampionshipRecord[];
   overrides: Record<string, Character>;
   previous: Record<string, Character>;
-  memories: Record<string, string[]>;
   playerStats: Record<string, PlayerCareerStats>;
   settings: Settings;
   stats: { hands: number; wins: number; tournaments: number; titles: number };
@@ -309,7 +308,6 @@ export const blank: Save = {
   tournamentRecords: [],
   overrides: {},
   previous: {},
-  memories: {},
   playerStats: {},
   settings: defaults,
   stats: { hands: 0, wins: 0, tournaments: 0, titles: 0 },
@@ -328,7 +326,6 @@ export function summarizeSaveRecords(save: Save): SaveRecordSummary {
     save.playerProfile.avatar !== null ||
     Object.keys(save.overrides).length > 0 ||
     Object.keys(save.previous).length > 0 ||
-    Object.keys(save.memories).length > 0 ||
     Object.entries(defaults).some(
       ([key, value]) => save.settings[key as keyof Settings] !== value,
     );
@@ -366,26 +363,39 @@ function repairLegacyDebugGame(value: unknown): unknown {
   const repairGame = (candidate: unknown) => {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return candidate;
     const game = candidate as Record<string, unknown>;
+    const shortened = Array.isArray(game.log) && game.log.length > GAME_LOG_LIMIT
+      ? { ...game, log: game.log.slice(0, GAME_LOG_LIMIT) }
+      : candidate;
     const players = Array.isArray(game.players) ? game.players : [];
     const board = Array.isArray(game.board) ? game.board : [];
     const deck = Array.isArray(game.deck) ? game.deck : [];
-    if (game.done !== true || game.street !== 3 || board.length !== 5 || !deck.length) return candidate;
+    if (game.done !== true || game.street !== 3 || board.length !== 5 || !deck.length) return shortened;
     const holeCards = players.reduce((count, player) => {
       if (!player || typeof player !== "object") return count;
       const cards = (player as Record<string, unknown>).cards;
       return count + (Array.isArray(cards) ? cards.length : 0);
     }, 0);
     const expectedDeckSize = 52 - 3 - board.length - holeCards;
-    if (expectedDeckSize < 0 || deck.length <= expectedDeckSize) return candidate;
-    return { ...game, deck: deck.slice(0, expectedDeckSize) };
+    if (expectedDeckSize < 0 || deck.length <= expectedDeckSize) return shortened;
+    return { ...(shortened as Record<string, unknown>), deck: deck.slice(0, expectedDeckSize) };
+  };
+  const repairTournament = (candidate: unknown) => {
+    if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) return candidate;
+    const tournament = candidate as Record<string, unknown>;
+    const playoff = tournament.playoff;
+    if (!playoff || typeof playoff !== "object" || Array.isArray(playoff)) return candidate;
+    const playoffRecord = playoff as Record<string, unknown>;
+    return { ...tournament, playoff: { ...playoffRecord, original: repairGame(playoffRecord.original) } };
   };
   const repaired: Record<string, unknown> = { ...save, game: repairGame(save.game) };
+  repaired.tournament = repairTournament(save.tournament);
   if ("pausedTournament" in save) {
     repaired.pausedTournament =
       save.pausedTournament && typeof save.pausedTournament === "object"
         ? {
           ...(save.pausedTournament as Record<string, unknown>),
           game: repairGame((save.pausedTournament as Record<string, unknown>).game),
+          tournament: repairTournament((save.pausedTournament as Record<string, unknown>).tournament),
         }
         : save.pausedTournament;
   }
@@ -457,8 +467,8 @@ export function parseSave(value: unknown): Save {
       stats.tournamentHandsPlayed = stats.handsPlayed;
     }
   }
-  const raw=value as {settings?:{soundConfigured?:boolean}};
-  if(raw.settings?.soundConfigured!==true)data.settings.sound=true;
+  const raw = value as { settings?: { soundConfigured?: boolean } };
+  if (raw.settings?.soundConfigured !== true) data.settings.sound = true;
   return data;
 }
 const storedSaveSchema = z.object({

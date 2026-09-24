@@ -1313,11 +1313,6 @@ export default function App() {
     }
     setData((old) => {
       const ended = next.done && !old.game?.done;
-      const memories = { ...old.memories };
-      if (ended) {
-        const handLog = next.log.slice(0, next.log.findIndex((x) => x.startsWith("第 ")) + 1);
-        next.players.filter((p) => p.cards.length === 2 && p.profile.id !== -1).forEach((p) => { memories[p.profile.id] = [...handLog, ...(memories[p.profile.id] || [])].slice(0, 60) });
-      }
       let tournament = old.tournament;
       if (next.done && tournament && tournament.round >= 2 && old.game) {
         tournament = recordTournamentEliminations(tournament, next);
@@ -1326,7 +1321,6 @@ export default function App() {
         ...old,
         game: next,
         tournament,
-        memories,
         stats: ended
           ? { ...old.stats, hands: old.stats.hands + 1, wins: old.stats.wins + (next.winners.includes(0) ? 1 : 0) }
           : old.stats,
@@ -1342,10 +1336,6 @@ export default function App() {
     let worker: Worker | undefined;
     const id = setTimeout(async () => {
       const o = observe(g);
-      o.memory = (data.memories[o.profile.id] || []).slice(
-        0,
-        o.profile.level * 10,
-      );
       if (t) o.qualify = t.round < 3 ? 4 : 1;
       const fallback = () => {
         worker = new BotWorker();
@@ -2295,15 +2285,6 @@ export default function App() {
           />
         </label>
         <div className="settings-actions settings-wide">
-          <button
-            className="text-button"
-            onClick={() => {
-              setData((d) => ({ ...d, memories: {} }));
-              setToast("公开交手记忆已清除");
-            }}
-          >
-            清除选手交手记忆
-          </button>
           <div className="notice">
             人物塑造和对局决策独立使用。浏览器直连要求服务支持跨域；失败时自动回退本地策略。
           </div>

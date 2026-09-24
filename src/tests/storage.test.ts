@@ -77,6 +77,13 @@ test("an unrecoverable active game does not block the rest of a save", () => {
   assert.equal(recovered.tournament, null);
   assert.equal(recovered.stats.hands, 3);
 });
+test("legacy AI memories are discarded during import", () => {
+  const parsed = parseSave({
+    ...blank,
+    memories: { "0": ["旧版交手记录"] },
+  });
+  assert.equal("memories" in parsed, false);
+});
 test("a suspended championship keeps its table and current simulation progress", () => {
   const game = newGame([hero, { ...hero, id: 7 }]);
   const tournament = {

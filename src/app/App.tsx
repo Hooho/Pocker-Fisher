@@ -923,6 +923,7 @@ export default function App() {
   const [celebrationDone, setCelebrationDone] = useState(false);
   const tableStageRef = useRef<HTMLDivElement>(null);
   const seatCardRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const [seatCardPositions, setSeatCardPositions] = useState<Array<{ x: number; y: number } | null>>([]);
   const [tableStageSize, setTableStageSize] = useState<TableStageSize>({ width: 0, height: 0 });
   const [tableSeatSize, setTableSeatSize] = useState<TableSeatSize>({ width: 0, height: 0 });
   const actionId = useRef(0);
@@ -970,6 +971,7 @@ export default function App() {
   const eliminatedWorker = useRef<Worker | null>(null);
   const g = data.game;
   const t = data.tournament;
+  const tablePlayerTotals = useMemo(() => g?.players.map((player) => player.total) ?? [], [g?.players]);
   const championshipWon = Boolean(
     t &&
     !t.complete &&
@@ -991,6 +993,7 @@ export default function App() {
     if (page !== "table") {
       setTableStageSize({ width: 0, height: 0 });
       setTableSeatSize({ width: 0, height: 0 });
+      setSeatCardPositions([]);
       return;
     }
     const stage = tableStageRef.current;
@@ -1017,6 +1020,23 @@ export default function App() {
           ? current
           : nextSeatSize,
       );
+      const nextSeatCardPositions = Array.from(stage.querySelectorAll<HTMLElement>(".seat-cards")).map((card) => {
+        const rect = card.getBoundingClientRect();
+        return rect.width && rect.height
+          ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+          : null;
+      });
+      setSeatCardPositions((current) => {
+        if (
+          current.length === nextSeatCardPositions.length &&
+          current.every((point, index) =>
+            point?.x === nextSeatCardPositions[index]?.x && point?.y === nextSeatCardPositions[index]?.y,
+          )
+        ) {
+          return current;
+        }
+        return nextSeatCardPositions;
+      });
     };
     updateSize();
     if (typeof ResizeObserver === "undefined") {
@@ -2566,7 +2586,17 @@ export default function App() {
                 <strong>{tableRoundLabel}</strong>
                 <span>第 {g.hand} 手</span>
               </div>
-              <Table3D potValue={pot(g)} chipUnit={g.bb} done={g.done} winnerIndices={g.winners} playerCount={g.players.length} chipToss={chipToss} />
+              <Table3D
+                potValue={pot(g)}
+                chipUnit={g.bb}
+                hand={g.hand}
+                playerTotals={tablePlayerTotals}
+                playerCardPositions={seatCardPositions}
+                done={g.done}
+                winnerIndices={g.winners}
+                playerCount={g.players.length}
+                chipToss={chipToss}
+              />
               <div className="community">
                 <div className="pot-label">
                   {g.done ? "已派奖" : "底池总额"}{" "}

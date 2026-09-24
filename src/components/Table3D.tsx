@@ -7,6 +7,9 @@ type ScreenPoint = { x: number; y: number };
 export default function Table3D({
   potValue,
   chipUnit,
+  hand,
+  playerTotals,
+  playerCardPositions,
   done,
   winnerIndices,
   playerCount,
@@ -14,17 +17,38 @@ export default function Table3D({
 }: {
   potValue: number;
   chipUnit: number;
+  hand: number;
+  playerTotals: number[];
+  playerCardPositions: Array<ScreenPoint | null>;
   done: boolean;
   winnerIndices: number[];
   playerCount: number;
   chipToss?: { seat: number; token: number; source: ScreenPoint | null } | null;
 }) {
   const update = useRef<
-    ((pot: number, unit: number, done: boolean, winners: number[], players: number) => void) | null
+    ((
+      pot: number,
+      unit: number,
+      hand: number,
+      totals: number[],
+      cardPositions: Array<ScreenPoint | null>,
+      done: boolean,
+      winners: number[],
+      players: number,
+    ) => void) | null
   >(null);
   useEffect(() => {
-    update.current?.(potValue, chipUnit, done, winnerIndices, playerCount);
-  }, [potValue, chipUnit, done, winnerIndices, playerCount]);
+    update.current?.(
+      potValue,
+      chipUnit,
+      hand,
+      playerTotals,
+      playerCardPositions,
+      done,
+      winnerIndices,
+      playerCount,
+    );
+  }, [potValue, chipUnit, hand, playerTotals, playerCardPositions, done, winnerIndices, playerCount]);
   const toss = useRef<((seat: number, players: number, source: ScreenPoint | null) => void) | null>(null);
   useEffect(() => {
     if (chipToss) toss.current?.(chipToss.seat, playerCount, chipToss.source);
@@ -199,14 +223,16 @@ export default function Table3D({
       );
       return screenRaycaster.ray.intersectPlane(chipPlane, new THREE.Vector3());
     };
-    toss.current = (seatIndex, players, source) => {
+    const playerStart = (seatIndex: number, players: number, source?: ScreenPoint | null) => {
       const angle = Math.PI / 2 + (seatIndex * Math.PI * 2) / Math.max(1, players);
       const fallbackStart = new THREE.Vector3(
         Math.cos(angle) * 4.25,
         0.25,
         Math.sin(angle) * 2.05 - 1.41,
       );
-      const start = source ? screenToTablePoint(source) ?? fallbackStart : fallbackStart;
+      return source ? screenToTablePoint(source) ?? fallbackStart : fallbackStart;
+    };
+    const createFlyer = (start: THREE.Vector3, delay = 0, onComplete?: () => void) => {
       const end = new THREE.Vector3(0, 0.22, 1.55);
       const flyer = new THREE.Group();
       const flyerColors = [0xb99863, 0xad5844, 0x59807f];
@@ -225,11 +251,11 @@ export default function Table3D({
       flyer.position.copy(start);
       flyer.rotation.z = (Math.random() - 0.5) * 0.6;
       scene.add(flyer);
-      const flyStart = performance.now();
+      const flyStart = performance.now() + delay;
       const duration = 480;
       const flyTick = () => {
         if (unmounted) return;
-        const progress = Math.min(1, (performance.now() - flyStart) / duration);
+        const progress = Math.min(1, Math.max(0, (performance.now() - flyStart) / duration));
         const ease = 1 - (1 - progress) ** 2;
         flyer.position.lerpVectors(start, end, ease);
         flyer.position.y = start.y + Math.sin(progress * Math.PI) * 0.9;
@@ -243,13 +269,64 @@ export default function Table3D({
             mesh.geometry.dispose();
             (mesh.material as THREE.Material).dispose();
           });
+          onComplete?.();
           renderer.render(scene, camera);
         }
       };
       flyTick();
     };
-    update.current = (pot, unit, finished, winners, players) => {
+    toss.current = (seatIndex, players, source) => {
+      createFlyer(playerStart(seatIndex, players, source));
+    };
+    let displayedHand: number | null = null;
+    let initialFlightHand: number | null = null;
+    let initialFlightSerial = 0;
+    let latestPot = 0;
+    let latestUnit = 1;
+    let latestFinished = false;
+    update.current = (pot, unit, handNumber, totals, cardPositions, finished, winners, players) => {
       cancelAnimationFrame(frame);
+      latestPot = pot;
+      latestUnit = unit;
+      latestFinished = finished;
+      const newHand = displayedHand === null || displayedHand !== handNumber;
+      displayedHand = handNumber;
+      if (initialFlightHand === handNumber) {
+        setPoolChipCount(chips, pot, unit);
+        return;
+      }
+      if (newHand && !finished) {
+        initialFlightHand = handNumber;
+        const flightSerial = ++initialFlightSerial;
+        chips.position.set(0, 0, 0);
+        chips.visible = false;
+        setPoolChipCount(chips, pot, unit);
+        const contributors = totals
+          .map((amount, index) => ({ amount, index }))
+          .filter(({ amount }) => amount > 0);
+        if (!contributors.length) {
+          initialFlightHand = null;
+          renderer.render(scene, camera);
+          return;
+        }
+        let remaining = contributors.length;
+        contributors.forEach(({ index }, sequence) => {
+          createFlyer(
+            playerStart(index, players, cardPositions[index]),
+            sequence * 90,
+            () => {
+              remaining -= 1;
+              if (remaining > 0 || flightSerial !== initialFlightSerial) return;
+              initialFlightHand = null;
+              chips.position.set(0, 0, 0);
+              setPoolChipCount(chips, latestPot, latestUnit);
+              chips.visible = latestPot > 0 && !latestFinished;
+              renderer.render(scene, camera);
+            },
+          );
+        });
+        return;
+      }
       setPoolChipCount(chips, pot, unit);
       const start = performance.now();
       const movingToWinners = finished && winners.length > 0;
@@ -302,7 +379,16 @@ export default function Table3D({
       };
       tick();
     };
-    update.current(potValue, chipUnit, done, winnerIndices, playerCount);
+    update.current(
+      potValue,
+      chipUnit,
+      hand,
+      playerTotals,
+      playerCardPositions,
+      done,
+      winnerIndices,
+      playerCount,
+    );
     return () => {
       unmounted = true;
       cancelAnimationFrame(frame);

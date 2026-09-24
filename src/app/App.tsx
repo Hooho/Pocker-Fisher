@@ -1363,7 +1363,7 @@ export default function App() {
       if (
         data.settings.mode === "all" ||
         (data.settings.mode === "key" &&
-          (o.call >= g.bb * 3 || o.pot >= g.bb * 8))
+          (o.call >= g.bb * 10 || o.pot >= g.bb * 25))
       ) {
         try {
           const move = await aiMove(data.settings, key, o, controller.signal);

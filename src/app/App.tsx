@@ -1954,6 +1954,11 @@ export default function App() {
     : 0;
   const waitingOnOtherTables = busy && !!t?.background && !t.background.done;
   const canAdvance = !!g?.done && alive <= threshold;
+  const championshipWon = !!t
+    && t.round >= counts.length - 1
+    && !!g?.done
+    && alive === 1
+    && g.players[0]?.chips > 0;
   const advancementTargetRound = t ? Math.min(t.round + 1, counts.length - 1) : 0;
   const advancementTargetLabel = t
     ? `${roundLabel(advancementTargetRound)} ${counts[advancementTargetRound]}强`
@@ -2671,7 +2676,13 @@ export default function App() {
                       >
                         {busy
                           ? "请稍候…"
-                          : canAdvance && t
+                          : championshipWon
+                            ? (
+                              <span className="advance-button-copy champion-button-copy">
+                                <strong className="advance-button-target">恭喜赢得总冠军</strong>
+                              </span>
+                            )
+                            : canAdvance && t
                             ? (
                               <span className="advance-button-copy">
                                 <span>确认晋级</span>

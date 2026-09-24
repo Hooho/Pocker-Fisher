@@ -2062,7 +2062,7 @@ export default function App() {
           </select>
         </label>
         <div className="notice settings-wide">
-          调试模式只影响牌桌显示：提前显示本手全部五张公共牌，其他玩家底牌仍然隐藏，不改变发牌、行动、结算、淘汰或晋级逻辑。
+          调试模式只影响牌桌显示：牌局进行时提前显示本手全部五张公共牌，牌局结束时按正常流程摊牌，不改变发牌、行动、结算、淘汰或晋级逻辑。
         </div>
         <div className="settings-wide provider-picker">
           <div className="provider-picker-heading">
@@ -2498,7 +2498,7 @@ export default function App() {
                 const seatPosition = getTableSeatPosition(g.players.length, i, tableStageSize);
                 const show =
                   p.profile.id === -1 ||
-                  (!data.settings.debugFast && g.done && !p.folded && g.board.length === 5);
+                  (g.done && !p.folded && g.board.length === 5);
                 const actionType = p.last.includes("弃牌")
                   ? "fold"
                   : p.last.includes("全下")

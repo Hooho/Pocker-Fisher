@@ -47,8 +47,7 @@ npm run dev
 
 ## 数据与资源
 
-`public/characters.json` 为 63 人正式资源；`public/avatars/` 存放程序化 SVG 头像，`public/avatars-webp/` 存放已压缩的 128px WebP 头像，`public/avatars-raster/` 存放 JPG/PNG 头像素材。`scripts/characters.mjs` 是构建前资源生成脚本，不在玩家开局时运行。
-缩减人物库前的头像草稿保留在 `scripts/avatar-drafts/`，不发布到静态站点。未批量删除任何原始文件。
+`public/characters.json` 为 63 人正式资源；`public/avatars-webp/` 存放已压缩的 128px WebP 头像，`public/avatars-png/` 仅作为原始头像备份，不参与运行时加载。`scripts/characters.mjs` 只生成角色数据，不再生成旧版 SVG 头像。
 
 ## 目录约定
 
@@ -64,7 +63,6 @@ npm run dev
 - `src/main.tsx`：唯一的 React 挂载入口，保持单应用结构。
 - `public/`：运行时直接发布的静态资源与独立静态页面。
 - `scripts/`：资源生成、校验脚本，以及不发布的历史草稿。
-- `samples/`：保留的视觉样例与素材样本。
 - `artifacts/`：本地生成的预览产物，不纳入版本控制。
 
 ## 已知边界

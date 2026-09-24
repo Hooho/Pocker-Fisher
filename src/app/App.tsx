@@ -998,7 +998,7 @@ export default function App() {
     const observer = new ResizeObserver(updateSize);
     observer.observe(stage);
     return () => observer.disconnect();
-  }, [page]);
+  }, [page, ready]);
   const resetTableTimer = () => {
     tableTimerState.current = { accumulatedMs: 0, runningSinceMs: null };
     saveTableTimer(tableTimerState.current);

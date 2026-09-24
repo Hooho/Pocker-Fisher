@@ -1114,6 +1114,16 @@ export default function App() {
     triggerChampionCelebration();
   }, [championshipWon, ready, triggerChampionCelebration]);
   useEffect(() => {
+    if (!championshipWon) return;
+    const replayChampionSound = () => playGameSound("champion", data.settings.sound, 4500);
+    window.addEventListener("pointerdown", replayChampionSound, { capture: true });
+    window.addEventListener("keydown", replayChampionSound, { capture: true });
+    return () => {
+      window.removeEventListener("pointerdown", replayChampionSound, { capture: true });
+      window.removeEventListener("keydown", replayChampionSound, { capture: true });
+    };
+  }, [championshipWon, data.settings.sound]);
+  useEffect(() => {
     return () => {
       if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
     };

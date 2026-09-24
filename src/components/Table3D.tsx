@@ -210,8 +210,7 @@ export default function Table3D({
     resize();
     let frame = 0;
     const screenRaycaster = new THREE.Raycaster();
-    const chipPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.25);
-    const screenToTablePoint = (point: ScreenPoint) => {
+    const screenToTablePoint = (point: ScreenPoint, planeY = 0.25) => {
       const rect = renderer.domElement.getBoundingClientRect();
       if (!rect.width || !rect.height) return null;
       screenRaycaster.setFromCamera(
@@ -221,7 +220,10 @@ export default function Table3D({
         ),
         camera,
       );
-      return screenRaycaster.ray.intersectPlane(chipPlane, new THREE.Vector3());
+      return screenRaycaster.ray.intersectPlane(
+        new THREE.Plane(new THREE.Vector3(0, 1, 0), -planeY),
+        new THREE.Vector3(),
+      );
     };
     const playerStart = (seatIndex: number, players: number, source?: ScreenPoint | null) => {
       const angle = Math.PI / 2 + (seatIndex * Math.PI * 2) / Math.max(1, players);
@@ -231,6 +233,15 @@ export default function Table3D({
         Math.sin(angle) * 2.05 - 1.41,
       );
       return source ? screenToTablePoint(source) ?? fallbackStart : fallbackStart;
+    };
+    const playerDestination = (seatIndex: number, players: number, source?: ScreenPoint | null) => {
+      const angle = Math.PI / 2 + (seatIndex * Math.PI * 2) / Math.max(1, players);
+      const fallbackDestination = new THREE.Vector3(
+        Math.cos(angle) * 4.25,
+        0,
+        Math.sin(angle) * 2.05 - 1.41,
+      );
+      return source ? screenToTablePoint(source, 0) ?? fallbackDestination : fallbackDestination;
     };
     const createFlyer = (start: THREE.Vector3, delay = 0, onComplete?: () => void) => {
       const end = new THREE.Vector3(0, 0.22, 1.55);
@@ -348,12 +359,8 @@ export default function Table3D({
         group.visible = true;
         starts[index] = group.position.clone();
         if (movingToWinners) {
-          const angle = Math.PI / 2 + (winners[index] * Math.PI * 2) / Math.max(1, players);
-          destinations[index] = new THREE.Vector3(
-            Math.cos(angle) * 4.25,
-            0,
-            Math.sin(angle) * 2.05 - 1.41,
-          );
+          const winnerSeat = winners[index];
+          destinations[index] = playerDestination(winnerSeat, players, cardPositions[winnerSeat]);
         } else {
           destinations[index] = new THREE.Vector3(0, 0, 0);
         }

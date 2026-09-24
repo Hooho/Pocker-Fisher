@@ -31,8 +31,13 @@ export function resolvePage(pathname: string, hash = ""): AppPage {
   return pageByPath[normalizePath(pathname)] || "lobby";
 }
 
+function isVscodeWebview() {
+  return typeof window !== "undefined" && window.location.protocol.startsWith("vscode-webview");
+}
+
 export function pathForPage(page: AppPage) {
-  return APP_ROUTES[page];
+  const path = APP_ROUTES[page];
+  return isVscodeWebview() ? `#${path}` : path;
 }
 
 function currentPage() {
@@ -54,6 +59,22 @@ export function useAppRouter() {
 
   const navigate = useCallback((nextPage: AppPage, options: NavigateOptions = {}) => {
     if (currentPage() === nextPage) return;
+
+    if (isVscodeWebview()) {
+      const nextHash = `#${APP_ROUTES[nextPage]}`;
+      if (options.replace) {
+        window.history.replaceState({}, "", nextHash);
+      } else {
+        // VS Code Webviews have a restricted history implementation. Hash
+        // navigation is the stable browser primitive there and also updates
+        // the visible Webview URL for debugging.
+        window.location.hash = nextHash;
+      }
+      if (window.location.hash !== nextHash) window.location.hash = nextHash;
+      setPage(nextPage);
+      return;
+    }
+
     const method = options.replace ? "replaceState" : "pushState";
     window.history[method]({}, "", pathForPage(nextPage));
     setPage(nextPage);

@@ -9,16 +9,16 @@ import {
   simulateTable,
   simulateTableWithStacks,
 } from "../domain/tournament/tournament";
-test("equal starting stacks on qualification boundary produce a playoff", () => {
+test("qualification does not revive eliminated players below the cutoff", () => {
   const g = newGame(Array.from({ length: 8 }, (_, id) => ({ ...hero, id })));
   g.players.forEach((p, i) => {
     p.chips = i < 3 ? 20000 : 0;
-    p.start = i < 6 ? 10000 : 0;
+    p.start = 10000;
   });
   const result = qualification(g, 4);
-  assert.equal(result.locked.length, 3);
-  assert.equal(result.tied.length, 3);
-  assert.equal(result.slots, 1);
+  assert.deepEqual(result.locked.map((player) => player.id), [0, 1, 2]);
+  assert.deepEqual(result.tied, []);
+  assert.equal(result.slots, 0);
 });
 
 test("qualification never advances players who have already been eliminated", () => {
@@ -31,6 +31,19 @@ test("qualification never advances players who have already been eliminated", ()
   const result = qualification(g, 4);
 
   assert.deepEqual(result.locked.map((player) => player.id), [0, 1, 2, 3]);
+  assert.deepEqual(result.tied, []);
+});
+
+test("qualification advances only the surviving player after a seven-player knockout", () => {
+  const g = newGame(Array.from({ length: 8 }, (_, id) => ({ ...hero, id })));
+  g.players.forEach((player, index) => {
+    player.chips = index === 0 ? 80000 : 0;
+    player.start = 10000;
+  });
+
+  const result = qualification(g, 4);
+
+  assert.deepEqual(result.locked.map((player) => player.id), [0]);
   assert.deepEqual(result.tied, []);
 });
 

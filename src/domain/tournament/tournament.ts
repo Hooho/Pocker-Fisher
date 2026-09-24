@@ -86,6 +86,24 @@ export function qualification(game: Game, slots: number) {
   const ranked = [...game.players].sort(
     (a, b) => b.chips - a.chips || b.start - a.start,
   );
+  if (slots >= ranked.length) {
+    return {
+      locked: ranked.map((player) => player.profile),
+      tied: [] as Character[],
+      slots: 0,
+    };
+  }
+  // A multi-way pot can eliminate more players than the remaining cutoff.
+  // Only players with chips left may advance; eliminated players must not be
+  // revived by the equal-stack playoff below.
+  const alive = ranked.filter((player) => player.chips > 0);
+  if (alive.length <= slots) {
+    return {
+      locked: alive.map((player) => player.profile),
+      tied: [] as Character[],
+      slots: 0,
+    };
+  }
   const boundary = ranked[slots - 1];
   const after = ranked[slots];
   if (

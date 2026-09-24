@@ -58,6 +58,7 @@ import {
   suit,
   pot,
   evaluate,
+  previewBoard,
   type Character,
   type Game,
   type Move,
@@ -2057,11 +2058,11 @@ export default function App() {
             onChange={(e) => updateSettings({ debugFast: e.target.value === "on" })}
           >
             <option value="off">关闭</option>
-            <option value="on">开启 · 显示所有底牌</option>
+            <option value="on">开启 · 提前显示五张公共牌</option>
           </select>
         </label>
         <div className="notice settings-wide">
-          调试模式只影响牌桌显示：显示所有选手的底牌，不改变发牌、行动、结算、淘汰或晋级逻辑。
+          调试模式只影响牌桌显示：提前显示本手全部五张公共牌，其他玩家底牌仍然隐藏，不改变发牌、行动、结算、淘汰或晋级逻辑。
         </div>
         <div className="settings-wide provider-picker">
           <div className="provider-picker-heading">
@@ -2266,6 +2267,7 @@ export default function App() {
       </div>
     </section>
   );
+  const displayedBoard = g && data.settings.debugFast ? previewBoard(g) : g?.board ?? [];
   return (
     <div className={`app ${page === "table" ? "immersive" : ""} ${page === "lobby" ? "home-screen" : ""}`}>
       <aside className="sidebar">
@@ -2473,11 +2475,11 @@ export default function App() {
                 <div className="board-cards">
                   {Array.from({ length: 5 }, (_, i) => (
                     <Card
-                      key={`${g.hand}-${i}-${g.board[i]}`}
-                      value={g.board[i]}
-                      back={g.board[i] === undefined}
-                      className={g.board[i] === undefined ? "board-card-deal" : "board-card-reveal"}
-                      style={{ animationDelay: g.board[i] === undefined ? `${i * 90}ms` : "0ms" }}
+                      key={`${g.hand}-${i}-${displayedBoard[i]}`}
+                      value={displayedBoard[i]}
+                      back={displayedBoard[i] === undefined}
+                      className={data.settings.debugFast ? "board-card-preview" : g.board[i] === undefined ? "board-card-deal" : "board-card-reveal"}
+                      style={{ animationDelay: data.settings.debugFast || g.board[i] === undefined ? `${i * 90}ms` : "0ms" }}
                       highlight={
                         (g.done &&
                           g.winners.some((w) =>
@@ -2495,9 +2497,8 @@ export default function App() {
               {g.players.map((p, i) => {
                 const seatPosition = getTableSeatPosition(g.players.length, i, tableStageSize);
                 const show =
-                  data.settings.debugFast ||
                   p.profile.id === -1 ||
-                  (g.done && !p.folded && g.board.length === 5);
+                  (!data.settings.debugFast && g.done && !p.folded && g.board.length === 5);
                 const actionType = p.last.includes("弃牌")
                   ? "fold"
                   : p.last.includes("全下")

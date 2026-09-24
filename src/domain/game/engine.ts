@@ -319,11 +319,25 @@ function advance(g: Game) {
   g.turn = g.dealer;
   advance(g);
 }
+function dealStreetCards(deck: number[], board: number[]) {
+  if (!deck.length) return;
+  deck.pop();
+  const n = board.length === 0 ? 3 : 1;
+  for (let i = 0; i < n; i++) {
+    const card = deck.pop();
+    if (card === undefined) return;
+    board.push(card);
+  }
+}
 function dealStreet(g: Game) {
-  g.deck.pop();
-  const n = g.board.length === 0 ? 3 : 1;
-  for (let i = 0; i < n; i++) g.board.push(g.deck.pop()!);
+  dealStreetCards(g.deck, g.board);
   g.street = Math.min(3, g.street + 1);
+}
+export function previewBoard(g: Pick<Game, "deck" | "board">): number[] {
+  const deck = [...g.deck];
+  const board = [...g.board];
+  while (board.length < 5 && deck.length) dealStreetCards(deck, board);
+  return board;
 }
 export function settle(g: Game) {
   const levels = [

@@ -1069,7 +1069,8 @@ footer>span:last-child {
   font-size: 24px;
 }
 
-.board-cards .board-card-deal {
+.board-cards .board-card-deal,
+.board-cards .board-card-preview {
   animation: deal 0.3s ease-out both;
 }
 

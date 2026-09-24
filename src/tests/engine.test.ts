@@ -11,6 +11,7 @@ import {
   pot,
   hero,
   settle,
+  previewBoard,
   type Character,
 } from "../domain/game/engine";
 const profiles: Character[] = Array.from({ length: 8 }, (_, i) => ({
@@ -58,6 +59,15 @@ test("a new hand keeps normal dealing and hand flow", () => {
   const next = startHand(g, 100);
   assert.equal(next.done, false);
   assert.equal(next.board.length, 0);
+});
+test("previewBoard reveals future community cards without mutating the hand", () => {
+  const g = newGame(profiles.slice(0, 3));
+  const deckBefore = [...g.deck];
+  const preview = previewBoard(g);
+
+  assert.equal(preview.length, 5);
+  assert.deepEqual(g.board, []);
+  assert.deepEqual(g.deck, deckBefore);
 });
 test("fold awards pot and preserves chips", () => {
   let g = newGame(profiles.slice(0, 2));

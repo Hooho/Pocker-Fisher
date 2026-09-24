@@ -20,6 +20,33 @@ npm run dev
 
 扩展构建命令为 `npm run build:vscode`。它会先构建 React Webview，再编译 VS Code 扩展宿主；`.vscode/tasks.json` 也提供了同名构建任务。扩展开发宿主关闭后，游戏源码不会被安装到当前 VS Code，只会在测试窗口中运行。
 
+## 一键发布扩展
+
+`npm run release` 会按顺序递增版本号、执行扩展构建、生成 VSIX，并发布到 VS Code Marketplace 和 Open VSX（Cursor 使用的第三方扩展注册表）。脚本不会创建 Git 提交或推送代码。
+
+首次发布前，在当前终端设置两个令牌；不要把令牌写入 `package.json`、脚本或提交到 Git：
+
+```sh
+export VSCE_PAT="你的 Azure DevOps PAT"
+export OVSX_PAT="你的 Open VSX Token"
+```
+
+发布命令：
+
+```sh
+npm run release             # patch，例如 1.0.0 -> 1.0.1
+npm run release -- minor    # minor，例如 1.0.0 -> 1.1.0
+npm run release -- major    # major，例如 1.0.0 -> 2.0.0
+```
+
+正式发布前可以只构建和检查 VSIX，不改版本号、不调用发布接口：
+
+```sh
+npm run release:check
+```
+
+如果某一个市场发布失败，可以使用 `--no-bump` 保持当前版本重试，并用 `--skip-vscode` 或 `--skip-openvsx` 跳过已经成功的市场。
+
 ## 单应用路由
 
 这是一个单应用，所有页面共享同一个 React 状态和本地存档，不拆成多个前端入口。页面通过客户端路由区分：

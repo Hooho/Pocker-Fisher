@@ -38,7 +38,9 @@ export function TournamentPage({
           <p className="muted">
             {t?.complete
               ? "本届赛事已结束，以下为最终名次。"
-              : "64 位选手同时分桌比赛，晋级选手带着当前筹码进入下一轮。"}
+              : t?.resetStacksEachRound
+                ? "64 位选手同时分桌比赛，晋级进入下一轮时全部重置为 10,000 筹码。"
+                : "64 位选手同时分桌比赛，晋级选手带着当前筹码进入下一轮。"}
           </p>
         </div>
         <div className="championship-actions">

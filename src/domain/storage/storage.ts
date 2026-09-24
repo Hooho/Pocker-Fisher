@@ -109,6 +109,7 @@ export type Tournament = {
   round: number;
   field: Character[];
   stacks?: Record<string, number>;
+  resetStacksEachRound?: boolean;
   entrants?: number;
   finalists?: Character[];
   finalStandings?: Character[];
@@ -183,6 +184,7 @@ const tournamentSchema = z.object({
         .optional(),
       field: z.array(characterSchema).max(256),
       stacks: z.record(money).optional(),
+      resetStacksEachRound: z.boolean().optional(),
       seed: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
       pace: z.number().int().min(5).max(30).default(10),
       out: z.boolean(),

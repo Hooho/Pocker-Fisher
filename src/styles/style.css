@@ -2271,6 +2271,84 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.modal .modal-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 14px;
+  border: 1px solid #425038;
+  border-radius: 8px;
+  background: #17231b;
+  cursor: pointer;
+}
+
+.modal-toggle-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.modal-toggle-copy strong {
+  color: #d7dcbf;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.modal-toggle-copy small {
+  color: #8e9f89;
+  font-size: 10px;
+}
+
+.modal .modal-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.modal-toggle-track {
+  position: relative;
+  flex: 0 0 42px;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: #303d31;
+  box-shadow: inset 0 0 0 1px #526247;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.modal-toggle-track::after {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #aab79c;
+  content: "";
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.modal-toggle input:checked + .modal-toggle-track {
+  background: #9f824a;
+  box-shadow: inset 0 0 0 1px #d6bd78;
+}
+
+.modal-toggle input:checked + .modal-toggle-track::after {
+  background: #fff1bd;
+  transform: translateX(18px);
+}
+
+.modal-toggle:has(input:focus-visible) {
+  outline: 2px solid #d6bd78;
+  outline-offset: 2px;
+}
+
 .modal textarea {
   resize: vertical;
   min-height: 78px;

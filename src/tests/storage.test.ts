@@ -82,6 +82,7 @@ test("a suspended championship keeps its table and current simulation progress",
   const tournament = {
     round: 0,
     field: [hero, { ...hero, id: 7 }, { ...hero, id: 8 }],
+    resetStacksEachRound: true,
     background: { remaining: [{ ...hero, id: 8 }], qualified: [], done: false },
     seed: 123,
     pace: 10,

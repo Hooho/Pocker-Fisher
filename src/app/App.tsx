@@ -589,7 +589,9 @@ function startNextTournamentRound(save: Save, localQualified: Character[]): Save
   const fieldStacks = Object.fromEntries(
     field.map((player) => [
       String(player.id),
-      player.id === -1 ? heroStack : knownStacks[String(player.id)] ?? 10000,
+      tournament.resetStacksEachRound
+        ? 10000
+        : player.id === -1 ? heroStack : knownStacks[String(player.id)] ?? 10000,
     ]),
   );
   const game = newGame(
@@ -865,6 +867,7 @@ export default function App() {
   >(null);
   const [newMode, setNewMode] = useState<"cash" | "tournament">("cash");
   const [seatCount, setSeatCount] = useState(6);
+  const [resetTournamentStacks, setResetTournamentStacks] = useState(false);
   const [paused, setPaused] = useState(false);
   const [tableSeconds, setTableSeconds] = useState(() => Math.floor(elapsedTableMs(loadTableTimer()) / 1000));
   const [pageVisible, setPageVisible] = useState(
@@ -1441,6 +1444,7 @@ export default function App() {
             userPlayer,
             ...roster,
           ].map((player) => [String(player.id), 10000])),
+          resetStacksEachRound: resetTournamentStacks,
           background: { remaining: roster.slice(7), qualified: [], done: false },
           entrants: roster.length + 1,
           seed: Date.now(),
@@ -1561,15 +1565,18 @@ export default function App() {
       let round = t.round + 1;
       while (round < 6 && alivePlayers.length <= [6, 4, 2, 1][round - 3]) round++;
       const advancingPlayers = alivePlayers.map((player) => player.profile);
-      const nextGame = startHand(
-        g,
-        Math.min(102400, 100 * 2 ** Math.floor(g.hand / t.pace)),
-      );
+      const nextBB = Math.min(102400, 100 * 2 ** Math.floor(g.hand / t.pace));
+      const nextRoundStacks = t.resetStacksEachRound
+        ? Object.fromEntries(advancingPlayers.map((player) => [String(player.id), 10000]))
+        : currentGameStacks;
+      const nextGame = t.resetStacksEachRound
+        ? newGame(advancingPlayers, nextBB, advancingPlayers.map(() => 10000))
+        : startHand(g, nextBB);
       setData((d) => {
         const nextTournament = d.tournament
           ? recordTournamentEliminations({
             ...d.tournament,
-            stacks: { ...(d.tournament.stacks || {}), ...currentGameStacks },
+            stacks: { ...(d.tournament.stacks || {}), ...nextRoundStacks },
             round,
             field: advancingPlayers,
             results: [...d.tournament.results, `${roundLabel(t.round)} · 晋级`],
@@ -2948,7 +2955,7 @@ export default function App() {
                   </label>
                 ) : (
                   <div className="notice">
-                    64 人 · 多桌同时模拟 · 晋级时保留你的现有筹码；出局后快速模拟至冠军产生。
+                    64 人 · 多桌同时模拟 · {resetTournamentStacks ? "进入下一轮时全部重置为 10,000 筹码" : "晋级时保留现有筹码"}；出局后快速模拟至冠军产生。
                   </div>
                 )}
                 <label>
@@ -2967,19 +2974,33 @@ export default function App() {
                   </select>
                 </label>
                 {newMode === "tournament" ? (
-                  <label>
-                    比赛节奏
-                    <select
-                      value={data.settings.pace}
-                      onChange={(e) =>
-                        updateSettings({ pace: +e.target.value })
-                      }
-                    >
-                      <option value={5}>快速 · 每 5 手涨盲</option>
-                      <option value={10}>标准 · 每 10 手涨盲</option>
-                      <option value={20}>深度 · 每 20 手涨盲</option>
-                    </select>
-                  </label>
+                  <>
+                    <label>
+                      比赛节奏
+                      <select
+                        value={data.settings.pace}
+                        onChange={(e) =>
+                          updateSettings({ pace: +e.target.value })
+                        }
+                      >
+                        <option value={5}>快速 · 每 5 手涨盲</option>
+                        <option value={10}>标准 · 每 10 手涨盲</option>
+                        <option value={20}>深度 · 每 20 手涨盲</option>
+                      </select>
+                    </label>
+                    <label className="modal-toggle">
+                      <span className="modal-toggle-copy">
+                        <strong>进入下一轮重置筹码</strong>
+                        <small>{resetTournamentStacks ? "全部选手重置为 10,000" : "保留选手当前筹码"}</small>
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={resetTournamentStacks}
+                        onChange={(e) => setResetTournamentStacks(e.target.checked)}
+                      />
+                      <span className="modal-toggle-track" aria-hidden="true" />
+                    </label>
+                  </>
                 ) : null}
                 <button
                   className="gold-button full"
@@ -3004,7 +3025,7 @@ export default function App() {
                 <ul className="mode-details-list">
                   <li>64 人分桌比赛，依次进行首轮、次轮、半决赛和总决赛。</li>
                   <li>前三轮每桌 8 进 4，最后 8 人进入总决赛。</li>
-                  <li>前三轮晋级后统一筹码，总决赛保留现有筹码并按 8、6、4、2、1 人推进。</li>
+                  <li>进入下一轮的筹码方式可在入座前选择：全部重置为 10,000，或保留现有筹码；总决赛按 8、6、4、2、1 人推进。</li>
                   <li>每赢一手牌获得积分，最终按名次获得额外奖励。</li>
                 </ul>
                 <div className="championship-bracket" aria-labelledby="championship-bracket-title">

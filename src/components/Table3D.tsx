@@ -12,7 +12,6 @@ export default function Table3D({
   playerTotals,
   playerIds,
   playerCardPositions,
-  playerAvatarPositions,
   chipAnimation,
   onChipAnimationStart,
   done,
@@ -26,7 +25,6 @@ export default function Table3D({
   playerTotals: number[];
   playerIds: number[];
   playerCardPositions: Array<ScreenPoint | null>;
-  playerAvatarPositions: Array<ScreenPoint | null>;
   chipAnimation: ChipAnimationProgress | null;
   onChipAnimationStart: (hand: number, updates: Record<string, number>) => void;
   done: boolean;
@@ -49,7 +47,6 @@ export default function Table3D({
       totals: number[],
       ids: number[],
       cardPositions: Array<ScreenPoint | null>,
-      avatarPositions: Array<ScreenPoint | null>,
       animationProgress: ChipAnimationProgress | null,
       done: boolean,
       winners: number[],
@@ -64,13 +61,12 @@ export default function Table3D({
       playerTotals,
       playerIds,
       playerCardPositions,
-      playerAvatarPositions,
       chipAnimation,
       done,
       winnerIndices,
       playerCount,
     );
-  }, [potValue, chipUnit, hand, playerTotals, playerIds, playerCardPositions, playerAvatarPositions, chipAnimation, done, winnerIndices, playerCount]);
+  }, [potValue, chipUnit, hand, playerTotals, playerIds, playerCardPositions, chipAnimation, done, winnerIndices, playerCount]);
   const toss = useRef<((seat: number, players: number, source: ScreenPoint | null, hand: number, playerId: number, total: number) => void) | null>(null);
   useEffect(() => {
     if (chipToss) toss.current?.(chipToss.seat, playerCount, chipToss.source, chipToss.hand, chipToss.playerId, chipToss.total);
@@ -325,7 +321,6 @@ export default function Table3D({
       totals,
       ids,
       cardPositions,
-      avatarPositions,
       animationProgress,
       finished,
       winners,
@@ -400,7 +395,7 @@ export default function Table3D({
         starts[index] = group.position.clone();
         if (movingToWinners) {
           const winnerSeat = winners[index];
-          destinations[index] = playerDestination(winnerSeat, players, avatarPositions[winnerSeat]);
+          destinations[index] = playerDestination(winnerSeat, players, cardPositions[winnerSeat]);
         } else {
           destinations[index] = new THREE.Vector3(0, 0, 0);
         }
@@ -433,7 +428,6 @@ export default function Table3D({
       playerTotals,
       playerIds,
       playerCardPositions,
-      playerAvatarPositions,
       chipAnimation,
       done,
       winnerIndices,

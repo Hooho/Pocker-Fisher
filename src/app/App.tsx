@@ -941,7 +941,6 @@ export default function App() {
   const tableStageRef = useRef<HTMLDivElement>(null);
   const seatCardRefs = useRef<Array<HTMLDivElement | null>>([]);
   const [seatCardPositions, setSeatCardPositions] = useState<Array<{ x: number; y: number } | null>>([]);
-  const [seatAvatarPositions, setSeatAvatarPositions] = useState<Array<{ x: number; y: number } | null>>([]);
   const [tableStageSize, setTableStageSize] = useState<TableStageSize>({ width: 0, height: 0 });
   const [tableSeatSize, setTableSeatSize] = useState<TableSeatSize>({ width: 0, height: 0 });
   const [showAllCommunityCards, setShowAllCommunityCards] = useState(false);
@@ -1059,7 +1058,6 @@ export default function App() {
       setTableStageSize({ width: 0, height: 0 });
       setTableSeatSize({ width: 0, height: 0 });
       setSeatCardPositions([]);
-      setSeatAvatarPositions([]);
       return;
     }
     const stage = tableStageRef.current;
@@ -1102,25 +1100,6 @@ export default function App() {
           return current;
         }
         return nextSeatCardPositions;
-      });
-      const nextSeatAvatarPositions = Array.from(
-        stage.querySelectorAll<HTMLElement>(".seat-info > img, .seat-info > .hero-avatar"),
-      ).map((avatar) => {
-        const rect = avatar.getBoundingClientRect();
-        return rect.width && rect.height
-          ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-          : null;
-      });
-      setSeatAvatarPositions((current) => {
-        if (
-          current.length === nextSeatAvatarPositions.length &&
-          current.every((point, index) =>
-            point?.x === nextSeatAvatarPositions[index]?.x && point?.y === nextSeatAvatarPositions[index]?.y,
-          )
-        ) {
-          return current;
-        }
-        return nextSeatAvatarPositions;
       });
     };
     updateSize();
@@ -2664,7 +2643,6 @@ export default function App() {
                 playerTotals={tablePlayerTotals}
                 playerIds={tablePlayerIds}
                 playerCardPositions={seatCardPositions}
-                playerAvatarPositions={seatAvatarPositions}
                 chipAnimation={data.chipAnimation ?? null}
                 onChipAnimationStart={markChipAnimationStarted}
                 done={g.done}

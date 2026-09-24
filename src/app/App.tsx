@@ -2427,11 +2427,11 @@ export default function App() {
           <dl className="info-settings-list">
             <div>
               <dt>文件名</dt>
-              <dd><code>river-club-save.json</code></dd>
+              <dd><code>river-fisher-save.json</code></dd>
             </div>
             <div>
               <dt>默认位置</dt>
-              <dd><code>.vscode/river-club-save.json</code></dd>
+              <dd><code>.vscode/river-fisher-save.json</code></dd>
             </div>
             <div>
               <dt>读取时机</dt>

@@ -4,6 +4,7 @@ import * as vscode from "vscode";
 
 const viewId = "riverClub.gameView";
 const saveGlobalStateKey = "riverClub.save";
+const backupFileName = "river-fisher-save.json";
 
 type PersistedSave = {
   revision: number;
@@ -74,24 +75,43 @@ function getBackupLocation(context: vscode.ExtensionContext) {
   const workspace = vscode.workspace.workspaceFolders?.[0]?.uri;
   if (workspace) {
     const directory = vscode.Uri.joinPath(workspace, ".vscode");
-    return { directory, file: vscode.Uri.joinPath(directory, "river-club-save.json") };
+    return { directory, file: vscode.Uri.joinPath(directory, backupFileName) };
   }
 
   return {
     directory: context.globalStorageUri,
-    file: vscode.Uri.joinPath(context.globalStorageUri, "river-club-save.json"),
+    file: vscode.Uri.joinPath(context.globalStorageUri, backupFileName),
   };
 }
 
 async function readJsonBackup(context: vscode.ExtensionContext): Promise<PersistedSave | null> {
-  const { file } = getBackupLocation(context);
+  const { directory, file } = getBackupLocation(context);
+  const candidates = [file];
   try {
-    const contents = await vscode.workspace.fs.readFile(file);
-    const value: unknown = JSON.parse(new TextDecoder().decode(contents));
-    return isPersistedSave(value) ? value : null;
+    const entries = await vscode.workspace.fs.readDirectory(directory);
+    for (const [name, type] of entries) {
+      if (
+        type === vscode.FileType.File &&
+        name.endsWith("-save.json") &&
+        name !== backupFileName
+      ) {
+        candidates.push(vscode.Uri.joinPath(directory, name));
+      }
+    }
   } catch {
-    return null;
+    // The directory may not exist until the first save.
   }
+
+  for (const candidate of candidates) {
+    try {
+      const contents = await vscode.workspace.fs.readFile(candidate);
+      const value: unknown = JSON.parse(new TextDecoder().decode(contents));
+      if (isPersistedSave(value)) return value;
+    } catch {
+      // Try the next candidate or start with the browser save.
+    }
+  }
+  return null;
 }
 
 async function writeJsonBackup(

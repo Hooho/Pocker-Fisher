@@ -4,4 +4,4 @@ dist-extension/
 artifacts/
 *.tsbuildinfo
 .DS_Store
-.vscode/river-club-save.json
+.vscode/*-save.json

@@ -1014,7 +1014,7 @@ export default function App() {
   const openPlayerProfileState = useRef({ page, paused, t });
   const tableEliminated = !!t?.out;
   const tableFinished = !!t?.complete;
-  const tableTimerRunning = page === "table" && !tableEliminated && !tableFinished && pageVisible;
+  const tableTimerRunning = page === "table" && !tableEliminated && !tableFinished && !championshipWon && pageVisible;
   const tableTimerState = useRef(loadTableTimer());
   useEffect(() => {
     if (page !== "table") {

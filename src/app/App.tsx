@@ -1090,6 +1090,7 @@ export default function App() {
   }, [tableTimerRunning]);
   const [showFireworks, setShowFireworks] = useState(false);
   const fireworksTimer = useRef<number | null>(null);
+  const championSoundPlayed = useRef(false);
   const triggerFireworks = useCallback((durationMs: number) => {
     setShowFireworks(true);
     if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
@@ -1098,8 +1099,14 @@ export default function App() {
   // Keep the celebration replayable until the player confirms the championship.
   // That means refreshing the unconfirmed final hand can replay the moment too.
   useEffect(() => {
-    if (ready && championshipWon) {
-      triggerFireworks(9500);
+    if (!championshipWon) {
+      championSoundPlayed.current = false;
+      return;
+    }
+    if (!ready) return;
+    triggerFireworks(9500);
+    if (!championSoundPlayed.current) {
+      championSoundPlayed.current = true;
       playGameSound("champion", data.settings.sound);
     }
   }, [championshipWon, ready, triggerFireworks]);
@@ -1186,7 +1193,20 @@ export default function App() {
     if (top.startsWith("第 ")) setLastAction(null);
     if (next.board.length > (g?.board.length || 0)) playGameSound("deal", data.settings.sound);
     const handEnded = next.done && !g?.done;
-    if (handEnded && next.winners.length) { setCelebrationDone(false); playGameSound("win", data.settings.sound) }
+    const localChampionWon = Boolean(
+      t &&
+      !t.complete &&
+      next.done &&
+      t.round >= counts.length - 1 &&
+      next.players.filter((player) => player.chips > 0).length === 1 &&
+      next.players[0]?.profile.id === -1 &&
+      next.players[0].chips > 0,
+    );
+    if (handEnded && next.winners.length) {
+      setCelebrationDone(false);
+      if (localChampionWon) championSoundPlayed.current = true;
+      playGameSound(localChampionWon ? "champion" : "win", data.settings.sound);
+    }
     setData((old) => {
       const ended = next.done && !old.game?.done;
       const memories = { ...old.memories };
@@ -1615,9 +1635,16 @@ export default function App() {
       const nextRoundStacks = t.resetStacksEachRound
         ? Object.fromEntries(advancingPlayers.map((player) => [String(player.id), 10000]))
         : currentGameStacks;
+      const advancingGamePlayers = g.players.filter((player) => player.chips > 0);
+      const previousDealerId = g.players[g.dealer]?.profile.id;
+      const dealer = advancingGamePlayers.findIndex((player) => player.profile.id === previousDealerId);
       const nextGame = t.resetStacksEachRound
         ? newGame(advancingPlayers, nextBB, advancingPlayers.map(() => 10000))
-        : startHand(g, nextBB);
+        : startHand({
+          ...g,
+          players: advancingGamePlayers,
+          dealer: dealer >= 0 ? dealer : Math.max(0, advancingGamePlayers.length - 1),
+        }, nextBB);
       setData((d) => {
         const nextTournament = d.tournament
           ? recordTournamentEliminations({

@@ -782,8 +782,8 @@ function Fireworks({ active }: { active: boolean }) {
       <div className="champion-celebration-flash" />
       <div className="champion-celebration-copy">
         <div className="champion-plaque">
-          <span className="champion-plaque-emblem champion-plaque-emblem-left"><Crown size={23} strokeWidth={2.4} /></span>
-          <span className="champion-plaque-emblem champion-plaque-emblem-right"><Crown size={23} strokeWidth={2.4} /></span>
+          <span className="champion-plaque-emblem champion-plaque-emblem-left"><Trophy size={52} strokeWidth={2.4} /></span>
+          <span className="champion-plaque-emblem champion-plaque-emblem-right"><Trophy size={52} strokeWidth={2.4} /></span>
           <span className="champion-plaque-kicker">CHAMPIONSHIP WON</span>
           <strong>恭喜您 <em>赢得总冠军</em></strong>
           <span className="champion-plaque-rule">✦　✦　✦</span>

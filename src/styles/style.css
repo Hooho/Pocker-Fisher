@@ -8699,29 +8699,26 @@ footer {
   top: 50%;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 52px;
+  height: 52px;
   color: #fff0a3;
-  font-size: 26px;
   line-height: 1;
-  border: 2px solid #f5d477;
-  background: linear-gradient(145deg, #d2a641, #684419 72%);
-  box-shadow: 0 0 0 3px #573918, 0 0 18px #f4cf6e88;
 }
 
 .champion-plaque-emblem svg {
-  transform: rotate(-45deg);
-  filter: drop-shadow(0 0 5px #fff0a3);
+  width: 52px;
+  height: 52px;
+  filter: drop-shadow(0 0 8px #fff0a3) drop-shadow(0 0 18px #f4cf6e88);
 }
 
 .champion-plaque-emblem-left {
-  left: -29px;
-  transform: translateY(-50%) rotate(45deg);
+  left: -42px;
+  transform: translateY(-50%);
 }
 
 .champion-plaque-emblem-right {
-  right: -29px;
-  transform: translateY(-50%) rotate(45deg);
+  right: -42px;
+  transform: translateY(-50%);
 }
 
 .champion-plaque-kicker {
@@ -8912,16 +8909,21 @@ footer {
   }
 
   .champion-plaque-emblem {
-    width: 28px;
-    height: 28px;
+    width: 34px;
+    height: 34px;
+  }
+
+  .champion-plaque-emblem svg {
+    width: 34px;
+    height: 34px;
   }
 
   .champion-plaque-emblem-left {
-    left: -21px;
+    left: -28px;
   }
 
   .champion-plaque-emblem-right {
-    right: -21px;
+    right: -28px;
   }
 
   .champion-plaque-kicker {

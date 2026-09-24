@@ -8735,10 +8735,11 @@ footer {
   margin-top: 9px;
   color: #fff1b7;
   font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
-  font-size: clamp(30px, 6vw, 68px);
+  font-size: clamp(28px, 5vw, 58px);
   font-weight: 700;
-  letter-spacing: .12em;
+  letter-spacing: .08em;
   line-height: 1.2;
+  white-space: nowrap;
   text-shadow: 0 2px 0 #8d6425, 0 0 18px #f6d77f, 0 4px 22px #000;
 }
 
@@ -8928,8 +8929,8 @@ footer {
   }
 
   .champion-plaque strong {
-    font-size: clamp(24px, 9vw, 40px);
-    letter-spacing: .06em;
+    font-size: clamp(20px, 7.2vw, 32px);
+    letter-spacing: .03em;
   }
 
   .champion-plaque small {

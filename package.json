@@ -2,7 +2,7 @@
   "name": "moyu-dezhou",
   "version": "1.0.0",
   "type": "module",
-  "publisher": "river-club",
+  "publisher": "river-fisher",
   "displayName": "摸鱼德州",
   "description": "在 VS Code 里玩本地德州扑克：单次赛、冠军之路和 AI 对手。",
   "license": "MIT",

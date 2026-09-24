@@ -14,7 +14,11 @@ import { PlayersPage } from "../pages/PlayersPage";
 import { SettingsPage, type SettingsSection } from "../pages/SettingsPage";
 import { TablePage } from "../pages/TablePage";
 import Table3D from "../components/Table3D";
-import { getTableSeatPosition, type TableStageSize } from "../components/tableLayout";
+import {
+  getTableSeatPositions,
+  type TableSeatSize,
+  type TableStageSize,
+} from "../components/tableLayout";
 import { TournamentPage } from "../pages/TournamentPage";
 import { LeaderboardPage } from "../pages/LeaderboardPage";
 import { useEffect, useRef, useState, useMemo, useCallback, memo, type CSSProperties } from "react";
@@ -914,6 +918,7 @@ export default function App() {
   const [celebrationDone, setCelebrationDone] = useState(false);
   const tableStageRef = useRef<HTMLDivElement>(null);
   const [tableStageSize, setTableStageSize] = useState<TableStageSize>({ width: 0, height: 0 });
+  const [tableSeatSize, setTableSeatSize] = useState<TableSeatSize>({ width: 0, height: 0 });
   const actionId = useRef(0);
   const file = useRef<HTMLInputElement>(null);
   const localLeaderboardRow = useRef<HTMLButtonElement>(null);
@@ -979,6 +984,7 @@ export default function App() {
   useEffect(() => {
     if (page !== "table") {
       setTableStageSize({ width: 0, height: 0 });
+      setTableSeatSize({ width: 0, height: 0 });
       return;
     }
     const stage = tableStageRef.current;
@@ -989,6 +995,22 @@ export default function App() {
       setTableStageSize((current) =>
         current.width === next.width && current.height === next.height ? current : next,
       );
+      const seatRects = Array.from(stage.querySelectorAll<HTMLElement>(".seat"));
+      const nextSeatSize = seatRects.reduce(
+        (size, seat) => {
+          const rect = seat.getBoundingClientRect();
+          return {
+            width: Math.max(size.width, Math.round(rect.width)),
+            height: Math.max(size.height, Math.round(rect.height)),
+          };
+        },
+        { width: 0, height: 0 },
+      );
+      setTableSeatSize((current) =>
+        current.width === nextSeatSize.width && current.height === nextSeatSize.height
+          ? current
+          : nextSeatSize,
+      );
     };
     updateSize();
     if (typeof ResizeObserver === "undefined") {
@@ -997,8 +1019,9 @@ export default function App() {
     }
     const observer = new ResizeObserver(updateSize);
     observer.observe(stage);
+    stage.querySelectorAll<HTMLElement>(".seat").forEach((seat) => observer.observe(seat));
     return () => observer.disconnect();
-  }, [page, ready]);
+  }, [page, ready, g?.hand, g?.players.length]);
   const resetTableTimer = () => {
     tableTimerState.current = { accumulatedMs: 0, runningSinceMs: null };
     saveTableTimer(tableTimerState.current);
@@ -2337,6 +2360,9 @@ export default function App() {
     </section>
   );
   const displayedBoard = g && data.settings.debugFast ? previewBoard(g) : g?.board ?? [];
+  const tableSeatPositions = g
+    ? getTableSeatPositions(g.players.length, tableStageSize, tableSeatSize)
+    : [];
   return (
     <div className={`app ${page === "table" ? "immersive" : ""} ${page === "lobby" ? "home-screen" : ""}`}>
       <aside className="sidebar">
@@ -2563,7 +2589,7 @@ export default function App() {
                 </div>
               </div>
               {g.players.map((p, i) => {
-                const seatPosition = getTableSeatPosition(g.players.length, i, tableStageSize);
+                const seatPosition = tableSeatPositions[i];
                 const show =
                   p.profile.id === -1 ||
                   (g.done && !p.folded && g.board.length === 5);

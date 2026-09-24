@@ -886,6 +886,7 @@ footer>span:last-child {
   margin: 0 auto;
   height: min(60vw, 580px);
   min-height: 440px;
+  --table-scale: 1;
   isolation: isolate;
 }
 
@@ -2890,11 +2891,6 @@ input[type="range"] {
     gap: 7px;
   }
 
-  .card {
-    width: 43px;
-    height: 64px;
-  }
-
   .character-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -3014,11 +3010,6 @@ input[type="range"] {
     justify-content: center;
   }
 
-  .seat-cards .card.small {
-    width: 25px;
-    height: 36px;
-  }
-
   .seat-cards .card.small b {
     font-size: 11px;
   }
@@ -3033,12 +3024,6 @@ input[type="range"] {
 
   .seat-info b {
     font-size: 12px;
-  }
-
-  .card {
-    width: 33px;
-    height: 49px;
-    padding: 4px;
   }
 
   .card b {
@@ -4465,12 +4450,6 @@ footer {
     gap: 3px
   }
 
-  .board-cards .card {
-    width: 31px;
-    height: 44px;
-    padding: 3px
-  }
-
   .board-cards .card-corner.top {
     top: 3px;
     left: 3px
@@ -4541,12 +4520,6 @@ footer {
 
   .seat-cards {
     margin-bottom: 2px
-  }
-
-  .seat-cards .card.small {
-    width: 22px;
-    height: 31px;
-    padding: 2px
   }
 
   .seat-cards .card.small .card-corner.top {
@@ -9828,4 +9801,97 @@ footer {
   .sidebar>.brand>span:last-child {
     font-size: 13px;
   }
+}
+
+/* The table stage owns one continuous visual scale. Structural breakpoints
+   may still change navigation and controls, but table cards stay in sync with
+   the 3D table at every available size. */
+.table-stage .card {
+  width: calc(53px * var(--table-scale));
+  height: calc(75px * var(--table-scale));
+  padding: calc(6px * var(--table-scale));
+  border-radius: calc(5px * var(--table-scale));
+}
+
+.table-stage .card.back {
+  border-width: calc(3px * var(--table-scale));
+  font-size: calc(24px * var(--table-scale));
+}
+
+.table-stage .card.small {
+  width: calc(35px * var(--table-scale));
+  height: calc(48px * var(--table-scale));
+  padding: calc(4px * var(--table-scale));
+  border-radius: calc(3px * var(--table-scale));
+}
+
+.table-stage .card.small.back {
+  border-width: calc(2px * var(--table-scale));
+  font-size: calc(20px * var(--table-scale));
+}
+
+.table-stage .card-face {
+  gap: calc(2px * var(--table-scale));
+}
+
+.table-stage .card-face b {
+  font-size: calc(29px * var(--table-scale));
+}
+
+.table-stage .card-face i {
+  font-size: calc(42px * var(--table-scale));
+}
+
+.table-stage .card.small .card-face b {
+  font-size: calc(19px * var(--table-scale));
+}
+
+.table-stage .card.small .card-face i {
+  font-size: calc(29px * var(--table-scale));
+}
+
+.table-stage .board-cards {
+  gap: calc(7px * var(--table-scale));
+}
+
+.table-stage .seat-cards {
+  gap: calc(3px * var(--table-scale));
+  margin-bottom: calc(6px * var(--table-scale));
+}
+
+.table-stage .seat {
+  width: calc(118px * var(--table-scale));
+  min-width: calc(118px * var(--table-scale));
+}
+
+.table-stage .seat-info {
+  gap: calc(9px * var(--table-scale));
+  padding: calc(7px * var(--table-scale)) calc(10px * var(--table-scale));
+}
+
+.table-stage .seat-info img,
+.table-stage .seat-info .hero-avatar {
+  width: calc(36px * var(--table-scale));
+  height: calc(36px * var(--table-scale));
+}
+
+.table-stage .seat-info strong {
+  font-size: calc(11px * var(--table-scale));
+}
+
+.table-stage .seat-info b {
+  font-size: calc(15px * var(--table-scale));
+}
+
+.table-stage .seat-action {
+  margin-top: calc(6px * var(--table-scale));
+  min-height: calc(14px * var(--table-scale));
+  font-size: calc(9px * var(--table-scale));
+}
+
+.table-stage .seat-action-callout {
+  gap: calc(6px * var(--table-scale));
+  padding: calc(4px * var(--table-scale)) calc(10px * var(--table-scale));
+  border-radius: calc(22px * var(--table-scale));
+  font-size: calc(11px * var(--table-scale));
 }

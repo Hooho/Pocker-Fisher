@@ -15,6 +15,7 @@ import { SettingsPage, type SettingsSection } from "../pages/SettingsPage";
 import { TablePage } from "../pages/TablePage";
 import Table3D from "../components/Table3D";
 import {
+  getTableUiScale,
   getTableSeatPositions,
   type TableSeatSize,
   type TableStageSize,
@@ -1065,6 +1066,11 @@ export default function App() {
     const updateSize = () => {
       const rect = stage.getBoundingClientRect();
       const next = { width: Math.round(rect.width), height: Math.round(rect.height) };
+      const nextScale = getTableUiScale(next);
+      const currentScale = Number(stage.style.getPropertyValue("--table-scale")) || 1;
+      if (Math.abs(currentScale - nextScale) > 0.001) {
+        stage.style.setProperty("--table-scale", nextScale.toFixed(3));
+      }
       setTableStageSize((current) =>
         current.width === next.width && current.height === next.height ? current : next,
       );

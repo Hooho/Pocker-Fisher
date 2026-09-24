@@ -26,9 +26,21 @@ const PORTRAIT_CAMERA_Z = 13.7;
 const PORTRAIT_ASPECT_THRESHOLD = 1.4;
 const TABLE_WORLD_RADIUS_X = 5.3;
 const TABLE_CAMERA_FOV_DEGREES = 36;
+const TABLE_REFERENCE_WIDTH = 1120;
+const TABLE_REFERENCE_HEIGHT = 580;
+const TABLE_UI_MIN_SCALE = 0.62;
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+export function getTableUiScale(stageSize: TableStageSize) {
+  if (!stageSize.width || !stageSize.height) return 1;
+  return clampNumber(
+    Math.min(stageSize.width / TABLE_REFERENCE_WIDTH, stageSize.height / TABLE_REFERENCE_HEIGHT),
+    TABLE_UI_MIN_SCALE,
+    1,
+  );
 }
 
 export function getTableCameraLayout(width: number, height: number): TableCameraLayout {

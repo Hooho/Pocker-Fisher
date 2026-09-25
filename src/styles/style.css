@@ -7581,6 +7581,11 @@ footer {
   background: linear-gradient(145deg, #282c21, #1d241b);
 }
 
+.info-settings-card-meta {
+  border-color: #5b573b;
+  background: linear-gradient(145deg, #242b22, #1a241d);
+}
+
 .info-settings-card-wide {
   grid-column: 1 / -1;
 }

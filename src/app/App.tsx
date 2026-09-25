@@ -9,6 +9,7 @@ import {
 } from "../domain/tournament/tournament";
 import { pathForPage, useAppRouter } from "./router";
 import { publicAsset } from "./assets";
+import { appMetadata, formatAppUpdatedAt } from "./appMetadata";
 import { LobbyPage } from "../pages/LobbyPage";
 import { PlayersPage } from "../pages/PlayersPage";
 import { SettingsPage, type SettingsSection } from "../pages/SettingsPage";
@@ -2715,6 +2716,26 @@ export default function App() {
         </div>
       </div>
       <div className="info-settings-grid">
+        <article className="info-settings-card info-settings-card-wide info-settings-card-meta">
+          <div className="info-settings-card-heading">
+            <span className="info-settings-icon"><Info size={17} /></span>
+            <div>
+              <p className="eyebrow">APPLICATION</p>
+              <h2>应用信息</h2>
+            </div>
+          </div>
+          <p>当前运行的 Web 应用和 VS Code Webview 共用同一份构建信息。</p>
+          <dl className="info-settings-list">
+            <div>
+              <dt>当前版本</dt>
+              <dd>v{appMetadata.version}</dd>
+            </div>
+            <div>
+              <dt>更新时间</dt>
+              <dd>{formatAppUpdatedAt(appMetadata.updatedAt)}</dd>
+            </div>
+          </dl>
+        </article>
         <article className="info-settings-card info-settings-card-primary">
           <div className="info-settings-card-heading">
             <span className="info-settings-icon"><Info size={17} /></span>
@@ -2734,6 +2755,10 @@ export default function App() {
             <div>
               <dt>旧版本</dt>
               <dd>有新保存时约每 5 分钟记录一个，最多保留 5 个整档旧版本，发现当前档损坏时自动回退并提示。</dd>
+            </div>
+            <div>
+              <dt>旧格式兼容</dt>
+              <dd>支持读取旧版 A/B 和 v2 存档，首次读取后自动迁移，不删除原数据。</dd>
             </div>
             <div>
               <dt>读取时机</dt>

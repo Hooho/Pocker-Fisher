@@ -2989,463 +2989,463 @@ export default function App() {
         ) : page === "table" ? (
           g ? (
             <TablePage>
-            <div className="table-heading">
-              <div className="table-heading-title table-heading-left">
-                <button
-                  className="exit-table-button"
-                  title="退出牌桌，牌局已自动保存"
-                  onClick={() => {
-                    setPaused(true);
-                    if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: true } } : old);
-                    setPage("lobby");
-                  }}
-                >
-                  <ArrowLeft size={16} />
-                  <span>退出牌桌</span>
-                </button>
-                <span className="table-timer" title="本局用时">
-                  <Clock size={13} />
-                  {formatTableDuration(tableSeconds)}
-                </span>
-              </div>
-              <div className="table-tools">
-                <span>
-                  盲注{" "}
-                  <b>
-                    {g.bb / 2} / {g.bb}
-                  </b>
-                </span>
-                <button
-                  className="icon-btn"
-                  aria-label={paused ? "继续" : "暂停"}
-                  onClick={() => {
-                    const nextPaused = !paused;
-                    setPaused(nextPaused);
-                    if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: nextPaused } } : old);
-                  }}
-                >
-                  {paused ? <Play size={18} /> : <Pause size={18} />}
-                </button>
-                <button
-                  className="icon-btn"
-                  aria-label="切换音效"
-                  onClick={() =>
-                    updateSettings({ sound: !data.settings.sound })
-                  }
-                >
-                  {data.settings.sound ? (
-                    <Volume2 size={18} />
-                  ) : (
-                    <VolumeX size={18} />
-                  )}
-                </button>
-                <button
-                  className="icon-btn"
-                  aria-label="德州规则"
-                  title="德州规则"
-                  onClick={openRules}
-                >
-                  <BookOpen size={18} />
-                </button>
-              </div>
-            </div>
-            <div className="table-stage" ref={tableStageRef}>
-              <div className="table-context-watermark">
-                <strong>{tableRoundLabel}</strong>
-                <span>第 {g.hand} 手</span>
-              </div>
-              <Table3D
-                potValue={pot(g)}
-                chipUnit={g.bb}
-                hand={g.hand}
-                playerTotals={tablePlayerTotals}
-                playerIds={tablePlayerIds}
-                playerCardPositions={seatCardPositions}
-                chipAnimation={data.chipAnimation ?? null}
-                onChipAnimationStart={markChipAnimationStarted}
-                done={g.done}
-                winnerIndices={g.winners}
-                playerCount={g.players.length}
-                chipToss={chipToss}
-              />
-              <div className="community">
-                <div className="pot-label">
-                  {g.done ? "已派奖" : "底池总额"}{" "}
-                  <b>{pot(g).toLocaleString()}</b>
-                </div>
-                <div className="board-cards">
-                  {Array.from({ length: 5 }, (_, i) => (
-                    <Card
-                      key={`${g.hand}-${i}-${displayedBoard[i]}`}
-                      value={displayedBoard[i]}
-                      back={displayedBoard[i] === undefined}
-                      className={showAllCommunityCards ? "board-card-preview" : g.board[i] === undefined ? "board-card-deal" : "board-card-reveal"}
-                      style={{ animationDelay: showAllCommunityCards || g.board[i] === undefined ? `${i * 90}ms` : "0ms" }}
-                      highlight={
-                        (g.done &&
-                          g.winners.some((w) =>
-                            evaluate([
-                              ...g.players[w].cards,
-                              ...g.board,
-                            ]).best.includes(g.board[i]),
-                          )) ||
-                        (!g.done && localBest.includes(g.board[i]))
-                      }
-                    />
-                  ))}
-                </div>
-              </div>
-              {g.players.map((p, i) => {
-                const seatPosition = tableSeatPositions[i];
-                const show =
-                  p.profile.id === -1 ||
-                  (g.done && !p.folded && g.board.length === 5);
-                const actionType = p.last.includes("弃牌")
-                  ? "fold"
-                  : p.last.includes("全下")
-                    ? "allin"
-                    : p.last.includes("加注")
-                      ? "raise"
-                      : p.last.includes("跟注")
-                        ? "call"
-                        : p.last.includes("过牌")
-                          ? "check"
-                          : "blind";
-                const actionAmount = p.last.match(/^(加注|跟注)\s([\d,]+)/);
-                const actionText = actionAmount
-                  ? `${actionAmount[1] === "加注" ? "加注至" : "跟注"} ${Number(actionAmount[2].replaceAll(",", "")).toLocaleString()}`
-                  : p.last;
-                const seatTitle = championshipTitle(data.tournamentRecords, p.profile.id);
-                const seatTitleLabel = seatTitle === "champion" ? "冠军" : seatTitle === "runner-up" ? "亚军" : "季军";
-                return (
-                  <div
-                    key={p.profile.id}
-                    className={`seat ${i === 0 ? "you" : ""} ${!g.done && g.turn === i ? "acting" : ""} ${p.folded ? "folded" : ""} ${g.winners.includes(i) && g.done ? "winner" : ""} ${p.last ? `action-${actionType}` : ""}`}
-                    style={seatPosition}
-                    onClick={() => {
-                      const raw =
-                        p.profile.id === -1
-                          ? userPlayer
-                          : characters.find((c) => c.id === p.profile.id);
-                      if (!raw) return;
-                      openPlayerProfile(raw, true);
-                    }}
-                  >
-                    <div
-                      className="seat-cards"
-                      ref={(element) => {
-                        seatCardRefs.current[i] = element;
-                      }}
-                    >
-                      {p.cards.map((c, j) => (
-                        <Card
-                          key={j}
-                          value={show ? c : undefined}
-                          back={!show}
-                          small
-                          highlight={
-                            i === 0 && !g.done && localBest.includes(c)
-                          }
-                        />
-                      ))}
-                    </div>
-                    {p.last ? <div className={`seat-action-callout ${actionType} ${lastAction?.player === p.profile.id ? "new-action" : ""}`} key={`${g.hand}-${p.profile.id}-${p.last}`}><b>{actionText}</b>{["raise", "allin", "call"].includes(actionType) ? <span className="action-chips"><i /><i /><i /></span> : null}</div> : null}
-                    {g.done && g.winners.includes(i) ? <div className="winner-chip-stack arrive" key={`${g.hand}-${p.profile.id}-${g.result}`} aria-label={`${p.profile.name} 获得筹码`}><span /><span /><span /><span /><b>+{Math.max(0, p.chips - p.start + p.total).toLocaleString()}</b></div> : null}
-                    {g.done && !celebrationDone && g.winners.includes(i) ? (
-                      <span className="winner-confetti" aria-hidden="true">
-                        {winnerPetals.map((petal, index) => (
-                          <i
-                            className={"winner-confetti-piece " + (index % 4 === 0 ? "confetti-round" : "")}
-                            key={`${g.hand}-${p.profile.id}-petal-${index}`}
-                            style={{
-                              "--burst-x": `${petal.x}px`,
-                              "--burst-y": `${petal.y}px`,
-                              "--burst-drift": petal.drift,
-                              "--burst-twist": petal.twist,
-                              "--petal-color": petal.color,
-                              "--petal-delay": `${(index % 5) * 55}ms`,
-                            } as CSSProperties}
-                          />
-                        ))}
-                      </span>
-                    ) : null}
-                    <div className="seat-info">
-                      <Avatar
-                        p={p.profile}
-                        playerAvatar={data.playerProfile.avatar}
-                        className={seatTitle ? `seat-avatar-title seat-avatar-${seatTitle}` : undefined}
-                      />
-                      {seatTitle ? (
-                        <i className={`seat-title-badge seat-title-${seatTitle}`} aria-label={seatTitleLabel} title={seatTitleLabel}>
-                          {seatTitle === "champion" ? <Crown size={9} /> : <Medal size={9} />}
-                        </i>
-                      ) : null}
-                      <div>
-                        <strong>
-                          {p.profile.name}
-                          {g.dealer === i ? <i className="dealer">D</i> : null}
-                        </strong>
-                        <b>{p.chips.toLocaleString()}</b>
-                      </div>
-                    </div>
-                    {!p.last && !g.done && g.turn === i ? (
-                      <div className="seat-action">
-                        {i === 0
-                          ? "轮到你行动"
-                          : (
-                            <span className="thinking">
-                              正在思考
-                              <span
-                                className="thinking-bar"
-                                style={
-                                  {
-                                    "--think-ms": `${Math.round(data.settings.speed * 1.07)}ms`,
-                                  } as CSSProperties
-                                }
-                              />
-                            </span>
-                          )}
-                      </div>
-                    ) : null}
-                    {g.done && show && g.board.length === 5 ? (
-                      <small className="hand-name">
-                        {evaluate([...p.cards, ...g.board]).name}
-                      </small>
-                    ) : null}
-                  </div>
-                );
-              })}
-              {g.done && g.winners.length && !celebrationDone ? <><div className="victory-flash" /><div className="winner-banner"><small>{g.winners.length > 1 ? "底池平分" : "底池归属"}</small><strong>{g.winners.map(i => g.players[i].profile.name).join(" & ")}{g.winners.length === 1 ? " 赢下底池" : ""}</strong><span>{g.winners.map(i => Math.max(0, g.players[i].chips - g.players[i].start + g.players[i].total).toLocaleString()).join(" / ")} 筹码到账</span></div></> : null}
-              {paused ? (
-                <div className="pause-overlay">
-                  <Pause size={26} />
-                  <h3>牌局已暂停</h3>
+              <div className="table-heading">
+                <div className="table-heading-title table-heading-left">
                   <button
-                    className="gold-button"
+                    className="exit-table-button"
+                    title="退出牌桌，牌局已自动保存"
                     onClick={() => {
-                      setPaused(false);
-                      if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: false } } : old);
+                      setPaused(true);
+                      if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: true } } : old);
+                      setPage("lobby");
                     }}
                   >
-                    继续牌局
+                    <ArrowLeft size={16} />
+                    <span>退出牌桌</span>
+                  </button>
+                  <span className="table-timer" title="本局用时">
+                    <Clock size={13} />
+                    {formatTableDuration(tableSeconds)}
+                  </span>
+                </div>
+                <div className="table-tools">
+                  <span>
+                    盲注{" "}
+                    <b>
+                      {g.bb / 2} / {g.bb}
+                    </b>
+                  </span>
+                  <button
+                    className="icon-btn"
+                    aria-label={paused ? "继续" : "暂停"}
+                    onClick={() => {
+                      const nextPaused = !paused;
+                      setPaused(nextPaused);
+                      if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: nextPaused } } : old);
+                    }}
+                  >
+                    {paused ? <Play size={18} /> : <Pause size={18} />}
+                  </button>
+                  <button
+                    className="icon-btn"
+                    aria-label="切换音效"
+                    onClick={() =>
+                      updateSettings({ sound: !data.settings.sound })
+                    }
+                  >
+                    {data.settings.sound ? (
+                      <Volume2 size={18} />
+                    ) : (
+                      <VolumeX size={18} />
+                    )}
+                  </button>
+                  <button
+                    className="icon-btn"
+                    aria-label="德州规则"
+                    title="德州规则"
+                    onClick={openRules}
+                  >
+                    <BookOpen size={18} />
                   </button>
                 </div>
-              ) : null}
-            </div>
-            <div className="action-slot">
-              <div className={`action-panel ${g.done ? "hand-complete" : ""}`}>
-                {g.done ? (
-                  <>
-                    <div className="hand-result">
-                      <span className={`eyebrow ${!t?.complete && !t?.out ? "hand-winner-eyebrow" : ""}`}>{t?.complete ? "CHAMPION" : t?.out ? "TOURNAMENT ENDED" : "本手赢家"}</span>
-                      {t?.complete ? <strong>{t.out ? "冠军赛模拟完成，最终冠军已产生" : "恭喜，你赢得了本届冠军！"}</strong> : t?.out ? <strong>你已出局，正在模拟其余比赛…</strong> : <div className="hand-winners">{g.winners.map(i => { const winner = g.players[i]; const amount = Math.max(0, winner.chips - winner.start + winner.total); return <div className="hand-winner" key={winner.profile.id}><Avatar p={winner.profile} playerAvatar={data.playerProfile.avatar} /><span><b>{winner.profile.name}</b></span><strong>+{amount.toLocaleString()}</strong>{g.board.length === 5 ? <em>{evaluate([...winner.cards, ...g.board]).name}</em> : null}</div> })}</div>}
-                      {waitingOnOtherTables ? (
-                        <div className="advance-wait" aria-live="polite">
-                          <span>{progress || "正在等待其他牌桌结束…"}</span>
-                          <div
-                            className="simulation-progress-track"
-                            role="progressbar"
-                            aria-label="其他牌桌结算进度"
-                            aria-valuemin={0}
-                            aria-valuemax={100}
-                            aria-valuenow={backgroundPercent}
-                          >
-                            <i style={{ width: `${backgroundPercent}%` }} />
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                    {!t?.out && !t?.complete ? (
-                      <button
-                        className="gold-button"
-                        disabled={busy}
-                        onClick={() => {
-                          if (championshipWon) {
-                            advanceTournament();
-                            setPage("tournament");
-                            return;
-                          }
-                          if (cashMatchFinished) {
-                            finishCashMatch();
-                            return;
-                          }
-                          if (!t && g.players[0].chips === 0) {
-                            setPage("lobby");
-                            return;
-                          }
-                          nextHand();
+              </div>
+              <div className="table-stage" ref={tableStageRef}>
+                <div className="table-context-watermark">
+                  <strong>{tableRoundLabel}</strong>
+                  <span>第 {g.hand} 手</span>
+                </div>
+                <Table3D
+                  potValue={pot(g)}
+                  chipUnit={g.bb}
+                  hand={g.hand}
+                  playerTotals={tablePlayerTotals}
+                  playerIds={tablePlayerIds}
+                  playerCardPositions={seatCardPositions}
+                  chipAnimation={data.chipAnimation ?? null}
+                  onChipAnimationStart={markChipAnimationStarted}
+                  done={g.done}
+                  winnerIndices={g.winners}
+                  playerCount={g.players.length}
+                  chipToss={chipToss}
+                />
+                <div className="community">
+                  <div className="pot-label">
+                    {g.done ? "已派奖" : "底池总额"}{" "}
+                    <b>{pot(g).toLocaleString()}</b>
+                  </div>
+                  <div className="board-cards">
+                    {Array.from({ length: 5 }, (_, i) => (
+                      <Card
+                        key={`${g.hand}-${i}-${displayedBoard[i]}`}
+                        value={displayedBoard[i]}
+                        back={displayedBoard[i] === undefined}
+                        className={showAllCommunityCards ? "board-card-preview" : g.board[i] === undefined ? "board-card-deal" : "board-card-reveal"}
+                        style={{ animationDelay: showAllCommunityCards || g.board[i] === undefined ? `${i * 90}ms` : "0ms" }}
+                        highlight={
+                          (g.done &&
+                            g.winners.some((w) =>
+                              evaluate([
+                                ...g.players[w].cards,
+                                ...g.board,
+                              ]).best.includes(g.board[i]),
+                            )) ||
+                          (!g.done && localBest.includes(g.board[i]))
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+                {g.players.map((p, i) => {
+                  const seatPosition = tableSeatPositions[i];
+                  const show =
+                    p.profile.id === -1 ||
+                    (g.done && !p.folded && g.board.length === 5);
+                  const actionType = p.last.includes("弃牌")
+                    ? "fold"
+                    : p.last.includes("全下")
+                      ? "allin"
+                      : p.last.includes("加注")
+                        ? "raise"
+                        : p.last.includes("跟注")
+                          ? "call"
+                          : p.last.includes("过牌")
+                            ? "check"
+                            : "blind";
+                  const actionAmount = p.last.match(/^(加注|跟注)\s([\d,]+)/);
+                  const actionText = actionAmount
+                    ? `${actionAmount[1] === "加注" ? "加注至" : "跟注"} ${Number(actionAmount[2].replaceAll(",", "")).toLocaleString()}`
+                    : p.last;
+                  const seatTitle = championshipTitle(data.tournamentRecords, p.profile.id);
+                  const seatTitleLabel = seatTitle === "champion" ? "冠军" : seatTitle === "runner-up" ? "亚军" : "季军";
+                  return (
+                    <div
+                      key={p.profile.id}
+                      className={`seat ${i === 0 ? "you" : ""} ${!g.done && g.turn === i ? "acting" : ""} ${p.folded ? "folded" : ""} ${g.winners.includes(i) && g.done ? "winner" : ""} ${p.last ? `action-${actionType}` : ""}`}
+                      style={seatPosition}
+                      onClick={() => {
+                        const raw =
+                          p.profile.id === -1
+                            ? userPlayer
+                            : characters.find((c) => c.id === p.profile.id);
+                        if (!raw) return;
+                        openPlayerProfile(raw, true);
+                      }}
+                    >
+                      <div
+                        className="seat-cards"
+                        ref={(element) => {
+                          seatCardRefs.current[i] = element;
                         }}
                       >
-                        {busy
-                          ? "请稍候…"
-                          : championshipWon
-                            ? (
-                              <span className="advance-button-copy champion-button-copy">
-                                <strong className="advance-button-target">查看结果</strong>
-                              </span>
-                            )
-                            : canAdvance && t
-                            ? (
-                              <span className="advance-button-copy">
-                                <span>确认晋级</span>
-                                <strong className="advance-button-target">{advancementTargetLabel}</strong>
-                              </span>
-                            )
-                            : cashMatchFinished
-                              ? "比赛结算"
-                              : g.players[0].chips === 0
-                                ? "返回大厅"
-                              : "下一手"}
-                        <ChevronRight size={17} />
-                      </button>
-                    ) : t?.complete ? (
-                      <button className="gold-button" onClick={() => setPage("tournament")}>
-                        查看结果
-                        <ChevronRight size={17} />
-                      </button>
-                    ) : (
-                      <button onClick={() => setPage("lobby")}>返回大厅</button>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="bet-controls">
-                      <div className="quick-bets">
-                        {(limits
-                          ? [
-                            {
-                              label: "最小",
-                              value: limits.min,
-                              title: `加注至最小 ${limits.min.toLocaleString()}`,
-                            },
-                            { label: "¼ 池", value: presetValue({ fraction: 0.25 }), title: "四分之一底池" },
-                            { label: "⅓ 池", value: presetValue({ fraction: 1 / 3 }), title: "三分之一底池" },
-                            { label: "½ 池", value: presetValue({ fraction: 0.5 }), title: "二分之一底池" },
-                            { label: "¾ 池", value: presetValue({ fraction: 0.75 }), title: "四分之三底池" },
-                            { label: "满池", value: presetValue({ fraction: 1 }), title: "加注一个底池" },
-                          ]
-                          : []
-                        ).map((option) => (
-                          <button
-                            key={option.label}
-                            title={option.title}
-                            aria-label={option.title}
-                            className={active && raise === option.value ? "active" : ""}
-                            disabled={!active || !limits?.canRaise}
-                            onClick={() => setRaise(option.value)}
-                          >
-                            {option.label}
-                          </button>
+                        {p.cards.map((c, j) => (
+                          <Card
+                            key={j}
+                            value={show ? c : undefined}
+                            back={!show}
+                            small
+                            highlight={
+                              i === 0 && !g.done && localBest.includes(c)
+                            }
+                          />
                         ))}
-                        <button
-                          className={`allin-btn ${active && limits && raise === limits.max ? "active" : ""}`}
-                          title="全下"
-                          aria-label="全下"
-                          disabled={!active || !limits?.canRaise}
-                          onClick={() => limits && setRaise(limits.max)}
-                        >全下</button>
                       </div>
-                      <div className="raise-range">
-                        <div className="raise-range-head">
-                          <span>加注至</span>
-                          <input
-                            type="number"
-                            className="raise-amount-input"
-                            aria-label="加注金额"
-                            min={limits?.min || 0}
-                            max={limits?.max || 0}
-                            value={raise}
-                            disabled={!active || !limits?.canRaise}
-                            onChange={(e) => {
-                              const v = Number(e.target.value);
-                              if (!Number.isNaN(v)) setRaise(v);
-                            }}
-                            onBlur={() => {
-                              if (!limits) return;
-                              setRaise(Math.max(limits.min, Math.min(limits.max, raise)));
-                            }}
-                          />
-                        </div>
-                        <input
-                          aria-label="加注金额滑块"
-                          type="range"
-                          min={limits?.min || 0}
-                          max={limits?.max || 0}
-                          step={g?.bb || 1}
-                          value={raise}
-                          disabled={!active || !limits?.canRaise}
-                          onChange={(e) => setRaise(Number(e.target.value))}
+                      {p.last ? <div className={`seat-action-callout ${actionType} ${lastAction?.player === p.profile.id ? "new-action" : ""}`} key={`${g.hand}-${p.profile.id}-${p.last}`}><b>{actionText}</b>{["raise", "allin", "call"].includes(actionType) ? <span className="action-chips"><i /><i /><i /></span> : null}</div> : null}
+                      {g.done && g.winners.includes(i) ? <div className="winner-chip-stack arrive" key={`${g.hand}-${p.profile.id}-${g.result}`} aria-label={`${p.profile.name} 获得筹码`}><span /><span /><span /><span /><b>+{Math.max(0, p.chips - p.start + p.total).toLocaleString()}</b></div> : null}
+                      {g.done && !celebrationDone && g.winners.includes(i) ? (
+                        <span className="winner-confetti" aria-hidden="true">
+                          {winnerPetals.map((petal, index) => (
+                            <i
+                              className={"winner-confetti-piece " + (index % 4 === 0 ? "confetti-round" : "")}
+                              key={`${g.hand}-${p.profile.id}-petal-${index}`}
+                              style={{
+                                "--burst-x": `${petal.x}px`,
+                                "--burst-y": `${petal.y}px`,
+                                "--burst-drift": petal.drift,
+                                "--burst-twist": petal.twist,
+                                "--petal-color": petal.color,
+                                "--petal-delay": `${(index % 5) * 55}ms`,
+                              } as CSSProperties}
+                            />
+                          ))}
+                        </span>
+                      ) : null}
+                      <div className="seat-info">
+                        <Avatar
+                          p={p.profile}
+                          playerAvatar={data.playerProfile.avatar}
+                          className={seatTitle ? `seat-avatar-title seat-avatar-${seatTitle}` : undefined}
                         />
+                        {seatTitle ? (
+                          <i className={`seat-title-badge seat-title-${seatTitle}`} aria-label={seatTitleLabel} title={seatTitleLabel}>
+                            {seatTitle === "champion" ? <Crown size={9} /> : <Medal size={9} />}
+                          </i>
+                        ) : null}
+                        <div>
+                          <strong>
+                            {p.profile.name}
+                            {g.dealer === i ? <i className="dealer">D</i> : null}
+                          </strong>
+                          <b>{p.chips.toLocaleString()}</b>
+                        </div>
                       </div>
-                    </div>
-                    <div className="action-buttons">
-                      <button
-                        className="fold-button"
-                        title="弃牌（快捷键 F）"
-                        disabled={!active}
-                        onClick={() => commit(act(g, { type: "fold" }))}
-                      >
-                        弃牌<span className="key-hint">F</span>
-                      </button>
-                      <button
-                        className="call-button"
-                        title={`${limits?.toCall ? `跟注 ${limits.toCall}` : "过牌"}（快捷键 C）`}
-                        disabled={!active}
-                        onClick={() => commit(act(g, { type: "call" }))}
-                      >
-                        {limits?.toCall ? (
-                          <>
-                            <span>跟注</span>
-                            <small className="action-amount">{limits.toCall}</small>
-                          </>
-                        ) : "过牌"}
-                        <span className="key-hint">C</span>
-                      </button>
-                      <button
-                        className="gold-button"
-                        title={`加注 ${raise}（快捷键 R）`}
-                        disabled={!active || !limits?.canRaise}
-                        onClick={submitRaise}
-                      >
-                        <span>加注</span>
-                        <small className="action-amount">{raise}</small>
-                        <span className="key-hint">R</span>
-                      </button>
-                      {confirmDialog ? (
-                        <>
-                          <div
-                            className="allin-confirm-backdrop"
-                            onMouseDown={() => setConfirmDialog(null)}
-                          />
-                          <div
-                            className="allin-confirm-popover"
-                            role="alertdialog"
-                            aria-modal="true"
-                            aria-label={confirmDialog.title}
-                          >
-                            <strong>{confirmDialog.title}</strong>
-                            <p>{confirmDialog.message}</p>
-                            <div className="allin-confirm-actions">
-                              <button onClick={() => setConfirmDialog(null)}>取消</button>
-                              <button
-                                className="gold-button"
-                                onClick={() => {
-                                  const run = confirmDialog.onConfirm;
-                                  setConfirmDialog(null);
-                                  run();
-                                }}
-                              >
-                                {confirmDialog.confirmLabel || "确认"}
-                              </button>
-                            </div>
-                          </div>
-                        </>
+                      {!p.last && !g.done && g.turn === i ? (
+                        <div className="seat-action">
+                          {i === 0
+                            ? "轮到你行动"
+                            : (
+                              <span className="thinking">
+                                正在思考
+                                <span
+                                  className="thinking-bar"
+                                  style={
+                                    {
+                                      "--think-ms": `${Math.round(data.settings.speed * 1.07)}ms`,
+                                    } as CSSProperties
+                                  }
+                                />
+                              </span>
+                            )}
+                        </div>
+                      ) : null}
+                      {g.done && show && g.board.length === 5 ? (
+                        <small className="hand-name">
+                          {evaluate([...p.cards, ...g.board]).name}
+                        </small>
                       ) : null}
                     </div>
-                  </>
-                )}
+                  );
+                })}
+                {g.done && g.winners.length && !celebrationDone ? <><div className="victory-flash" /><div className="winner-banner"><small>{g.winners.length > 1 ? "底池平分" : "底池归属"}</small><strong>{g.winners.map(i => g.players[i].profile.name).join(" & ")}{g.winners.length === 1 ? " 赢下底池" : ""}</strong><span>{g.winners.map(i => Math.max(0, g.players[i].chips - g.players[i].start + g.players[i].total).toLocaleString()).join(" / ")} 筹码到账</span></div></> : null}
+                {paused ? (
+                  <div className="pause-overlay">
+                    <Pause size={26} />
+                    <h3>牌局已暂停</h3>
+                    <button
+                      className="gold-button"
+                      onClick={() => {
+                        setPaused(false);
+                        if (t) setData((old) => old.tournament ? { ...old, tournament: { ...old.tournament, paused: false } } : old);
+                      }}
+                    >
+                      继续牌局
+                    </button>
+                  </div>
+                ) : null}
               </div>
-            </div>
+              <div className="action-slot">
+                <div className={`action-panel ${g.done ? "hand-complete" : ""}`}>
+                  {g.done ? (
+                    <>
+                      <div className="hand-result">
+                        <span className={`eyebrow ${!t?.complete && !t?.out ? "hand-winner-eyebrow" : ""}`}>{t?.complete ? "CHAMPION" : t?.out ? "TOURNAMENT ENDED" : "本手赢家"}</span>
+                        {t?.complete ? <strong>{t.out ? "冠军赛模拟完成，最终冠军已产生" : "恭喜，你赢得了本届冠军！"}</strong> : t?.out ? <strong>你已出局，正在模拟其余比赛…</strong> : <div className="hand-winners">{g.winners.map(i => { const winner = g.players[i]; const amount = Math.max(0, winner.chips - winner.start + winner.total); return <div className="hand-winner" key={winner.profile.id}><Avatar p={winner.profile} playerAvatar={data.playerProfile.avatar} /><span><b>{winner.profile.name}</b></span><strong>+{amount.toLocaleString()}</strong>{g.board.length === 5 ? <em>{evaluate([...winner.cards, ...g.board]).name}</em> : null}</div> })}</div>}
+                        {waitingOnOtherTables ? (
+                          <div className="advance-wait" aria-live="polite">
+                            <span>{progress || "正在等待其他牌桌结束…"}</span>
+                            <div
+                              className="simulation-progress-track"
+                              role="progressbar"
+                              aria-label="其他牌桌结算进度"
+                              aria-valuemin={0}
+                              aria-valuemax={100}
+                              aria-valuenow={backgroundPercent}
+                            >
+                              <i style={{ width: `${backgroundPercent}%` }} />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                      {!t?.out && !t?.complete ? (
+                        <button
+                          className="gold-button"
+                          disabled={busy}
+                          onClick={() => {
+                            if (championshipWon) {
+                              advanceTournament();
+                              setPage("tournament");
+                              return;
+                            }
+                            if (cashMatchFinished) {
+                              finishCashMatch();
+                              return;
+                            }
+                            if (!t && g.players[0].chips === 0) {
+                              setPage("lobby");
+                              return;
+                            }
+                            nextHand();
+                          }}
+                        >
+                          {busy
+                            ? "请稍候…"
+                            : championshipWon
+                              ? (
+                                <span className="advance-button-copy champion-button-copy">
+                                  <strong className="advance-button-target">查看结果</strong>
+                                </span>
+                              )
+                              : canAdvance && t
+                                ? (
+                                  <span className="advance-button-copy">
+                                    <span>确认晋级</span>
+                                    <strong className="advance-button-target">{advancementTargetLabel}</strong>
+                                  </span>
+                                )
+                                : cashMatchFinished
+                                  ? "比赛结算"
+                                  : g.players[0].chips === 0
+                                    ? "返回大厅"
+                                    : "下一手"}
+                          <ChevronRight size={17} />
+                        </button>
+                      ) : t?.complete ? (
+                        <button className="gold-button" onClick={() => setPage("tournament")}>
+                          查看结果
+                          <ChevronRight size={17} />
+                        </button>
+                      ) : (
+                        <button onClick={() => setPage("lobby")}>返回大厅</button>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <div className="bet-controls">
+                        <div className="quick-bets">
+                          {(limits
+                            ? [
+                              {
+                                label: "最小",
+                                value: limits.min,
+                                title: `加注至最小 ${limits.min.toLocaleString()}`,
+                              },
+                              { label: "¼ 池", value: presetValue({ fraction: 0.25 }), title: "四分之一底池" },
+                              { label: "⅓ 池", value: presetValue({ fraction: 1 / 3 }), title: "三分之一底池" },
+                              { label: "½ 池", value: presetValue({ fraction: 0.5 }), title: "二分之一底池" },
+                              { label: "¾ 池", value: presetValue({ fraction: 0.75 }), title: "四分之三底池" },
+                              { label: "满池", value: presetValue({ fraction: 1 }), title: "加注一个底池" },
+                            ]
+                            : []
+                          ).map((option) => (
+                            <button
+                              key={option.label}
+                              title={option.title}
+                              aria-label={option.title}
+                              className={active && raise === option.value ? "active" : ""}
+                              disabled={!active || !limits?.canRaise}
+                              onClick={() => setRaise(option.value)}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                          <button
+                            className={`allin-btn ${active && limits && raise === limits.max ? "active" : ""}`}
+                            title="全下"
+                            aria-label="全下"
+                            disabled={!active || !limits?.canRaise}
+                            onClick={() => limits && setRaise(limits.max)}
+                          >全下</button>
+                        </div>
+                        <div className="raise-range">
+                          <div className="raise-range-head">
+                            <span>加注至</span>
+                            <input
+                              type="number"
+                              className="raise-amount-input"
+                              aria-label="加注金额"
+                              min={limits?.min || 0}
+                              max={limits?.max || 0}
+                              value={raise}
+                              disabled={!active || !limits?.canRaise}
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                if (!Number.isNaN(v)) setRaise(v);
+                              }}
+                              onBlur={() => {
+                                if (!limits) return;
+                                setRaise(Math.max(limits.min, Math.min(limits.max, raise)));
+                              }}
+                            />
+                          </div>
+                          <input
+                            aria-label="加注金额滑块"
+                            type="range"
+                            min={limits?.min || 0}
+                            max={limits?.max || 0}
+                            step={g?.bb || 1}
+                            value={raise}
+                            disabled={!active || !limits?.canRaise}
+                            onChange={(e) => setRaise(Number(e.target.value))}
+                          />
+                        </div>
+                      </div>
+                      <div className="action-buttons">
+                        <button
+                          className="fold-button"
+                          title="弃牌（快捷键 F）"
+                          disabled={!active}
+                          onClick={() => commit(act(g, { type: "fold" }))}
+                        >
+                          弃牌<span className="key-hint">F</span>
+                        </button>
+                        <button
+                          className="call-button"
+                          title={`${limits?.toCall ? `跟注 ${limits.toCall}` : "过牌"}（快捷键 C）`}
+                          disabled={!active}
+                          onClick={() => commit(act(g, { type: "call" }))}
+                        >
+                          {limits?.toCall ? (
+                            <>
+                              <span>跟注</span>
+                              <small className="action-amount">{limits.toCall}</small>
+                            </>
+                          ) : "过牌"}
+                          <span className="key-hint">C</span>
+                        </button>
+                        <button
+                          className="gold-button"
+                          title={`加注 ${raise}（快捷键 R）`}
+                          disabled={!active || !limits?.canRaise}
+                          onClick={submitRaise}
+                        >
+                          <span>加注</span>
+                          <small className="action-amount">{raise}</small>
+                          <span className="key-hint">R</span>
+                        </button>
+                        {confirmDialog ? (
+                          <>
+                            <div
+                              className="allin-confirm-backdrop"
+                              onMouseDown={() => setConfirmDialog(null)}
+                            />
+                            <div
+                              className="allin-confirm-popover"
+                              role="alertdialog"
+                              aria-modal="true"
+                              aria-label={confirmDialog.title}
+                            >
+                              <strong>{confirmDialog.title}</strong>
+                              <p>{confirmDialog.message}</p>
+                              <div className="allin-confirm-actions">
+                                <button onClick={() => setConfirmDialog(null)}>取消</button>
+                                <button
+                                  className="gold-button"
+                                  onClick={() => {
+                                    const run = confirmDialog.onConfirm;
+                                    setConfirmDialog(null);
+                                    run();
+                                  }}
+                                >
+                                  {confirmDialog.confirmLabel || "确认"}
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
             </TablePage>
           ) : (
             <div className="loading">正在恢复牌局…</div>
@@ -3636,7 +3636,7 @@ export default function App() {
                 </p>
                 {newMode === "cash" ? (
                   <label>
-                    牌桌人数 
+                    牌桌人数
                     <select
                       value={seatCount}
                       onChange={(e) => setSeatCount(+e.target.value)}

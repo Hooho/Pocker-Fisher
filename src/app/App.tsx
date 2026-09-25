@@ -3858,7 +3858,7 @@ export default function App() {
                   <div className="points-rule-chart" aria-label="单次赛人数基础分">
                     {singleMatchPointRules.map((row) => (
                       <div className="points-rule-row" key={row.entrants}>
-                        <span>{row.entrants} 人桌基础分</span>
+                        <span>{row.entrants} 人桌赢家</span>
                         <b>{(row.basePointsTenths / 10).toFixed(1)}</b>
                       </div>
                     ))}
@@ -3871,13 +3871,12 @@ export default function App() {
                     {[
                       { label: "冠军", points: 20 },
                       { label: "亚军", points: 15 },
-                      { label: "季军（第 3 名）", points: 12 },
+                      { label: "季军", points: 12 },
                       { label: "第 4 名", points: 11 },
                       { label: "第 5 名", points: 10 },
                       { label: "第 6 名", points: 9 },
                       { label: "第 7 名", points: 8 },
                       { label: "第 8 名", points: 7 },
-                      { label: "第 9 名及以后", points: 0 },
                     ].map((row) => (
                       <div className="points-rule-row" key={row.label}>
                         <span>{row.label}</span>

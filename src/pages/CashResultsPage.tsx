@@ -54,7 +54,6 @@ export function CashResultsPage({
         <section className="cash-results-card" aria-labelledby="cash-results-title">
           <div className="cash-results-card-heading">
             <div>
-              <small>FINAL STANDINGS</small>
               <h2 id="cash-results-title">最终排名</h2>
             </div>
             <span>筹码决定名次</span>

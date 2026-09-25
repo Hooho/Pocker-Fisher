@@ -3602,7 +3602,7 @@ export default function App() {
                           弃牌<span className="key-hint">F</span>
                         </button>
                         <button
-                          className="call-button"
+                          className={limits?.toCall ? "call-button" : "check-button"}
                           title={`${limits?.toCall ? `跟注 ${limits.toCall}` : "过牌"}（快捷键 C）`}
                           disabled={!active}
                           onClick={() => commit(act(g, { type: "call" }))}

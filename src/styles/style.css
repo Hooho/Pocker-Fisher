@@ -1688,15 +1688,25 @@ input[type="range"] {
   border-color: #7a5c4c;
 }
 
-.action-buttons .call-button {
+.action-buttons .call-button,
+.action-buttons .check-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
   white-space: nowrap;
+}
+
+.action-buttons .call-button {
   background: #1f3324;
   border-color: #4f8a5c;
   color: #bfe3b0;
+}
+
+.action-buttons .check-button {
+  background: #1c2d38;
+  border-color: #4e7f96;
+  color: #b8d8e7;
 }
 
 .action-buttons .action-amount {
@@ -1710,6 +1720,11 @@ input[type="range"] {
 .action-buttons .call-button:hover:not(:disabled) {
   background: #27402c;
   border-color: #63a86f;
+}
+
+.action-buttons .check-button:hover:not(:disabled) {
+  background: #243c4a;
+  border-color: #6ca5c3;
 }
 
 .key-hint {

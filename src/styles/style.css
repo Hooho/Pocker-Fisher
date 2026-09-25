@@ -2393,6 +2393,19 @@ input[type="range"] {
   min-height: 78px;
 }
 
+.save-code-modal {
+  width: 620px;
+}
+
+.save-code-textarea {
+  min-height: 180px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
 .full {
   width: 100%;
 }

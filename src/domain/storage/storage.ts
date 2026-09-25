@@ -8,6 +8,7 @@ const SHARDED_STORAGE_PREFIX = "river-save";
 const SNAPSHOT_STORAGE_KEY = `${SHARDED_STORAGE_PREFIX}:snapshots`;
 const SAVE_LOCK_NAME = "river-save-write";
 const SAVE_CHANNEL_NAME = "river-save-sync";
+const SAVE_CODE_PREFIX = "RIVER-SAVE-V1.";
 const GAME_LOG_LIMIT = 15;
 const SNAPSHOT_LIMIT = 5;
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
@@ -853,6 +854,11 @@ const snapshotArchiveSchema = z.object({
     save: z.unknown(),
   })).max(SNAPSHOT_LIMIT),
 });
+const saveCodePayloadSchema = z.object({
+  version: z.literal(1),
+  checksum: z.string().regex(/^[0-9a-f]{8}$/),
+  save: z.unknown(),
+});
 
 function stableSerialize(value: unknown): string {
   if (value === undefined) return "null";
@@ -955,6 +961,64 @@ function saveFingerprint(save: Save) {
 
 export function areSaveContentsEqual(left: Save, right: Save) {
   return saveFingerprint(left) === saveFingerprint(right);
+}
+
+function encodeBase64Url(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+  }
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function decodeBase64Url(value: string) {
+  const padded = value.replace(/-/g, "+").replace(/_/g, "/")
+    + "=".repeat((4 - (value.length % 4)) % 4);
+  const binary = atob(padded);
+  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+export function createSaveCode(data: Save) {
+  const save = validateSaveForStorage(data);
+  return SAVE_CODE_PREFIX + encodeBase64Url(JSON.stringify({
+    version: 1,
+    checksum: checksumValue(save),
+    save,
+  }));
+}
+
+export function parseSaveCode(code: string): Save {
+  const normalized = code.trim().replace(/\s+/g, "");
+  if (!normalized.startsWith(SAVE_CODE_PREFIX)) {
+    throw new SaveValidationError(["存档码版本或前缀无效"]);
+  }
+
+  let payload: z.infer<typeof saveCodePayloadSchema>;
+  try {
+    const decoded = JSON.parse(decodeBase64Url(normalized.slice(SAVE_CODE_PREFIX.length)));
+    const result = saveCodePayloadSchema.safeParse(decoded);
+    if (!result.success) throw new Error("invalid save code payload");
+    payload = result.data;
+  } catch {
+    throw new SaveValidationError(["存档码无效或已损坏"]);
+  }
+
+  if (checksumValue(payload.save) !== payload.checksum) {
+    throw new SaveValidationError(["存档码内容不完整，请重新复制"]);
+  }
+
+  let save: Save;
+  try {
+    save = parseSave(payload.save);
+  } catch {
+    throw new SaveValidationError(["存档码中的游戏进度校验失败"]);
+  }
+  return save;
 }
 
 function browserManifestKey() {

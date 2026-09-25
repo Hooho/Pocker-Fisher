@@ -36,6 +36,8 @@ import {
   Trophy,
   Spade,
   Download,
+  Copy,
+  Clipboard,
   Upload,
   Play,
   Pause,
@@ -83,7 +85,9 @@ import {
   checkSaveState,
   adoptSaveRevision,
   areSaveContentsEqual,
+  createSaveCode,
   parseSave,
+  parseSaveCode,
   downloadSave,
   getSaveRevision,
   isSaveConflictError,
@@ -128,6 +132,36 @@ const championshipQualifyingStages = [
   { round: "半决赛", players: "16 人", tables: "2 桌" },
   { round: "总决赛", players: "8 强", tables: "冠军桌" },
 ] as const;
+
+async function copyTextToClipboard(value: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      // Fall back to a selection-based copy for older mobile webviews.
+    }
+  }
+
+  if (typeof document === "undefined") return false;
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  }
+  textarea.remove();
+  return copied;
+}
+
 // One concrete five-card example per hand ranking, highest to lowest, used to
 // illustrate the rules with real cards instead of just naming them.
 const handRankExamples = [
@@ -1147,6 +1181,8 @@ export default function App() {
   const [progress, setProgress] = useState("");
   const [eliminatedProgress, setEliminatedProgress] = useState<ChampionshipSimulationProgress | null>(null);
   const [imported, setImported] = useState<Save | null>(null);
+  const [saveCodeModal, setSaveCodeModal] = useState<"export" | "import" | null>(null);
+  const [saveCodeText, setSaveCodeText] = useState("");
   const [saveError, setSaveError] = useState(false);
   const [saveLoadIssue, setSaveLoadIssue] = useState<{
     title: string;
@@ -1202,6 +1238,8 @@ export default function App() {
     setMoreMenuOpen(false);
     setModal(null);
     setImported(null);
+    setSaveCodeModal(null);
+    setSaveCodeText("");
     setConfirmDialog(null);
     setSelected(null);
     setBatchOpen(false);
@@ -2331,6 +2369,40 @@ export default function App() {
     }
     if (file.current) file.current.value = "";
   };
+  const openSaveCodeExport = () => {
+    setSaveCodeText(createSaveCode(data));
+    setSaveCodeModal("export");
+    setMoreMenuOpen(false);
+  };
+  const openSaveCodeImport = () => {
+    setSaveCodeText("");
+    setSaveCodeModal("import");
+    setMoreMenuOpen(false);
+  };
+  const copySaveCode = async () => {
+    const copied = await copyTextToClipboard(saveCodeText);
+    setToast(
+      copied
+        ? "存档码已复制，可直接发到微信或粘贴到另一台设备"
+        : "复制失败，请长按文本框并选择“全选—复制”",
+    );
+  };
+  const applySaveCode = () => {
+    let nextSave: Save;
+    try {
+      nextSave = parseSaveCode(saveCodeText);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "存档码无效，现有数据未修改");
+      return;
+    }
+    setSaveCodeModal(null);
+    setSaveCodeText("");
+    if (summarizeSaveRecords(data).hasExistingData) {
+      setImported(nextSave);
+    } else {
+      applyImportedSave(nextSave, false);
+    }
+  };
   const openNew = (mode: "cash" | "tournament") => {
     setNewMode(mode);
     setModal("new");
@@ -2882,7 +2954,6 @@ export default function App() {
               <h2>应用信息</h2>
             </div>
           </div>
-          <p>当前运行的游戏使用以下构建信息。</p>
           <dl className="info-settings-list">
             <div>
               <dt>当前版本</dt>
@@ -2940,22 +3011,24 @@ export default function App() {
             </div>
           </div>
           <p>
-            你可以随时导出一份 JSON 存档，也可以在另一台设备导入它来继续游戏。
-            完全离线，不联网
+            你可以随时导出一份 JSON 存档，也可以复制存档码，通过微信在另一台设备恢复进度。
+            完全离线，不联网。
           </p>
           <div className="info-settings-transfer">
-            <span><Download size={14} /> 导出最新存档</span>
-            <span><Upload size={14} /> 导入并恢复进度</span>
+            <span><Download size={14} /> 导出 JSON</span>
+            <span><Upload size={14} /> 导入 JSON</span>
+            <span><Copy size={14} /> 复制存档码</span>
+            <span><Clipboard size={14} /> 粘贴存档码</span>
           </div>
           <div className="info-settings-browser-actions">
-            支持跨端使用：只要在不同设备之间保持同一份最新存档文件，并在切换设备时导入即可。不同设备之间不会自动同步。
+            微信内无法下载文件时，使用顶部的“复制存档码”和“导入存档码”即可完成备份与恢复。
           </div>
         </article>
         <section className="reset-settings" aria-labelledby="reset-settings-title">
           <div className="reset-danger-panel">
             <h2>重置所有数据</h2>
             <p>
-              此操作会删除当前环境中的全部游戏进度和个性化内容，无法撤销。头像文件和应用资源不会受到影响。
+              此操作会删除当前环境中的全部游戏进度和个性化内容，无法撤销。
             </p>
             <div className="reset-data-summary" aria-label="当前存档摘要">
               <span>手数 <strong>{currentSaveSummary.hands.toLocaleString()}</strong></span>
@@ -3024,6 +3097,15 @@ export default function App() {
             </button>
             <button
               className="icon-btn"
+              aria-label="复制存档码"
+              title="复制存档码"
+              onClick={openSaveCodeExport}
+            >
+              <Copy size={17} />
+              <span className="tool-label">复制存档码</span>
+            </button>
+            <button
+              className="icon-btn"
               aria-label="导入存档"
               title="导入存档"
               onClick={() => {
@@ -3033,6 +3115,15 @@ export default function App() {
             >
               <Upload size={17} />
               <span className="tool-label">导入存档</span>
+            </button>
+            <button
+              className="icon-btn"
+              aria-label="导入存档码"
+              title="导入存档码"
+              onClick={openSaveCodeImport}
+            >
+              <Clipboard size={17} />
+              <span className="tool-label">导入存档码</span>
             </button>
             <button
               className={`settings-btn ${page === "settings" ? "active" : ""}`}
@@ -4255,6 +4346,83 @@ export default function App() {
                 应用 {batchResults.length} 位人物的新性格
               </button>
             ) : null}
+          </section>
+        </div>
+      ) : null}
+      {saveCodeModal ? (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSaveCodeModal(null);
+              setSaveCodeText("");
+            }
+          }}
+        >
+          <section
+            className="modal save-code-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-code-title"
+          >
+            <button
+              type="button"
+              className="close"
+              aria-label="关闭"
+              onClick={() => {
+                setSaveCodeModal(null);
+                setSaveCodeText("");
+              }}
+            >
+              <X size={17} />
+            </button>
+            <p className="eyebrow">WECHAT SAVE CODE</p>
+            <h2 id="save-code-title">
+              {saveCodeModal === "export" ? "复制存档码" : "粘贴存档码"}
+            </h2>
+            <p className="muted">
+              {saveCodeModal === "export"
+                ? "复制下面的文字，发到微信聊天或文件传输助手。"
+                : "把另一台设备上的完整存档码粘贴到这里，然后恢复进度。"}
+            </p>
+            <textarea
+              className="save-code-textarea"
+              value={saveCodeText}
+              onChange={(event) => setSaveCodeText(event.target.value)}
+              onFocus={(event) => {
+                if (saveCodeModal === "export") event.currentTarget.select();
+              }}
+              placeholder={saveCodeModal === "import" ? "请粘贴 RIVER-SAVE-V1. 开头的存档码" : undefined}
+              readOnly={saveCodeModal === "export"}
+              rows={8}
+              spellCheck={false}
+              autoFocus
+            />
+            <div className="modal-actions">
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveCodeModal(null);
+                  setSaveCodeText("");
+                }}
+              >
+                取消
+              </button>
+              {saveCodeModal === "export" ? (
+                <button type="button" className="gold-button" onClick={() => void copySaveCode()}>
+                  <Copy size={14} /> 复制存档码
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="gold-button"
+                  disabled={!saveCodeText.trim()}
+                  onClick={applySaveCode}
+                >
+                  恢复存档
+                </button>
+              )}
+            </div>
           </section>
         </div>
       ) : null}

@@ -2,7 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   blank,
+  createSaveCode,
   loadSave,
+  parseSaveCode,
   parseSave,
   saveData,
   checkSaveState,
@@ -124,6 +126,29 @@ test("duplicate cards and negative chips in imports are rejected", () => {
 test("import overwrite detection ignores a blank save", () => {
   assert.equal(summarizeSaveRecords(blank).hasExistingData, false);
 });
+
+test("save codes round-trip UTF-8 progress and tolerate copied whitespace", () => {
+  const save = {
+    ...blank,
+    playerProfile: { ...blank.playerProfile, name: "阿河的牌局" },
+    stats: { ...blank.stats, hands: 12, wins: 4 },
+    savedAt: new Date().toISOString(),
+  };
+  const code = createSaveCode(save);
+
+  assert.match(code, /^RIVER-SAVE-V1\./);
+  assert.deepEqual(parseSaveCode(code.replace(/(.{32})/g, "$1\n")), parseSave(save));
+});
+
+test("save codes reject tampered progress", () => {
+  const code = createSaveCode({
+    ...blank,
+    stats: { ...blank.stats, hands: 2 },
+  });
+
+  assert.throws(() => parseSaveCode(code.slice(0, -1) + "A"));
+});
+
 test("import overwrite detection finds progress and personalization", () => {
   const withProgress = {
     ...blank,

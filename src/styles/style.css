@@ -970,11 +970,11 @@ footer>span:last-child {
 .table-context-watermark span {
   position: absolute;
   top: 55%;
-  left: calc(100% + 42px);
+  left: calc(100% + 20px);
   transform: translateY(-45%);
   color: #d7dfc354;
   font-family: "Noto Sans SC", sans-serif;
-  font-size: clamp(14px, 1.6vw, 22px);
+  font-size: clamp(13px, 1.35vw, 19px);
   font-weight: 600;
   letter-spacing: 0.16em;
 }

@@ -247,6 +247,54 @@ test("save freshness checks can distinguish a new revision with unchanged conten
   }
 });
 
+test("championship saves with optional undefined fields survive a reload", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+
+  try {
+    await loadSave();
+    const game = newGame([hero, { ...hero, id: 0 }]);
+    const tournament = {
+      round: 0,
+      field: [hero, { ...hero, id: 0 }],
+      seed: 1,
+      pace: 10,
+      out: false,
+      paused: false,
+      autoSimulating: false,
+      simulationComplete: false,
+      complete: false,
+      results: [],
+      background: { remaining: [], qualified: [], done: true },
+      pendingLocal: undefined,
+      playoff: undefined,
+      simulationCheckpoint: undefined,
+    };
+    await saveData({ ...blank, game, tournament, chipAnimation: undefined });
+
+    const loaded = await loadSave();
+    assert.equal(loaded.recoveryNotice, undefined);
+    assert.equal(loaded.save.tournament?.round, 0);
+    assert.equal(loaded.save.game?.players.length, 2);
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
+});
+
 test("save conflicts expose both revisions for a second validation", async () => {
   const previousStorage = globalThis.localStorage;
   const values = new Map<string, string>();

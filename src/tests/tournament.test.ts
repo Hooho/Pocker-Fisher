@@ -4,10 +4,13 @@ import { newGame, hero } from "../domain/game/engine";
 import {
   championshipCareerBonuses,
   championshipStandings,
+  difficultyPointRules,
   pointsForPlace,
   qualification,
   simulateTable,
   simulateTableWithStacks,
+  singleMatchPointRules,
+  singleMatchPointsTenths,
 } from "../domain/tournament/tournament";
 test("qualification does not revive eliminated players below the cutoff", () => {
   const g = newGame(Array.from({ length: 8 }, (_, id) => ({ ...hero, id })));
@@ -76,6 +79,20 @@ test("championship points award the top eight and no points below eighth", () =>
     [20, 15, 12, 11, 10, 9, 8, 7],
   );
   assert.equal(pointsForPlace(9), 0);
+  assert.equal(pointsForPlace(1, 1), 16);
+  assert.equal(pointsForPlace(1, 5), 24);
+});
+
+test("single-match winner points scale with field size and difficulty", () => {
+  assert.deepEqual(singleMatchPointRules.map(({ entrants, basePointsTenths }) => [entrants, basePointsTenths]), [
+    [2, 10], [4, 20], [6, 30], [8, 40],
+  ]);
+  assert.deepEqual(difficultyPointRules.map(({ label, multiplierTenths }) => [label, multiplierTenths]), [
+    ["入门", 8], ["普通", 9], ["进阶", 10], ["专家", 11], ["大师", 12],
+  ]);
+  assert.equal(singleMatchPointsTenths(2, 1), 8);
+  assert.equal(singleMatchPointsTenths(6, 3), 30);
+  assert.equal(singleMatchPointsTenths(8, 5), 48);
 });
 
 test("championship standings keep the top eight and award the configured points", () => {

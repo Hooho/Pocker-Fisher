@@ -48,13 +48,49 @@ export type ChampionshipSimulationProgress = {
   checkpoint?: ChampionshipSimulationCheckpoint;
   performance?: SimulationPlayerStatsMap;
 };
-export const pointsForPlace = (place: number) =>
-  place === 1 ? 20 : place === 2 ? 15 : place >= 3 && place <= 8 ? 15 - place : 0;
-export function championshipStandings(players: Character[]) {
+
+/** Base points for winning a single match, before applying the difficulty multiplier. */
+export const singleMatchPointRules = [
+  { entrants: 2, basePointsTenths: 10 },
+  { entrants: 4, basePointsTenths: 20 },
+  { entrants: 6, basePointsTenths: 30 },
+  { entrants: 8, basePointsTenths: 40 },
+] as const;
+
+/** Difficulty multipliers are stored as tenths so all saved points stay integral. */
+export const difficultyPointRules = [
+  { difficulty: 1, label: "入门", multiplierTenths: 8 },
+  { difficulty: 2, label: "普通", multiplierTenths: 9 },
+  { difficulty: 3, label: "进阶", multiplierTenths: 10 },
+  { difficulty: 4, label: "专家", multiplierTenths: 11 },
+  { difficulty: 5, label: "大师", multiplierTenths: 12 },
+] as const;
+
+export function difficultyMultiplierTenths(difficulty: number) {
+  const difficultyIndex = Math.max(
+    0,
+    Math.min(difficultyPointRules.length - 1, Math.round(difficulty) - 1),
+  );
+  return difficultyPointRules[difficultyIndex].multiplierTenths;
+}
+
+/** Returns single-match winner points in tenths (e.g. 48 means 4.8 points). */
+export function singleMatchPointsTenths(entrants: number, difficulty: number) {
+  const base = singleMatchPointRules.find((rule) => rule.entrants === entrants)?.basePointsTenths
+    ?? singleMatchPointRules[singleMatchPointRules.length - 1].basePointsTenths;
+  return Math.round((base * difficultyMultiplierTenths(difficulty)) / 10);
+}
+
+export const pointsForPlace = (place: number, difficulty = 3) => {
+  const basePoints = place === 1 ? 20 : place === 2 ? 15 : place >= 3 && place <= 8 ? 15 - place : 0;
+  if (!basePoints) return 0;
+  return Math.round((basePoints * difficultyMultiplierTenths(difficulty)) / 10);
+};
+export function championshipStandings(players: Character[], difficulty = 3) {
   return players.slice(0, 8).map((player, index) => ({
     place: index + 1,
     player,
-    points: pointsForPlace(index + 1),
+    points: pointsForPlace(index + 1, difficulty),
   }));
 }
 export function championshipCareerBonuses(

@@ -47,7 +47,7 @@ export function LeaderboardPage({
             <small>计分规则</small>
             <Info size={13} aria-hidden="true" />
           </span>
-          <strong>赢手 +0.1 · 冠军 +20</strong>
+          <strong>单次赛最高 +4.8 · 冠军最高 +24</strong>
         </button>
       </div>
       <section

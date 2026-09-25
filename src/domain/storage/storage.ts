@@ -314,7 +314,12 @@ export type Tournament = {
   results: string[];
 };
 export type MatchMode = "cash" | "championship";
-export type MatchSession = { id: string; mode: MatchMode };
+export type MatchSession = {
+  id: string;
+  mode: MatchMode;
+  entrants?: number;
+  difficulty?: number;
+};
 export type SuspendedTournament = {
   game: Game;
   tournament: Tournament;
@@ -402,6 +407,8 @@ const tournamentSchema = z.object({
 const matchSessionSchema = z.object({
   id: z.string().min(1).max(100),
   mode: z.enum(["cash", "championship"]),
+  entrants: z.number().int().min(2).max(256).optional(),
+  difficulty: z.number().int().min(1).max(5).optional(),
 });
 const chipAnimationSchema = z.object({
   hand: money,
@@ -444,7 +451,7 @@ const tournamentRecordSchema = z.object({
   standings: z.array(z.object({
     place: z.number().int().min(1).max(256),
     player: characterSchema,
-    points: z.number().int().min(0).max(20),
+    points: z.number().int().min(0).max(24),
   })).max(10),
 });
 

@@ -1,8 +1,11 @@
 import {
   championshipStandings,
   championshipCareerBonuses,
+  difficultyPointRules,
   eliminatedProfiles,
   qualification,
+  singleMatchPointRules,
+  singleMatchPointsTenths,
   type ChampionshipSimulationProgress,
   type SimulationPlayerStatsMap,
   type SimulatedTablePerformance,
@@ -24,7 +27,7 @@ import {
 import { TournamentPage } from "../pages/TournamentPage";
 import { CashResultsPage, type CashMatchResult } from "../pages/CashResultsPage";
 import { LeaderboardPage } from "../pages/LeaderboardPage";
-import { useEffect, useRef, useState, useMemo, useCallback, memo, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, useMemo, useCallback, memo, type CSSProperties } from "react";
 import {
   ArrowUpRight,
   ChevronRight,
@@ -213,13 +216,14 @@ function createChampionshipRecord(
   players: Character[],
   mode: ChampionshipRecord["mode"],
   entrants: number,
+  difficulty = 3,
 ): ChampionshipRecord {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     playedAt: new Date().toISOString(),
     mode,
     entrants,
-    standings: championshipStandings(players),
+    standings: championshipStandings(players, difficulty),
   };
 }
 function recordCashEliminations(eliminated: Character[], before: Game, after: Game): Character[] {
@@ -431,11 +435,18 @@ function recordHandResult(save: Save, game: Game, inTournament: boolean): Save {
   }
   return { ...save, playerStats };
 }
-function recordCashMatchWinner(save: Save, game: Game): Save {
+function recordCashMatchWinner(
+  save: Save,
+  game: Game,
+  match?: MatchSession,
+  fallbackDifficulty = 3,
+): Save {
   const winner = game.players.find((player) => player.chips > 0);
   if (!winner) return save;
   const id = String(winner.profile.id);
   const current = save.playerStats[id] || blankCareerStats;
+  const entrants = match?.entrants ?? game.players.length;
+  const difficulty = match?.difficulty ?? fallbackDifficulty;
   return {
     ...save,
     playerStats: {
@@ -443,6 +454,7 @@ function recordCashMatchWinner(save: Save, game: Game): Save {
       [id]: {
         ...current,
         cashMatchesWon: current.cashMatchesWon + 1,
+        pointsTenths: current.pointsTenths + singleMatchPointsTenths(entrants, difficulty),
       },
     },
   };
@@ -555,11 +567,14 @@ type TableTimerState = {
   accumulatedMs: number;
   runningSinceMs: number | null;
 };
-function createMatchSession(mode: MatchMode): MatchSession {
+function createMatchSession(
+  mode: MatchMode,
+  config: Pick<MatchSession, "entrants" | "difficulty"> = {},
+): MatchSession {
   const randomId = typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-  return { id: randomId, mode };
+  return { id: randomId, mode, ...config };
 }
 function emptyTimerStorage(): TimerStorage {
   return { cash: null, championship: null };
@@ -637,14 +652,23 @@ function ensureMatchMetadata(save: Save): Save {
   let next = save;
   if ((save.game || save.tournament) && !save.activeMatch) {
     const mode: MatchMode = save.tournament ? "championship" : "cash";
-    next = { ...next, activeMatch: createMatchSession(mode) };
+    next = {
+      ...next,
+      activeMatch: createMatchSession(mode, {
+        entrants: save.tournament?.entrants ?? save.game?.players.length,
+        difficulty: save.settings.difficulty,
+      }),
+    };
   }
   if (next.pausedTournament && !next.pausedTournament.match) {
     next = {
       ...next,
       pausedTournament: {
         ...next.pausedTournament,
-        match: createMatchSession("championship"),
+        match: createMatchSession("championship", {
+          entrants: next.pausedTournament.tournament.entrants ?? next.pausedTournament.game.players.length,
+          difficulty: next.settings.difficulty,
+        }),
       },
     };
   }
@@ -1145,6 +1169,7 @@ export default function App() {
   const [seatCardPositions, setSeatCardPositions] = useState<Array<{ x: number; y: number } | null>>([]);
   const [tableStageSize, setTableStageSize] = useState<TableStageSize>({ width: 0, height: 0 });
   const [tableSeatSize, setTableSeatSize] = useState<TableSeatSize>({ width: 0, height: 0 });
+  const [tableLayoutReady, setTableLayoutReady] = useState(false);
   const [showAllCommunityCards, setShowAllCommunityCards] = useState(false);
   const actionId = useRef(0);
   const file = useRef<HTMLInputElement>(null);
@@ -1301,8 +1326,9 @@ export default function App() {
     tableTimerState.current = nextState;
     setTableSeconds(nextState ? Math.floor(nextState.accumulatedMs / 1000) : 0);
   }, [activeMatch?.id, activeMatch?.mode]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (page !== "table") {
+      setTableLayoutReady(false);
       setTableStageSize({ width: 0, height: 0 });
       setTableSeatSize({ width: 0, height: 0 });
       setSeatCardPositions([]);
@@ -1354,6 +1380,7 @@ export default function App() {
         }
         return nextSeatCardPositions;
       });
+      setTableLayoutReady(true);
     };
     updateSize();
     if (typeof ResizeObserver === "undefined") {
@@ -1626,7 +1653,7 @@ export default function App() {
       if (!ended) return updated;
       const withHandResult = recordHandResult(updated, next, !!tournament);
       return !tournament && next.players.filter((player) => player.chips > 0).length === 1
-        ? recordCashMatchWinner(withHandResult, next)
+        ? recordCashMatchWinner(withHandResult, next, old.activeMatch, old.settings.difficulty)
         : withHandResult;
     });
     if (handEnded && next.winners.length) { const timer = window.setTimeout(() => setCelebrationDone(true), 5200); return () => window.clearTimeout(timer) }
@@ -1831,7 +1858,12 @@ export default function App() {
           : [];
         const fullOrder = [...event.data.standings, ...past]
           .filter((p, index, all) => all.findIndex((other) => other.id === p.id) === index);
-        const record = createChampionshipRecord(fullOrder, "played", t.entrants || t.field.length);
+        const record = createChampionshipRecord(
+          fullOrder,
+          "played",
+          t.entrants || t.field.length,
+          data.activeMatch?.difficulty ?? data.settings.difficulty,
+        );
         setData((old) => {
           const current = old.tournament;
           if (!current?.autoSimulating) return old;
@@ -1878,7 +1910,7 @@ export default function App() {
       startingBestPlace: t.field.length,
     });
     setBusy(true);
-  }, [ready, page, t?.autoSimulating, t?.simulationComplete, t?.round, g?.hand]);
+  }, [ready, page, t?.autoSimulating, t?.simulationComplete, t?.round, g?.hand, data.activeMatch?.difficulty, data.settings.difficulty]);
   useEffect(() => {
     if (g && !g.done) setRaise(legal(g).min);
   }, [g?.turn, g?.current, g?.hand]);
@@ -1919,10 +1951,14 @@ export default function App() {
         }
         : null;
     const entrants = tournament ? [userPlayer, ...roster] : game.players.map((player) => player.profile);
+    const matchConfig = {
+      entrants: tournament?.entrants ?? game.players.length,
+      difficulty: data.settings.difficulty,
+    };
     const currentMatch = data.activeMatch || (data.game
-      ? createMatchSession(data.tournament ? "championship" : "cash")
+      ? createMatchSession(data.tournament ? "championship" : "cash", matchConfig)
       : undefined);
-    const newMatch = createMatchSession(newMode === "tournament" ? "championship" : "cash");
+    const newMatch = createMatchSession(newMode === "tournament" ? "championship" : "cash", matchConfig);
     const pausedTournament = newMode === "cash" && data.tournament && data.game && !data.tournament.complete
       ? {
         game: data.game,
@@ -2037,7 +2073,12 @@ export default function App() {
           ...finalEliminated.slice().reverse(),
           ...(t.topTwoOuts || []),
         ].filter((player, index, players) => players.findIndex((other) => other.id === player.id) === index);
-        const record = createChampionshipRecord(actualPlacements, "played", t.entrants || 64);
+        const record = createChampionshipRecord(
+          actualPlacements,
+          "played",
+          t.entrants || 64,
+          data.activeMatch?.difficulty ?? data.settings.difficulty,
+        );
         setData((d) => {
           if (!d.tournament || d.tournament.complete) return d;
           const updated: Save = {
@@ -3077,7 +3118,11 @@ export default function App() {
                   </button>
                 </div>
               </div>
-              <div className="table-stage" ref={tableStageRef}>
+              <div
+                className="table-stage"
+                ref={tableStageRef}
+                style={{ visibility: tableLayoutReady ? "visible" : "hidden" }}
+              >
                 <div className="table-context-watermark">
                   <strong>{tableRoundLabel}</strong>
                   <span>第 {g.hand} 手</span>
@@ -3781,12 +3826,23 @@ export default function App() {
                 <h2>计分规则</h2>
                 <div className="rules-copy">
                   <p>
-                    积分只累计你亲自参与过的冠军赛：完全由系统自动模拟、你未参赛的冠军赛不计分；日常单次现金局的手数只计入"手数"战绩，不计入积分。
+                    单次赛和冠军赛分别计分。单次赛只有最终赢家得分；冠军赛按最终名次给前 8 名积分，冠军赛中的每个赢手再获得 <strong>+0.1</strong> 分。
                   </p>
                   <p>
-                    赢下一手牌 <strong>+0.1</strong> 分——包括你亲自坐镇的牌桌，以及冠军赛期间你出局后系统代打的其他牌桌。
+                    单次赛赢家分 = 参赛人数基础分 × 难度系数。参赛人数越多、电脑难度越高，赢家获得的积分越多；单次赛不额外按赢手计分。
                   </p>
-                  <p>冠军赛结束时，按最终名次一次性发放名次分：</p>
+                  <div className="points-rule-chart" aria-label="单次赛人数基础分">
+                    {singleMatchPointRules.map((row) => (
+                      <div className="points-rule-row" key={row.entrants}>
+                        <span>{row.entrants} 人桌基础分</span>
+                        <b>{(row.basePointsTenths / 10).toFixed(1)}</b>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="muted rules-chart-note">
+                    单次赛和冠军赛名次分共用难度系数：{difficultyPointRules.map((rule, index) => `${index ? "、" : ""}${rule.label} ${rule.multiplierTenths / 10}`).join("")}；冠军赛赢手的 <strong>+0.1</strong> 分不乘系数。
+                  </p>
+                  <p>冠军赛结束时，按最终名次一次性发放名次分（进阶难度为基准）：</p>
                   <div className="points-rule-chart" aria-label="名次积分对照表">
                     {[
                       { label: "冠军", points: 20 },

@@ -80,6 +80,7 @@ import {
   downloadSave,
   getSaveRevision,
   isSaveConflictError,
+  isSaveValidationError,
   summarizeSaveRecords,
   subscribeToSaveChanges,
   type Save,
@@ -1274,7 +1275,9 @@ export default function App() {
   userPlayerRef.current = userPlayer;
   useEffect(() => {
     Promise.all([loadSave(), fetch(publicAsset("characters.json")).then((r) => r.json())])
-      .then(([saved, chars]) => {
+      .then(([loaded, chars]) => {
+        const saved = loaded.save;
+        if (loaded.recoveryNotice) setToast(loaded.recoveryNotice);
         const restored = saved.tournament?.out && !saved.tournament.complete && !saved.tournament.simulationComplete
           ? { ...saved, tournament: { ...saved.tournament, autoSimulating: true } }
           : saved;
@@ -1324,6 +1327,11 @@ export default function App() {
       .catch((error) => {
         if (isSaveConflictError(error)) {
           markSaveStale();
+          return;
+        }
+        if (isSaveValidationError(error)) {
+          setSaveError(true);
+          setToast(error.message);
           return;
         }
         setSaveError(true);
@@ -2096,6 +2104,11 @@ export default function App() {
         markSaveStale();
         return;
       }
+      if (isSaveValidationError(error)) {
+        setSaveError(true);
+        setToast(error.message);
+        return;
+      }
       setSaveError(true);
       setToast("个人资料保存失败，请导出存档备份后重试");
     } finally {
@@ -2130,6 +2143,11 @@ export default function App() {
       if (isSaveConflictError(error)) {
         setResetConfirmOpen(false);
         markSaveStale();
+        return;
+      }
+      if (isSaveValidationError(error)) {
+        setSaveError(true);
+        setToast(error.message);
         return;
       }
       setSaveError(true);
@@ -2497,16 +2515,16 @@ export default function App() {
             </div>
           </div>
           <p>
-            游戏运行时会先快速保存到 Webview 的本地存储，同时在后台自动备份为 JSON 文件。存档只保存在本地，不会自动上传到云端。
+            保存前会先校验完整存档；校验失败时不会覆盖已有存档。通过校验后，游戏会快速保存到本地，并在后台备份为多个分片 JSON 文件。存档只保存在本地，不会自动上传到云端。
           </p>
           <dl className="info-settings-list">
             <div>
-              <dt>文件名</dt>
-              <dd><code>river-fisher-save.json</code></dd>
+              <dt>文件结构</dt>
+              <dd><code>river-fisher-save-a/b-*.json</code></dd>
             </div>
             <div>
-              <dt>默认位置</dt>
-              <dd><code>.vscode/river-fisher-save.json</code></dd>
+              <dt>旧版本</dt>
+              <dd>有新保存时约每 5 分钟记录一个，最多保留 5 个整档旧版本，发现当前档损坏时自动回退并提示。</dd>
             </div>
             <div>
               <dt>读取时机</dt>
@@ -2514,7 +2532,7 @@ export default function App() {
             </div>
           </dl>
           <div className="notice info-settings-note">
-            JSON 备份会在游戏操作停止约 0.75 秒后写入，不会阻塞牌局操作。没有打开工作区时，会保存到扩展专属目录。
+            JSON 备份会在游戏操作停止约 0.75 秒后写入，不会阻塞牌局操作。分片写入完成后才更新 manifest；没有打开工作区时，会保存到扩展专属目录。
           </div>
         </article>
         <article className="info-settings-card">

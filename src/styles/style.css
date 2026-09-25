@@ -2406,6 +2406,21 @@ input[type="range"] {
   word-break: break-all;
 }
 
+.save-transfer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 14px;
+}
+
+.save-transfer-actions button {
+  font-size: 11px;
+}
+
+.save-code-help {
+  line-height: 1.7;
+}
+
 .full {
   width: 100%;
 }

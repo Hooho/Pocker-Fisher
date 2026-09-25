@@ -37,7 +37,6 @@ import {
   Spade,
   Download,
   Copy,
-  Clipboard,
   Upload,
   Play,
   Pause,
@@ -1181,8 +1180,9 @@ export default function App() {
   const [progress, setProgress] = useState("");
   const [eliminatedProgress, setEliminatedProgress] = useState<ChampionshipSimulationProgress | null>(null);
   const [imported, setImported] = useState<Save | null>(null);
-  const [saveCodeModal, setSaveCodeModal] = useState<"export" | "import" | null>(null);
+  const [saveCodeModal, setSaveCodeModal] = useState<"download" | "upload" | null>(null);
   const [saveCodeText, setSaveCodeText] = useState("");
+  const [saveCodePasteOpen, setSaveCodePasteOpen] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [saveLoadIssue, setSaveLoadIssue] = useState<{
     title: string;
@@ -1240,6 +1240,7 @@ export default function App() {
     setImported(null);
     setSaveCodeModal(null);
     setSaveCodeText("");
+    setSaveCodePasteOpen(false);
     setConfirmDialog(null);
     setSelected(null);
     setBatchOpen(false);
@@ -2369,15 +2370,30 @@ export default function App() {
     }
     if (file.current) file.current.value = "";
   };
-  const openSaveCodeExport = () => {
+  const openDownloadSaveModal = () => {
     setSaveCodeText(createSaveCode(data));
-    setSaveCodeModal("export");
+    setSaveCodeModal("download");
+    setSaveCodePasteOpen(false);
     setMoreMenuOpen(false);
   };
-  const openSaveCodeImport = () => {
+  const openUploadSaveModal = () => {
     setSaveCodeText("");
-    setSaveCodeModal("import");
+    setSaveCodeModal("upload");
+    setSaveCodePasteOpen(false);
     setMoreMenuOpen(false);
+  };
+  const closeSaveCodeModal = () => {
+    setSaveCodeModal(null);
+    setSaveCodeText("");
+    setSaveCodePasteOpen(false);
+  };
+  const uploadJsonSave = () => {
+    closeSaveCodeModal();
+    file.current?.click();
+  };
+  const openSaveCodePaste = () => {
+    setSaveCodePasteOpen(true);
+    setSaveCodeText("");
   };
   const copySaveCode = async () => {
     const copied = await copyTextToClipboard(saveCodeText);
@@ -2395,8 +2411,7 @@ export default function App() {
       setToast(error instanceof Error ? error.message : "存档码无效，现有数据未修改");
       return;
     }
-    setSaveCodeModal(null);
-    setSaveCodeText("");
+    closeSaveCodeModal();
     if (summarizeSaveRecords(data).hasExistingData) {
       setImported(nextSave);
     } else {
@@ -3011,17 +3026,15 @@ export default function App() {
             </div>
           </div>
           <p>
-            你可以随时导出一份 JSON 存档，也可以复制存档码，通过微信在另一台设备恢复进度。
+            点击顶部的“下载存档”或“导入存档”，即可选择 JSON 文件或存档码。
             完全离线，不联网。
           </p>
           <div className="info-settings-transfer">
-            <span><Download size={14} /> 导出 JSON</span>
-            <span><Upload size={14} /> 导入 JSON</span>
-            <span><Copy size={14} /> 复制存档码</span>
-            <span><Clipboard size={14} /> 粘贴存档码</span>
+            <span><Download size={14} /> 下载 JSON / 复制存档码</span>
+            <span><Upload size={14} /> 上传 JSON / 粘贴存档码</span>
           </div>
           <div className="info-settings-browser-actions">
-            微信内无法下载文件时，使用顶部的“复制存档码”和“导入存档码”即可完成备份与恢复。
+            如果微信提示不支持下载，可在下载弹窗中复制存档码；之后在导入弹窗粘贴即可恢复。
           </div>
         </article>
         <section className="reset-settings" aria-labelledby="reset-settings-title">
@@ -3087,43 +3100,19 @@ export default function App() {
               className="icon-btn"
               aria-label="导出存档"
               title="导出存档"
-              onClick={() => {
-                exportCurrentSave();
-                setMoreMenuOpen(false);
-              }}
+              onClick={openDownloadSaveModal}
             >
               <Download size={17} />
               <span className="tool-label">导出存档</span>
             </button>
             <button
               className="icon-btn"
-              aria-label="复制存档码"
-              title="复制存档码"
-              onClick={openSaveCodeExport}
-            >
-              <Copy size={17} />
-              <span className="tool-label">复制存档码</span>
-            </button>
-            <button
-              className="icon-btn"
               aria-label="导入存档"
               title="导入存档"
-              onClick={() => {
-                file.current?.click();
-                setMoreMenuOpen(false);
-              }}
+              onClick={openUploadSaveModal}
             >
               <Upload size={17} />
               <span className="tool-label">导入存档</span>
-            </button>
-            <button
-              className="icon-btn"
-              aria-label="导入存档码"
-              title="导入存档码"
-              onClick={openSaveCodeImport}
-            >
-              <Clipboard size={17} />
-              <span className="tool-label">导入存档码</span>
             </button>
             <button
               className={`settings-btn ${page === "settings" ? "active" : ""}`}
@@ -4353,10 +4342,7 @@ export default function App() {
         <div
           className="modal-backdrop"
           onMouseDown={(event) => {
-            if (event.target === event.currentTarget) {
-              setSaveCodeModal(null);
-              setSaveCodeText("");
-            }
+            if (event.target === event.currentTarget) closeSaveCodeModal();
           }}
         >
           <section
@@ -4369,59 +4355,91 @@ export default function App() {
               type="button"
               className="close"
               aria-label="关闭"
-              onClick={() => {
-                setSaveCodeModal(null);
-                setSaveCodeText("");
-              }}
+              onClick={closeSaveCodeModal}
             >
               <X size={17} />
             </button>
-            <p className="eyebrow">WECHAT SAVE CODE</p>
+            <p className="eyebrow">WECHAT SAVE</p>
             <h2 id="save-code-title">
-              {saveCodeModal === "export" ? "复制存档码" : "粘贴存档码"}
+              {saveCodeModal === "download" ? "下载存档" : "导入存档"}
             </h2>
-            <p className="muted">
-              {saveCodeModal === "export"
-                ? "复制下面的文字，发到微信聊天或文件传输助手。"
-                : "把另一台设备上的完整存档码粘贴到这里，然后恢复进度。"}
-            </p>
-            <textarea
-              className="save-code-textarea"
-              value={saveCodeText}
-              onChange={(event) => setSaveCodeText(event.target.value)}
-              onFocus={(event) => {
-                if (saveCodeModal === "export") event.currentTarget.select();
-              }}
-              placeholder={saveCodeModal === "import" ? "请粘贴 RIVER-SAVE-V1. 开头的存档码" : undefined}
-              readOnly={saveCodeModal === "export"}
-              rows={8}
-              spellCheck={false}
-              autoFocus
-            />
+            {saveCodeModal === "download" ? (
+              <>
+                <p className="muted">
+                  优先点击“下载 JSON 存档”。如果微信提示不支持下载，点击“复制存档码”，再发给自己或保存到文件传输助手。
+                </p>
+                <div className="save-transfer-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exportCurrentSave();
+                      setToast("如果微信没有出现下载文件，请改用“复制存档码”");
+                    }}
+                  >
+                    <Download size={14} /> 下载 JSON 存档
+                  </button>
+                  <button type="button" className="gold-button" onClick={() => void copySaveCode()}>
+                    <Copy size={14} /> 复制存档码
+                  </button>
+                </div>
+                <textarea
+                  className="save-code-textarea"
+                  value={saveCodeText}
+                  onFocus={(event) => event.currentTarget.select()}
+                  readOnly
+                  rows={8}
+                  spellCheck={false}
+                  aria-label="存档码"
+                />
+                <p className="save-code-help muted">
+                  复制按钮无效时，可长按上方文字，选择“全选—复制”。
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="muted">
+                  可以上传之前下载的 JSON 文件；如果微信不支持下载文件，就点击“粘贴存档码”恢复。
+                </p>
+                <div className="save-transfer-actions">
+                  <button type="button" onClick={uploadJsonSave}>
+                    <Upload size={14} /> 上传 JSON 存档
+                  </button>
+                  <button
+                    type="button"
+                    className={saveCodePasteOpen ? "gold-button" : undefined}
+                    onClick={openSaveCodePaste}
+                  >
+                    <Copy size={14} /> 粘贴存档码
+                  </button>
+                </div>
+                {saveCodePasteOpen ? (
+                  <>
+                    <textarea
+                      className="save-code-textarea"
+                      value={saveCodeText}
+                      onChange={(event) => setSaveCodeText(event.target.value)}
+                      placeholder="请粘贴 RIVER-SAVE-V1. 开头的存档码"
+                      rows={8}
+                      spellCheck={false}
+                      autoFocus
+                      aria-label="粘贴存档码"
+                    />
+                    <div className="modal-actions">
+                      <button
+                        type="button"
+                        className="gold-button"
+                        disabled={!saveCodeText.trim()}
+                        onClick={applySaveCode}
+                      >
+                        恢复存档
+                      </button>
+                    </div>
+                  </>
+                ) : null}
+              </>
+            )}
             <div className="modal-actions">
-              <button
-                type="button"
-                onClick={() => {
-                  setSaveCodeModal(null);
-                  setSaveCodeText("");
-                }}
-              >
-                取消
-              </button>
-              {saveCodeModal === "export" ? (
-                <button type="button" className="gold-button" onClick={() => void copySaveCode()}>
-                  <Copy size={14} /> 复制存档码
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  className="gold-button"
-                  disabled={!saveCodeText.trim()}
-                  onClick={applySaveCode}
-                >
-                  恢复存档
-                </button>
-              )}
+              <button type="button" onClick={closeSaveCodeModal}>关闭</button>
             </div>
           </section>
         </div>

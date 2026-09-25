@@ -24,12 +24,27 @@ npm run dev
 
 `npm run release` 是一个交互式发布向导。它会逐步询问版本类型、是否运行测试、是否打包 VSIX、是否创建 Release Commit / Git Tag，以及是否发布到 VS Code Marketplace 和 Open VSX（Cursor 可使用的第三方扩展注册表）。发布渠道默认选择“否”，脚本不会推送代码。
 
-如果在向导中选择发布，提前在当前终端设置对应令牌；只打包或只做检查时不需要令牌。不要把令牌写入 `package.json`、脚本或提交到 Git：
+如果在向导中选择发布，可以使用项目根目录的 `.env` 文件配置令牌；只打包或只做检查时不需要令牌。先复制模板并填写：
+
+```sh
+cp .env.example .env
+```
+
+`.env.example` 中的配置项：
+
+```dotenv
+VSCE_PAT="你的 Azure DevOps PAT"
+OVSX_PAT="你的 Open VSX Token"
+```
+
+也可以只在当前终端设置环境变量：
 
 ```sh
 export VSCE_PAT="你的 Azure DevOps PAT"
 export OVSX_PAT="你的 Open VSX Token"
 ```
+
+终端环境变量优先于 `.env`；真实 `.env` 已被 `.gitignore` 排除，不要提交到 Git。
 
 发布命令：
 

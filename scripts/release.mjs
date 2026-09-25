@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const packageJsonPath = resolve(projectRoot, "package.json");
 const artifactsDirectory = resolve(projectRoot, "artifacts");
+const dotenvPath = resolve(projectRoot, ".env");
 const npxCommand = process.platform === "win32" ? "npx.cmd" : "npx";
 const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
 const gitCommand = process.platform === "win32" ? "git.exe" : "git";
@@ -32,6 +33,46 @@ const noBump = flags.has("--no-bump");
 const skipVsCode = flags.has("--skip-vscode");
 const skipOpenVsx = flags.has("--skip-openvsx");
 const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
+
+function loadDotEnv() {
+  if (!existsSync(dotenvPath)) {
+    return;
+  }
+
+  const lines = readFileSync(dotenvPath, "utf8").split(/\r?\n/);
+  for (const line of lines) {
+    const normalizedLine = line.trim();
+    if (!normalizedLine || normalizedLine.startsWith("#")) {
+      continue;
+    }
+
+    const assignment = normalizedLine.startsWith("export ")
+      ? normalizedLine.slice("export ".length).trim()
+      : normalizedLine;
+    const separatorIndex = assignment.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const key = assignment.slice(0, separatorIndex).trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) || process.env[key] !== undefined) {
+      continue;
+    }
+
+    let value = assignment.slice(separatorIndex + 1).trim();
+    if (
+      value.length >= 2 &&
+      ((value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith("'") && value.endsWith("'")))
+    ) {
+      value = value.slice(1, -1);
+    }
+
+    process.env[key] = value;
+  }
+}
+
+loadDotEnv();
 
 function fail(message) {
   console.error(`\n发布失败：${message}`);

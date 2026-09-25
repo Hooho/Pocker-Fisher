@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { blank, parseSave, summarizeSaveRecords } from "../domain/storage/storage";
+import {
+  blank,
+  loadSave,
+  parseSave,
+  saveData,
+  summarizeSaveRecords,
+} from "../domain/storage/storage";
 import { newGame, hero } from "../domain/game/engine";
 test("a tournament export can be imported unchanged", () => {
   const save = {
@@ -134,4 +140,59 @@ test("import overwrite detection finds progress and personalization", () => {
     }).hasExistingData,
     true,
   );
+});
+
+test("sharded browser storage keeps other data when the active shard is damaged", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", {
+    configurable: true,
+    value: storage,
+  });
+
+  try {
+    const saved = await saveData({
+      ...blank,
+      savedAt: new Date().toISOString(),
+      stats: { ...blank.stats, hands: 12 },
+      settings: { ...blank.settings, difficulty: 4 },
+      overrides: { "0": { ...hero, name: "自定义角色" } },
+      game: newGame([hero, { ...hero, id: 0 }]),
+    });
+    assert.equal(saved.revision, 1);
+
+    const manifestKey = "river-save-v2:a:manifest";
+    const manifest = JSON.parse(values.get(manifestKey)!);
+    assert.deepEqual(Object.keys(manifest.checksums).sort(), [
+      "active",
+      "characters",
+      "history",
+      "profile",
+    ]);
+    for (const shard of Object.keys(manifest.checksums)) {
+      assert.ok(values.has(`river-save-v2:a:${shard}`));
+    }
+
+    values.set("river-save-v2:a:active", "{损坏的 JSON");
+    const recovered = await loadSave();
+    assert.equal(recovered.game, null);
+    assert.equal(recovered.stats.hands, 12);
+    assert.equal(recovered.settings.difficulty, 4);
+    assert.equal(recovered.overrides["0"].name, "自定义角色");
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
 });

@@ -3,9 +3,40 @@ import type { Game, Character } from "../game/engine";
 import type { ChampionshipSimulationCheckpoint } from "../tournament/tournament";
 
 const SAVE_STORAGE_KEY = "river-save";
+const SHARDED_STORAGE_PREFIX = "river-save-v2";
 const SAVE_LOCK_NAME = "river-save-write";
 const SAVE_CHANNEL_NAME = "river-save-sync";
 const GAME_LOG_LIMIT = 15;
+
+const SAVE_SHARDS = ["profile", "active", "history", "characters"] as const;
+type SaveShardName = (typeof SAVE_SHARDS)[number];
+type SaveSlot = "a" | "b";
+
+type PersistedShard = {
+  format: 2;
+  revision: number;
+  checksum: string;
+  data: unknown;
+};
+
+type SaveManifest = {
+  format: 2;
+  version: 1;
+  revision: number;
+  savedAt: string;
+  slot: SaveSlot;
+  checksums: Record<SaveShardName, string>;
+};
+
+type ShardedSlotPayload = {
+  manifest: unknown;
+  shards: Partial<Record<SaveShardName, unknown>>;
+};
+
+type ShardedStoragePayload = {
+  format: 2;
+  slots: Partial<Record<SaveSlot, ShardedSlotPayload>>;
+};
 
 export type StoredSave = {
   revision: number;
@@ -346,55 +377,79 @@ const chipAnimationSchema = z.object({
   hand: money,
   settledTotals: z.record(money),
 });
-const schema = z.object({
-  version: z.literal(1),
-  savedAt: z.string(),
+const settingsSchema = z.object({
+  difficulty: z.number().int().min(1).max(5),
+  speed: z.number().min(100).max(5000),
+  mode: z.enum(["local", "key", "all"]),
+  endpoint: z.string().max(1000),
+  model: z.string().max(200),
+  sound: z.boolean(),
+  soundConfigured: z.boolean().default(false),
+  pace: z.number().int().min(5).max(30),
+});
+const statsSchema = z.object({
+  hands: money,
+  wins: money,
+  tournaments: money,
+  titles: money,
+});
+const playerStatsSchema = z.object({
+  matches: money,
+  advances: money,
+  handsWon: money,
+  handsPlayed: money.default(0),
+  championshipsEntered: money.default(0),
+  tournamentHandsWon: money.default(0),
+  tournamentHandsPlayed: money.default(0),
+  pointsTenths: money,
+  highestChips: money,
+  bestPlace: z.number().int().min(0).max(256),
+});
+const tournamentRecordSchema = z.object({
+  id: z.string().max(100),
+  playedAt: z.string().max(40),
+  mode: z.enum(["played", "simulated"]),
+  entrants: z.number().int().min(2).max(256),
+  standings: z.array(z.object({
+    place: z.number().int().min(1).max(256),
+    player: characterSchema,
+    points: z.number().int().min(0).max(20),
+  })).max(10),
+});
+
+const profileShardSchema = z.object({
   playerProfile: playerProfileSchema,
+  settings: settingsSchema,
+});
+const activeShardSchema = z.object({
   game: gameSchema.nullable(),
   tournament: tournamentSchema.nullable(),
   pausedTournament: z.object({ game: gameSchema, tournament: tournamentSchema }).optional(),
   chipAnimation: chipAnimationSchema.optional(),
-  tournamentRecords: z.array(z.object({
-    id: z.string().max(100),
-    playedAt: z.string().max(40),
-    mode: z.enum(["played", "simulated"]),
-    entrants: z.number().int().min(2).max(256),
-    standings: z.array(z.object({
-      place: z.number().int().min(1).max(256),
-      player: characterSchema,
-      points: z.number().int().min(0).max(20),
-    })).max(10),
-  })).max(1000).default([]),
+});
+const historyShardSchema = z.object({
+  tournamentRecords: z.array(tournamentRecordSchema).max(1000).default([]),
+  playerStats: z.record(playerStatsSchema).default({}),
+  stats: statsSchema,
+});
+const charactersShardSchema = z.object({
   overrides: z.record(characterSchema),
   previous: z.record(characterSchema),
-  playerStats: z.record(z.object({
-    matches: money,
-    advances: money,
-    handsWon: money,
-    handsPlayed: money.default(0),
-    championshipsEntered: money.default(0),
-    tournamentHandsWon: money.default(0),
-    tournamentHandsPlayed: money.default(0),
-    pointsTenths: money,
-    highestChips: money,
-    bestPlace: z.number().int().min(0).max(256),
-  })).default({}),
-  settings: z.object({
-    difficulty: z.number().int().min(1).max(5),
-    speed: z.number().min(100).max(5000),
-    mode: z.enum(["local", "key", "all"]),
-    endpoint: z.string().max(1000),
-    model: z.string().max(200),
-    sound: z.boolean(),
-    soundConfigured:z.boolean().default(false),
-    pace: z.number().int().min(5).max(30),
-  }),
-  stats: z.object({
-    hands: money,
-    wins: money,
-    tournaments: money,
-    titles: money,
-  }),
+});
+const schema = z.object({
+  version: z.literal(1),
+  savedAt: z.string(),
+  playerProfile: profileShardSchema.shape.playerProfile,
+  game: activeShardSchema.shape.game,
+  tournament: activeShardSchema.shape.tournament,
+  pausedTournament: activeShardSchema.shape.pausedTournament,
+  chipAnimation: activeShardSchema.shape.chipAnimation,
+  tournamentRecords: historyShardSchema.shape.tournamentRecords,
+  overrides: charactersShardSchema.shape.overrides,
+  previous: charactersShardSchema.shape.previous,
+  playerStats: historyShardSchema.shape.playerStats,
+  settings: profileShardSchema.shape.settings,
+  stats: historyShardSchema.shape.stats,
 });
 export type Save = {
   version: 1;
@@ -441,6 +496,77 @@ export const blank: Save = {
   settings: defaults,
   stats: { hands: 0, wins: 0, tournaments: 0, titles: 0 },
 };
+
+type SaveShardData = {
+  profile: {
+    playerProfile: PlayerProfile;
+    settings: Settings;
+  };
+  active: {
+    game: Game | null;
+    tournament: Tournament | null;
+    pausedTournament?: SuspendedTournament;
+    chipAnimation?: {
+      hand: number;
+      settledTotals: Record<string, number>;
+    };
+  };
+  history: {
+    tournamentRecords: ChampionshipRecord[];
+    playerStats: Record<string, PlayerCareerStats>;
+    stats: Save["stats"];
+  };
+  characters: {
+    overrides: Record<string, Character>;
+    previous: Record<string, Character>;
+  };
+};
+
+const saveShardSchemas = {
+  profile: profileShardSchema,
+  active: activeShardSchema,
+  history: historyShardSchema,
+  characters: charactersShardSchema,
+} as const;
+
+function splitSave(save: Save): SaveShardData {
+  return {
+    profile: {
+      playerProfile: save.playerProfile,
+      settings: save.settings,
+    },
+    active: {
+      game: save.game,
+      tournament: save.tournament,
+      ...(save.pausedTournament ? { pausedTournament: save.pausedTournament } : {}),
+      ...(save.chipAnimation ? { chipAnimation: save.chipAnimation } : {}),
+    },
+    history: {
+      tournamentRecords: save.tournamentRecords,
+      playerStats: save.playerStats,
+      stats: save.stats,
+    },
+    characters: {
+      overrides: save.overrides,
+      previous: save.previous,
+    },
+  };
+}
+
+function mergeSaveShards(
+  manifest: SaveManifest,
+  shards: Partial<SaveShardData>,
+): Save {
+  return parseSave({
+    ...blank,
+    savedAt: manifest.savedAt,
+    ...(shards.profile ?? {}),
+    ...(shards.active ?? {}),
+    ...(shards.history ?? {}),
+    ...(shards.characters ?? {}),
+  });
+}
+
 export type SaveRecordSummary = {
   hasExistingData: boolean;
   hasActiveGame: boolean;
@@ -604,6 +730,38 @@ const storedSaveSchema = z.object({
   revision: z.number().int().nonnegative(),
   save: z.unknown(),
 });
+const persistedShardSchema = z.object({
+  format: z.literal(2),
+  revision: z.number().int().nonnegative(),
+  checksum: z.string().min(1),
+  data: z.unknown(),
+});
+const saveManifestSchema = z.object({
+  format: z.literal(2),
+  version: z.literal(1),
+  revision: z.number().int().nonnegative(),
+  savedAt: z.string(),
+  slot: z.enum(["a", "b"]),
+  checksums: z.object({
+    profile: z.string().min(1),
+    active: z.string().min(1),
+    history: z.string().min(1),
+    characters: z.string().min(1),
+  }),
+});
+const shardedStorageSchema = z.object({
+  format: z.literal(2),
+  slots: z.object({
+    a: z.object({
+      manifest: z.unknown(),
+      shards: z.record(z.unknown()),
+    }).optional(),
+    b: z.object({
+      manifest: z.unknown(),
+      shards: z.record(z.unknown()),
+    }).optional(),
+  }),
+});
 
 function stableSerialize(value: unknown): string {
   if (value === null || typeof value !== "object") {
@@ -620,18 +778,150 @@ function stableSerialize(value: unknown): string {
     .join(",")}}`;
 }
 
+function checksumValue(value: unknown): string {
+  let hash = 2166136261;
+  for (const character of stableSerialize(value)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
 function saveFingerprint(save: Save) {
   const { savedAt: _savedAt, ...content } = save;
   return stableSerialize(content);
 }
 
-function writeBrowserStoredSave(stored: StoredSave) {
-  localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(stored));
+function browserManifestKey(slot: SaveSlot) {
+  return `${SHARDED_STORAGE_PREFIX}:${slot}:manifest`;
 }
 
-function readBrowserStoredSave(): StoredSave {
+function browserShardKey(slot: SaveSlot, shard: SaveShardName) {
+  return `${SHARDED_STORAGE_PREFIX}:${slot}:${shard}`;
+}
+
+function createShardedSlot(stored: StoredSave, slot: SaveSlot): ShardedSlotPayload {
+  const data = splitSave(stored.save);
+  const shards = {} as Record<SaveShardName, PersistedShard>;
+  const checksums = {} as Record<SaveShardName, string>;
+
+  for (const shardName of SAVE_SHARDS) {
+    const shardData = data[shardName];
+    const checksum = checksumValue(shardData);
+    checksums[shardName] = checksum;
+    shards[shardName] = {
+      format: 2,
+      revision: stored.revision,
+      checksum,
+      data: shardData,
+    };
+  }
+
+  return {
+    manifest: {
+      format: 2,
+      version: 1,
+      revision: stored.revision,
+      savedAt: stored.save.savedAt,
+      slot,
+      checksums,
+    } satisfies SaveManifest,
+    shards,
+  };
+}
+
+type ReadStoredSave = StoredSave & {
+  source: "empty" | "legacy" | "sharded";
+  slot?: SaveSlot;
+};
+
+function readShardedStoragePayload(payload: unknown): ReadStoredSave | null {
+  const parsedPayload = shardedStorageSchema.safeParse(payload);
+  if (!parsedPayload.success) return null;
+
+  const candidates: Array<ReadStoredSave & { slot: SaveSlot }> = [];
+  for (const slot of ["a", "b"] as const) {
+    const rawSlot = parsedPayload.data.slots[slot];
+    if (!rawSlot) continue;
+
+    const manifestResult = saveManifestSchema.safeParse(rawSlot.manifest);
+    if (!manifestResult.success || manifestResult.data.slot !== slot) continue;
+    const manifest = manifestResult.data;
+    const shards: Partial<Record<SaveShardName, unknown>> = {};
+
+    for (const shardName of SAVE_SHARDS) {
+      const shardResult = persistedShardSchema.safeParse(rawSlot.shards[shardName]);
+      if (!shardResult.success) continue;
+      if (
+        shardResult.data.revision !== manifest.revision ||
+        shardResult.data.checksum !== manifest.checksums[shardName] ||
+        checksumValue(shardResult.data.data) !== shardResult.data.checksum
+      ) {
+        continue;
+      }
+
+      const dataResult = saveShardSchemas[shardName].safeParse(shardResult.data.data);
+      if (dataResult.success) shards[shardName] = dataResult.data;
+    }
+
+    candidates.push({
+      revision: manifest.revision,
+      save: mergeSaveShards(manifest, shards as Partial<SaveShardData>),
+      source: "sharded",
+      slot,
+    });
+  }
+
+  candidates.sort((left, right) => right.revision - left.revision);
+  return candidates[0] ?? null;
+}
+
+function readBrowserShardedSave(): ReadStoredSave | null {
+  const slots: Partial<Record<SaveSlot, ShardedSlotPayload>> = {};
+  for (const slot of ["a", "b"] as const) {
+    const manifestRaw = localStorage.getItem(browserManifestKey(slot));
+    if (!manifestRaw) continue;
+
+    try {
+      slots[slot] = { manifest: JSON.parse(manifestRaw), shards: {} };
+    } catch {
+      // A malformed slot is ignored; the other slot or legacy save may still work.
+      continue;
+    }
+
+    for (const shardName of SAVE_SHARDS) {
+      const shardRaw = localStorage.getItem(browserShardKey(slot, shardName));
+      if (!shardRaw) continue;
+      try {
+        slots[slot]!.shards[shardName] = JSON.parse(shardRaw);
+      } catch {
+        // Leave only this shard unavailable; the other shards remain recoverable.
+      }
+    }
+  }
+  return readShardedStoragePayload({ format: 2, slots });
+}
+
+function writeBrowserStoredSave(stored: StoredSave) {
+  const current = readBrowserShardedSave();
+  const slot: SaveSlot = current?.slot === "a" ? "b" : "a";
+  const next = createShardedSlot(stored, slot);
+
+  for (const shardName of SAVE_SHARDS) {
+    localStorage.setItem(
+      browserShardKey(slot, shardName),
+      JSON.stringify(next.shards[shardName]),
+    );
+  }
+  localStorage.setItem(browserManifestKey(slot), JSON.stringify(next.manifest));
+}
+
+function readBrowserStoredSave(): ReadStoredSave {
+  const sharded = readBrowserShardedSave();
+  if (sharded) return sharded;
+
   const raw = localStorage.getItem(SAVE_STORAGE_KEY);
-  if (!raw) return { revision: 0, save: blank };
+  if (!raw) return { revision: 0, save: blank, source: "empty" };
 
   const parsed: unknown = JSON.parse(raw);
   const envelope = storedSaveSchema.safeParse(parsed);
@@ -639,27 +929,32 @@ function readBrowserStoredSave(): StoredSave {
     return {
       revision: envelope.data.revision,
       save: parseSave(envelope.data.save),
+      source: "legacy",
     };
   }
 
   // Accept a plain Save once so data written by an earlier localStorage build
   // can be upgraded without forcing the user to import a backup.
-  return { revision: 0, save: parseSave(parsed) };
+  return { revision: 0, save: parseSave(parsed), source: "legacy" };
 }
 
-async function readVsCodeStoredSave(): Promise<StoredSave> {
+async function readVsCodeStoredSave(): Promise<ReadStoredSave> {
   const stored = await requestVsCodeStorage<unknown>({ operation: "load" });
-  if (!stored || typeof stored !== "object" || Array.isArray(stored)) {
-    return { revision: 0, save: blank };
-  }
+  const sharded = readShardedStoragePayload(stored);
+  if (sharded) return sharded;
 
   const envelope = storedSaveSchema.safeParse(stored);
   if (!envelope.success || envelope.data.save === null) {
-    return { revision: envelope.success ? envelope.data.revision : 0, save: blank };
+    return {
+      revision: envelope.success ? envelope.data.revision : 0,
+      save: blank,
+      source: "empty",
+    };
   }
   return {
     revision: envelope.data.revision,
     save: parseSave(envelope.data.save),
+    source: "legacy",
   };
 }
 
@@ -673,7 +968,7 @@ function isStoredSaveNewer(candidate: StoredSave, current: StoredSave) {
 }
 
 function getSaveChannel(): BroadcastChannel | null {
-  if (typeof BroadcastChannel === "undefined") return null;
+  if (typeof window === "undefined" || typeof BroadcastChannel === "undefined") return null;
   if (!saveChannel) saveChannel = new BroadcastChannel(SAVE_CHANNEL_NAME);
   return saveChannel;
 }
@@ -743,6 +1038,9 @@ export const loadSave = async () => {
       // optional VS Code JSON backup is unavailable.
     }
   }
+  if (stored.source === "legacy") {
+    writeBrowserStoredSave(stored);
+  }
   localRevision = stored.revision;
   knownRevision = stored.revision;
   scheduleVscodeBackup(stored);
@@ -790,8 +1088,15 @@ export function subscribeToSaveChanges(listener: (revision: number) => void) {
     }
   };
   const onStorage = (event: StorageEvent) => {
-    if (event.key !== SAVE_STORAGE_KEY || !event.newValue) return;
+    const isManifestChange = event.key === browserManifestKey("a") || event.key === browserManifestKey("b");
+    if (!event.newValue || (event.key !== SAVE_STORAGE_KEY && !isManifestChange)) return;
     try {
+      if (isManifestChange) {
+        const manifest = saveManifestSchema.safeParse(JSON.parse(event.newValue));
+        if (manifest.success) listener(manifest.data.revision);
+        return;
+      }
+
       const envelope = storedSaveSchema.safeParse(JSON.parse(event.newValue));
       if (envelope.success) listener(envelope.data.revision);
     } catch {

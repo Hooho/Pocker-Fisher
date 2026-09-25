@@ -5,10 +5,22 @@ import * as vscode from "vscode";
 const viewId = "riverClub.gameView";
 const saveGlobalStateKey = "riverClub.save";
 const backupFileName = "river-fisher-save.json";
+const backupBaseName = "river-fisher-save";
+const saveShardNames = ["profile", "active", "history", "characters"] as const;
+type SaveShardName = (typeof saveShardNames)[number];
+type SaveSlot = "a" | "b";
 
 type PersistedSave = {
   revision: number;
   save: unknown;
+};
+
+type ShardedStoragePayload = {
+  format: 2;
+  slots: Partial<Record<SaveSlot, {
+    manifest: unknown;
+    shards: Partial<Record<SaveShardName, unknown>>;
+  }>>;
 };
 
 type SaveStorageRequest = {
@@ -71,17 +83,36 @@ function isPersistedSave(value: unknown): value is PersistedSave {
   );
 }
 
-function getBackupLocation(context: vscode.ExtensionContext) {
+function getBackupDirectory(context: vscode.ExtensionContext) {
   const workspace = vscode.workspace.workspaceFolders?.[0]?.uri;
   if (workspace) {
-    const directory = vscode.Uri.joinPath(workspace, ".vscode");
-    return { directory, file: vscode.Uri.joinPath(directory, backupFileName) };
+    return vscode.Uri.joinPath(workspace, ".vscode");
   }
 
-  return {
-    directory: context.globalStorageUri,
-    file: vscode.Uri.joinPath(context.globalStorageUri, backupFileName),
-  };
+  return context.globalStorageUri;
+}
+
+function getBackupLocation(context: vscode.ExtensionContext) {
+  const directory = getBackupDirectory(context);
+  return { directory, file: vscode.Uri.joinPath(directory, backupFileName) };
+}
+
+function getManifestBackupFile(context: vscode.ExtensionContext, slot: SaveSlot) {
+  return vscode.Uri.joinPath(
+    getBackupDirectory(context),
+    `${backupBaseName}-${slot}-manifest.json`,
+  );
+}
+
+function getShardBackupFile(
+  context: vscode.ExtensionContext,
+  slot: SaveSlot,
+  shard: SaveShardName,
+) {
+  return vscode.Uri.joinPath(
+    getBackupDirectory(context),
+    `${backupBaseName}-${slot}-${shard}.json`,
+  );
 }
 
 async function readJsonBackup(context: vscode.ExtensionContext): Promise<PersistedSave | null> {
@@ -114,16 +145,137 @@ async function readJsonBackup(context: vscode.ExtensionContext): Promise<Persist
   return null;
 }
 
-async function writeJsonBackup(
+async function readShardedJsonBackup(
+  context: vscode.ExtensionContext,
+): Promise<ShardedStoragePayload | null> {
+  const slots: ShardedStoragePayload["slots"] = {};
+  for (const slot of ["a", "b"] as const) {
+    let manifest: unknown;
+    try {
+      const contents = await vscode.workspace.fs.readFile(getManifestBackupFile(context, slot));
+      manifest = JSON.parse(new TextDecoder().decode(contents));
+    } catch {
+      continue;
+    }
+
+    const shards: Partial<Record<SaveShardName, unknown>> = {};
+    for (const shard of saveShardNames) {
+      try {
+        const contents = await vscode.workspace.fs.readFile(getShardBackupFile(context, slot, shard));
+        shards[shard] = JSON.parse(new TextDecoder().decode(contents));
+      } catch {
+        // The webview can recover the other shards if one file is damaged.
+      }
+    }
+    slots[slot] = { manifest, shards };
+  }
+
+  return Object.keys(slots).length > 0 ? { format: 2, slots } : null;
+}
+
+function stableSerialize(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value) ?? "undefined";
+  }
+  if (Array.isArray(value)) {
+    return `[${value.map(stableSerialize).join(",")}]`;
+  }
+
+  const record = value as Record<string, unknown>;
+  return `{${Object.keys(record)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
+    .join(",")}}`;
+}
+
+function checksumValue(value: unknown): string {
+  let hash = 2166136261;
+  for (const character of stableSerialize(value)) {
+    hash ^= character.charCodeAt(0);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function getPayloadRevision(payload: ShardedStoragePayload | null): number {
+  if (!payload) return 0;
+  return Math.max(
+    0,
+    ...(["a", "b"] as const).map((slot) => {
+      const manifest = payload.slots[slot]?.manifest;
+      return isRecord(manifest) && typeof manifest.revision === "number"
+        ? manifest.revision
+        : 0;
+    }),
+  );
+}
+
+async function writeShardedJsonBackup(
   context: vscode.ExtensionContext,
   value: PersistedSave,
 ): Promise<void> {
-  const { directory, file } = getBackupLocation(context);
+  const current = await readShardedJsonBackup(context);
+  const currentSlot = (["a", "b"] as const).find((slot) => {
+    const manifest = current?.slots[slot]?.manifest;
+    return isRecord(manifest) && manifest.revision === getPayloadRevision(current);
+  });
+  const slot: SaveSlot = currentSlot === "a" ? "b" : "a";
+  const source = isRecord(value.save) ? value.save : {};
+  const data: Record<SaveShardName, Record<string, unknown>> = {
+    profile: {
+      playerProfile: source.playerProfile,
+      settings: source.settings,
+    },
+    active: {
+      game: source.game ?? null,
+      tournament: source.tournament ?? null,
+      ...(source.pausedTournament !== undefined
+        ? { pausedTournament: source.pausedTournament }
+        : {}),
+      ...(source.chipAnimation !== undefined
+        ? { chipAnimation: source.chipAnimation }
+        : {}),
+    },
+    history: {
+      tournamentRecords: source.tournamentRecords,
+      playerStats: source.playerStats,
+      stats: source.stats,
+    },
+    characters: {
+      overrides: source.overrides,
+      previous: source.previous,
+    },
+  };
+  const checksums = {} as Record<SaveShardName, string>;
+
+  const directory = getBackupDirectory(context);
   await vscode.workspace.fs.createDirectory(directory);
+  for (const shard of saveShardNames) {
+    const checksum = checksumValue(data[shard]);
+    checksums[shard] = checksum;
+    await vscode.workspace.fs.writeFile(
+      getShardBackupFile(context, slot, shard),
+      new TextEncoder().encode(JSON.stringify({
+        format: 2,
+        revision: value.revision,
+        checksum,
+        data: data[shard],
+      }, null, 2) + "\n"),
+    );
+  }
+
   await vscode.workspace.fs.writeFile(
-    file,
-    new TextEncoder().encode(`${JSON.stringify(value, null, 2)}\n`),
+    getManifestBackupFile(context, slot),
+    new TextEncoder().encode(JSON.stringify({
+      format: 2,
+      version: 1,
+      revision: value.revision,
+      savedAt: typeof source.savedAt === "string" ? source.savedAt : "",
+      slot,
+      checksums,
+    }, null, 2) + "\n"),
   );
+  await context.globalState.update(saveGlobalStateKey, value);
 }
 
 function getNonce(): string {
@@ -266,7 +418,7 @@ export function activate(context: vscode.ExtensionContext): void {
     message: SaveStorageRequest,
   ): Promise<void> => {
     if (message.operation === "load") {
-      const backup = await readJsonBackup(context);
+      const backup = (await readShardedJsonBackup(context)) ?? await readJsonBackup(context);
       postStorageResponse(webview, {
         type: "riverClub.storageResponse",
         requestId: message.requestId,
@@ -277,11 +429,18 @@ export function activate(context: vscode.ExtensionContext): void {
     }
 
     if (message.operation === "revision") {
+      const backup = await readShardedJsonBackup(context);
+      const legacy = await readJsonBackup(context);
+      const revision = Math.max(
+        getPayloadRevision(backup),
+        readPersistedSave().revision,
+        legacy?.revision ?? 0,
+      );
       postStorageResponse(webview, {
         type: "riverClub.storageResponse",
         requestId: message.requestId,
         ok: true,
-        value: { revision: readPersistedSave().revision },
+        value: { revision },
       });
       return;
     }
@@ -298,11 +457,22 @@ export function activate(context: vscode.ExtensionContext): void {
 
     try {
       const result = await enqueueSave(async () => {
+        const backup = await readShardedJsonBackup(context);
+        const legacy = await readJsonBackup(context);
+        const currentRevision = Math.max(
+          getPayloadRevision(backup),
+          readPersistedSave().revision,
+          legacy?.revision ?? 0,
+        );
+        if (currentRevision !== message.expectedRevision) {
+          return { conflict: true as const, revision: currentRevision };
+        }
+
         const next: PersistedSave = {
           revision: message.expectedRevision!,
           save: message.save,
         };
-        await writeJsonBackup(context, next);
+        await writeShardedJsonBackup(context, next);
         return { conflict: false as const, revision: next.revision };
       });
 

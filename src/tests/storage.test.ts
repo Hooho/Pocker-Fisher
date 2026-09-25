@@ -5,6 +5,9 @@ import {
   loadSave,
   parseSave,
   saveData,
+  checkSaveState,
+  areSaveContentsEqual,
+  isSaveConflictError,
   isSaveValidationError,
   summarizeSaveRecords,
 } from "../domain/storage/storage";
@@ -204,6 +207,81 @@ test("rapid save requests coalesce to the latest state", async () => {
     assert.equal(latestResult.revision, 1);
     assert.equal(writes, 5);
     assert.equal(JSON.parse(values.get("river-save:history")!).data.stats.hands, 2);
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
+});
+
+test("save freshness checks can distinguish a new revision with unchanged content", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+
+  try {
+    await loadSave();
+    const saved = { ...blank, stats: { ...blank.stats, hands: 1 } };
+    await saveData(saved);
+    const stored = await checkSaveState();
+
+    assert.equal(stored.revision, 1);
+    assert.equal(areSaveContentsEqual(stored.save, { ...stored.save, savedAt: "later" }), true);
+    assert.equal(areSaveContentsEqual(stored.save, { ...saved, stats: { ...saved.stats, hands: 2 } }), false);
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
+});
+
+test("save conflicts expose both revisions for a second validation", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+
+  try {
+    await loadSave();
+    const saved = { ...blank, stats: { ...blank.stats, hands: 1 } };
+    await saveData(saved);
+    for (const key of ["river-save:profile", "river-save:active", "river-save:history", "river-save:characters", "river-save:manifest"]) {
+      const value = JSON.parse(values.get(key)!);
+      value.revision = 2;
+      values.set(key, JSON.stringify(value));
+    }
+
+    await assert.rejects(
+      () => saveData({ ...saved, stats: { ...saved.stats, hands: 2 } }),
+      (error: unknown) => {
+        if (!isSaveConflictError(error)) return false;
+        assert.equal(error.expectedRevision, 1);
+        assert.equal(error.actualRevision, 2);
+        assert.equal(areSaveContentsEqual(error.currentSave!, saved), true);
+        return true;
+      },
+    );
   } finally {
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,

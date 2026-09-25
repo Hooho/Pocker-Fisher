@@ -109,7 +109,11 @@ const pendingStorageRequests = new Map<string, PendingStorageRequest>();
 const saveListeners = new Set<(revision: number) => void>();
 
 export class SaveConflictError extends Error {
-  constructor() {
+  constructor(
+    public readonly expectedRevision?: number,
+    public readonly actualRevision?: number,
+    public readonly currentSave?: Save,
+  ) {
     super("本地存档已被另一个标签页更新");
     this.name = "SaveConflictError";
   }
@@ -947,6 +951,10 @@ function saveFingerprint(save: Save) {
   return stableSerialize(content);
 }
 
+export function areSaveContentsEqual(left: Save, right: Save) {
+  return saveFingerprint(left) === saveFingerprint(right);
+}
+
 function browserManifestKey() {
   return `${SHARDED_STORAGE_PREFIX}:manifest`;
 }
@@ -1208,6 +1216,12 @@ export function getSaveRevision() {
   return localRevision;
 }
 
+export function adoptSaveRevision(revision: number) {
+  if (!Number.isInteger(revision) || revision < 0) return;
+  localRevision = Math.max(localRevision, revision);
+  knownRevision = Math.max(knownRevision, revision);
+}
+
 async function writeVsCodeSave(stored: StoredSave) {
   const result = await requestVsCodeStorage<{ revision: number }>({
     operation: "save",
@@ -1338,10 +1352,10 @@ async function writeSaveData(validated: Save): Promise<StoredSave> {
   const stored = await withSaveLock(() => {
     const current = readBrowserStoredSave();
     if (current.revision !== localRevision) {
-      throw new SaveConflictError();
+      throw new SaveConflictError(localRevision, current.revision, current.save);
     }
 
-    if (saveFingerprint(current.save) === saveFingerprint(validated)) {
+    if (areSaveContentsEqual(current.save, validated)) {
       return current;
     }
 
@@ -1463,6 +1477,16 @@ export function subscribeToSaveChanges(listener: (revision: number) => void) {
 
 export function checkSaveRevision() {
   return Promise.resolve(readBrowserStoredSave().revision);
+}
+
+export function checkSaveState(): Promise<StoredSave> {
+  const current = readBrowserStoredSave();
+  return Promise.resolve({
+    revision: current.revision,
+    save: current.save,
+    snapshots: current.snapshots,
+    appVersion: current.appVersion,
+  });
 }
 
 export function downloadSave(data: Save) {

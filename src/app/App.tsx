@@ -379,6 +379,7 @@ const blankCareerStats: PlayerCareerStats = {
   advances: 0,
   handsWon: 0,
   handsPlayed: 0,
+  cashMatchesWon: 0,
   championshipsEntered: 0,
   tournamentHandsWon: 0,
   tournamentHandsPlayed: 0,
@@ -429,6 +430,22 @@ function recordHandResult(save: Save, game: Game, inTournament: boolean): Save {
     };
   }
   return { ...save, playerStats };
+}
+function recordCashMatchWinner(save: Save, game: Game): Save {
+  const winner = game.players.find((player) => player.chips > 0);
+  if (!winner) return save;
+  const id = String(winner.profile.id);
+  const current = save.playerStats[id] || blankCareerStats;
+  return {
+    ...save,
+    playerStats: {
+      ...save.playerStats,
+      [id]: {
+        ...current,
+        cashMatchesWon: current.cashMatchesWon + 1,
+      },
+    },
+  };
 }
 function applyTablePerformance(save: Save, performance: SimulatedTablePerformance): Save {
   const playerStats = { ...save.playerStats };
@@ -713,6 +730,9 @@ function historicalHonorsLabel(honors: HistoricalHonors) {
     honors.top8 ? `${honors.top8}八强` : "",
   ].join("");
 }
+function winRateLabel(wins: number, entries: number) {
+  return entries ? `${Math.round((wins / entries) * 100)}%` : "—";
+}
 function startNextTournamentRound(save: Save, localQualified: Character[]): Save {
   const tournament = save.tournament;
   if (!tournament) return save;
@@ -866,10 +886,10 @@ const LeaderboardRows = memo(function LeaderboardRows({
             <strong>{bestResultLabel(row.bestPlace)}</strong>
             {historicalHonorsLabel(row.honors) ? <small>{historicalHonorsLabel(row.honors)}</small> : null}
           </span>
-          <span>{row.matches}</span>
-          <span>{row.advances}</span>
-          <span>{row.handsWon}</span>
-          <span>{row.highestChips ? row.highestChips.toLocaleString() : "—"}</span>
+          <span className="leaderboard-stat">{row.championshipsEntered}</span>
+          <span className="leaderboard-stat">{winRateLabel(row.honors.champion, row.championshipsEntered)}</span>
+          <span className="leaderboard-stat">{Math.max(0, row.matches - row.championshipsEntered)}</span>
+          <span className="leaderboard-stat">{winRateLabel(row.cashMatchesWon, Math.max(0, row.matches - row.championshipsEntered))}</span>
         </button>
       ))}
     </>
@@ -1603,7 +1623,11 @@ export default function App() {
           ? { ...old.stats, hands: old.stats.hands + 1, wins: old.stats.wins + (next.winners.includes(0) ? 1 : 0) }
           : old.stats,
       };
-      return ended ? recordHandResult(updated, next, !!tournament) : updated;
+      if (!ended) return updated;
+      const withHandResult = recordHandResult(updated, next, !!tournament);
+      return !tournament && next.players.filter((player) => player.chips > 0).length === 1
+        ? recordCashMatchWinner(withHandResult, next)
+        : withHandResult;
     });
     if (handEnded && next.winners.length) { const timer = window.setTimeout(() => setCelebrationDone(true), 5200); return () => window.clearTimeout(timer) }
   };

@@ -428,6 +428,7 @@ const playerStatsSchema = z.object({
   advances: money,
   handsWon: money,
   handsPlayed: money.default(0),
+  cashMatchesWon: money.default(0),
   championshipsEntered: money.default(0),
   tournamentHandsWon: money.default(0),
   tournamentHandsPlayed: money.default(0),
@@ -539,6 +540,7 @@ export type PlayerCareerStats = {
   advances: number;
   handsWon: number;
   handsPlayed: number;
+  cashMatchesWon: number;
   // Entries/hands scoped to real championship play only (not cash-table sessions),
   // so a player's championship win rate isn't diluted by unrelated cash grinding.
   championshipsEntered: number;
@@ -756,6 +758,7 @@ export function parseSave(value: unknown): Save {
       // Historical saves only tracked total hands on `stats.hands`, not per-player —
       // backfill with that as a reasonable one-time approximation for the hero.
       handsPlayed: Math.max(data.stats.hands, data.stats.wins),
+      cashMatchesWon: 0,
       championshipsEntered: 0,
       // No historical record distinguishes championship hands from cash hands, so
       // approximate with the same totals — the general backfill below covers this

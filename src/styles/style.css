@@ -8125,7 +8125,7 @@ footer {
 .leaderboard-head,
 .leaderboard-row {
   min-width: 750px;
-  grid-template-columns: 180px minmax(82px, .75fr) minmax(104px, .9fr) minmax(64px, .6fr) minmax(64px, .6fr) minmax(64px, .6fr) minmax(112px, 1fr);
+  grid-template-columns: 180px minmax(82px, .75fr) minmax(148px, 1.1fr) minmax(94px, .75fr) minmax(86px, .7fr) minmax(94px, .75fr) minmax(86px, .7fr);
   padding: 0 15px 0 0;
 }
 
@@ -8196,6 +8196,11 @@ footer {
   font-size: 8px;
   letter-spacing: .2px;
   white-space: nowrap;
+}
+
+.leaderboard-stat {
+  color: #d4dbc9;
+  font-variant-numeric: tabular-nums;
 }
 
 .leaderboard-row.local-player {
@@ -8352,8 +8357,8 @@ footer {
 
   .leaderboard-head,
   .leaderboard-row {
-    min-width: 720px;
-    grid-template-columns: 150px 78px 100px 62px 62px 62px 108px;
+    min-width: 850px;
+    grid-template-columns: 150px 78px 142px 88px 80px 88px 80px;
     padding-right: 8px;
   }
 

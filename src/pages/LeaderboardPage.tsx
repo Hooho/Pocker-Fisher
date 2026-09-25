@@ -52,13 +52,13 @@ export function LeaderboardPage({
       </div>
       <section
         className="leaderboard-card"
-        aria-label="所有选手积分与战绩"
+        aria-label="所有选手积分与赛事成绩"
         ref={leaderboardRef}
         onScroll={onScroll}
       >
         <div className="leaderboard-head">
-          <span>排名 · 选手</span><span>积分</span><span>最佳成绩</span><span>比赛</span>
-          <span>晋级</span><span>赢手</span><span>最高筹码</span>
+          <span>排名 · 选手</span><span>积分</span><span>最佳成绩 / 历史荣誉</span>
+          <span>冠军赛参赛</span><span>冠军胜率</span><span>单次赛参赛</span><span>单次赛胜率</span>
         </div>
         <div className="leaderboard-body">{rows}</div>
       </section>

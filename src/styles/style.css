@@ -9129,6 +9129,91 @@ footer {
   }
 }
 
+.cash-victory-overlay {
+  background: #060b0888;
+}
+
+.cash-victory-overlay .champion-celebration-flash {
+  background:
+    radial-gradient(circle at 50% 45%, #fff8d9 0%, #f7d8792b 15%, transparent 38%),
+    radial-gradient(circle at 22% 28%, #ffb86b22, transparent 24%),
+    radial-gradient(circle at 78% 25%, #7acbff1c, transparent 22%);
+}
+
+.cash-victory-plaque {
+  width: min(480px, calc(100vw - 56px));
+  padding: 22px 28px 20px;
+  border-radius: 16px;
+}
+
+.cash-victory-trophy {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 7px;
+  color: #fff0a3;
+  border: 2px solid #f5d477;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #d2a641, #684419 72%);
+  box-shadow: 0 0 0 4px #573918, 0 0 22px #f4cf6eaa;
+  animation: cash-victory-trophy-pop .72s cubic-bezier(.13, .82, .18, 1.08) both;
+}
+
+.cash-victory-trophy svg {
+  filter: drop-shadow(0 0 6px #fff0a3);
+}
+
+.cash-victory-plaque .champion-plaque-kicker {
+  letter-spacing: 5px;
+}
+
+.cash-victory-plaque strong {
+  font-size: clamp(25px, 4vw, 42px);
+}
+
+@keyframes cash-victory-trophy-pop {
+  0% {
+    opacity: 0;
+    transform: scale(.45) rotate(-12deg);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1.08) rotate(3deg);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0);
+  }
+}
+
+@media (max-width: 600px) {
+  .cash-victory-plaque {
+    width: calc(100vw - 56px);
+    padding: 19px 18px 17px;
+  }
+
+  .cash-victory-trophy {
+    width: 52px;
+    height: 52px;
+  }
+
+  .cash-victory-trophy svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .cash-victory-plaque .champion-plaque-kicker {
+    letter-spacing: 3px;
+  }
+
+  .cash-victory-plaque strong {
+    font-size: clamp(21px, 6.5vw, 30px);
+  }
+}
+
 /* Sidebar settings button (moved out of .side-bottom into the utility tools group) */
 .settings-btn {
   justify-content: flex-start;

@@ -603,6 +603,17 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
   );
 
+  const statusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    100,
+  );
+  statusBarItem.name = "摸鱼德州";
+  statusBarItem.text = "$(play) 摸鱼德州";
+  statusBarItem.tooltip = "打开摸鱼德州";
+  statusBarItem.command = "riverClub.openGame";
+  statusBarItem.show();
+  context.subscriptions.push(statusBarItem);
+
 }
 
 export function deactivate(): void {

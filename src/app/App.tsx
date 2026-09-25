@@ -1586,7 +1586,7 @@ export default function App() {
 
     const checkForNewerSave = async () => {
       try {
-        if ((await checkSaveRevision()) !== getSaveRevision()) {
+        if ((await checkSaveRevision()) > getSaveRevision()) {
           markSaveStale();
         }
       } catch {
@@ -1594,7 +1594,7 @@ export default function App() {
       }
     };
     const unsubscribe = subscribeToSaveChanges((revision) => {
-      if (revision !== getSaveRevision()) {
+      if (revision > getSaveRevision()) {
         markSaveStale();
       }
     });

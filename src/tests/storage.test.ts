@@ -172,6 +172,46 @@ test("invalid saves are rejected before any storage write", async () => {
   }
 });
 
+test("rapid save requests coalesce to the latest state", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  let writes = 0;
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => {
+      writes += 1;
+      values.set(key, value);
+    },
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+
+  try {
+    await loadSave();
+    const first = { ...blank, stats: { ...blank.stats, hands: 1 } };
+    const latest = { ...blank, stats: { ...blank.stats, hands: 2 } };
+    const [firstResult, latestResult] = await Promise.all([
+      saveData(first),
+      saveData(latest),
+    ]);
+
+    assert.equal(firstResult.revision, 1);
+    assert.equal(latestResult.revision, 1);
+    assert.equal(writes, 5);
+    assert.equal(JSON.parse(values.get("river-save:history")!).data.stats.hands, 2);
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
+});
+
 test("legacy river-save data is migrated to the sharded format", async () => {
   const previousStorage = globalThis.localStorage;
   const values = new Map<string, string>();

@@ -11,6 +11,7 @@ const SAVE_CHANNEL_NAME = "river-save-sync";
 const GAME_LOG_LIMIT = 15;
 const SNAPSHOT_LIMIT = 5;
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
+const SAVE_COALESCE_MS = 50;
 
 const SAVE_SHARDS = ["profile", "active", "history", "characters"] as const;
 type SaveShardName = (typeof SAVE_SHARDS)[number];
@@ -1319,8 +1320,21 @@ export const loadSave = async (): Promise<SaveLoadResult> => {
   return { save: stored.save, recoveryNotice: stored.recoveryNotice };
 };
 
-export const saveData = async (data: Save) => {
-  const validated = validateSaveForStorage(data);
+type SaveWaiter = {
+  resolve: (value: StoredSave) => void;
+  reject: (reason: unknown) => void;
+};
+
+type PendingSave = {
+  data: Save;
+  waiters: SaveWaiter[];
+};
+
+let pendingSave: PendingSave | null = null;
+let saveDrainPromise: Promise<void> | null = null;
+let saveDrainTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function writeSaveData(validated: Save): Promise<StoredSave> {
   const stored = await withSaveLock(() => {
     const current = readBrowserStoredSave();
     if (current.revision !== localRevision) {
@@ -1342,7 +1356,64 @@ export const saveData = async (data: Save) => {
   });
   scheduleVscodeBackup(stored);
   return stored;
-};
+}
+
+async function drainSaveQueue(): Promise<void> {
+  if (saveDrainPromise) return saveDrainPromise;
+
+  saveDrainPromise = (async () => {
+    while (pendingSave) {
+      const batch = pendingSave;
+      pendingSave = null;
+      try {
+        const stored = await writeSaveData(batch.data);
+        batch.waiters.forEach(({ resolve }) => resolve(stored));
+      } catch (error) {
+        batch.waiters.forEach(({ reject }) => reject(error));
+      }
+    }
+  })().finally(() => {
+    saveDrainPromise = null;
+    if (pendingSave && saveDrainTimer === null) {
+      saveDrainTimer = setTimeout(() => {
+        saveDrainTimer = null;
+        void drainSaveQueue();
+      }, SAVE_COALESCE_MS);
+    }
+  });
+
+  return saveDrainPromise;
+}
+
+export function saveData(data: Save): Promise<StoredSave> {
+  let validated: Save;
+  try {
+    validated = validateSaveForStorage(data);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  const promise = new Promise<StoredSave>((resolve, reject) => {
+    if (pendingSave) {
+      pendingSave.data = validated;
+      pendingSave.waiters.push({ resolve, reject });
+    } else {
+      pendingSave = {
+        data: validated,
+        waiters: [{ resolve, reject }],
+      };
+    }
+  });
+
+  if (!saveDrainPromise && saveDrainTimer === null) {
+    saveDrainTimer = setTimeout(() => {
+      saveDrainTimer = null;
+      void drainSaveQueue();
+    }, SAVE_COALESCE_MS);
+  }
+
+  return promise;
+}
 
 export function subscribeToSaveChanges(listener: (revision: number) => void) {
   if (typeof window === "undefined") return () => undefined;

@@ -339,7 +339,8 @@ async function prepareAvatar(file: File) {
   if (file.size > 8 * 1024 * 1024) throw new Error("图片不能超过 8 MB");
   const bitmap = await createImageBitmap(file);
   try {
-    const size = 256;
+    const size = 160;
+    const quality = 0.78;
     const scale = Math.max(size / bitmap.width, size / bitmap.height);
     const width = bitmap.width * scale;
     const height = bitmap.height * scale;
@@ -351,7 +352,10 @@ async function prepareAvatar(file: File) {
     context.fillStyle = "#324635";
     context.fillRect(0, 0, size, size);
     context.drawImage(bitmap, (size - width) / 2, (size - height) / 2, width, height);
-    return canvas.toDataURL("image/jpeg", 0.82);
+    const webp = canvas.toDataURL("image/webp", quality);
+    return webp.startsWith("data:image/webp")
+      ? webp
+      : canvas.toDataURL("image/jpeg", quality);
   } finally {
     bitmap.close();
   }
@@ -2888,7 +2892,7 @@ export default function App() {
           </div>
           <div className="profile-avatar-actions">
             <strong>头像</strong>
-            <p className="muted">选择图片后会自动裁切为正方形。</p>
+            <p className="muted">选择图片后会自动裁切并压缩为头像。</p>
             <div>
               <button type="button" onClick={() => avatarFile.current?.click()}>
                 <Upload size={15} /> 更换头像

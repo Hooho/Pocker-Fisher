@@ -11,6 +11,7 @@ const SAVE_CHANNEL_NAME = "river-save-sync";
 const GAME_LOG_LIMIT = 15;
 const SNAPSHOT_LIMIT = 5;
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
+const SAVE_COALESCE_MS = 50;
 
 const SAVE_SHARDS = ["profile", "active", "history", "characters"] as const;
 type SaveShardName = (typeof SAVE_SHARDS)[number];
@@ -108,7 +109,11 @@ const pendingStorageRequests = new Map<string, PendingStorageRequest>();
 const saveListeners = new Set<(revision: number) => void>();
 
 export class SaveConflictError extends Error {
-  constructor() {
+  constructor(
+    public readonly expectedRevision?: number,
+    public readonly actualRevision?: number,
+    public readonly currentSave?: Save,
+  ) {
     super("本地存档已被另一个标签页更新");
     this.name = "SaveConflictError";
   }
@@ -850,15 +855,17 @@ const snapshotArchiveSchema = z.object({
 });
 
 function stableSerialize(value: unknown): string {
+  if (value === undefined) return "null";
   if (value === null || typeof value !== "object") {
-    return JSON.stringify(value) ?? "undefined";
+    return JSON.stringify(value) ?? "null";
   }
   if (Array.isArray(value)) {
-    return `[${value.map(stableSerialize).join(",")}]`;
+    return `[${value.map((item) => stableSerialize(item === undefined ? null : item)).join(",")}]`;
   }
 
   const record = value as Record<string, unknown>;
   return `{${Object.keys(record)
+    .filter((key) => record[key] !== undefined)
     .sort()
     .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
     .join(",")}}`;
@@ -944,6 +951,10 @@ function updateSnapshotArchive(current: StoredSave): SaveSnapshot[] {
 function saveFingerprint(save: Save) {
   const { savedAt: _savedAt, ...content } = save;
   return stableSerialize(content);
+}
+
+export function areSaveContentsEqual(left: Save, right: Save) {
+  return saveFingerprint(left) === saveFingerprint(right);
 }
 
 function browserManifestKey() {
@@ -1032,19 +1043,22 @@ function readCurrentShardedStoragePayload(payload: unknown): ReadStoredSave | nu
   const manifest = manifestResult.data;
   const shards: Partial<Record<SaveShardName, unknown>> = {};
   let complete = true;
+  let allShardsReadable = true;
+  let checksumMismatch = false;
   for (const shardName of SAVE_SHARDS) {
     const shardResult = persistedShardSchema.safeParse(parsedPayload.data.shards[shardName]);
     if (!shardResult.success) {
       complete = false;
+      allShardsReadable = false;
       continue;
     }
-    if (
+    const checksumsMatch =
       shardResult.data.revision !== manifest.revision ||
       shardResult.data.checksum !== manifest.checksums[shardName] ||
-      checksumValue(shardResult.data.data) !== shardResult.data.checksum
-    ) {
+      checksumValue(shardResult.data.data) !== shardResult.data.checksum;
+    if (checksumsMatch) {
       complete = false;
-      continue;
+      checksumMismatch = true;
     }
 
     const dataResult = saveShardSchemas[shardName].safeParse(shardResult.data.data);
@@ -1052,6 +1066,7 @@ function readCurrentShardedStoragePayload(payload: unknown): ReadStoredSave | nu
       shards[shardName] = dataResult.data;
     } else {
       complete = false;
+      allShardsReadable = false;
     }
   }
 
@@ -1063,6 +1078,13 @@ function readCurrentShardedStoragePayload(payload: unknown): ReadStoredSave | nu
     appVersion: manifest.app.version,
   };
   if (complete) return stored;
+
+  if (checksumMismatch && allShardsReadable) {
+    return {
+      ...stored,
+      recoveryNotice: `当前存档（版本 ${manifest.revision}）的校验和与内容不一致，已保留可读取数据并准备修复。`,
+    };
+  }
 
   const snapshot = snapshots.find((candidate) => candidate.revision < manifest.revision);
   if (snapshot) {
@@ -1207,6 +1229,12 @@ export function getSaveRevision() {
   return localRevision;
 }
 
+export function adoptSaveRevision(revision: number) {
+  if (!Number.isInteger(revision) || revision < 0) return;
+  localRevision = Math.max(localRevision, revision);
+  knownRevision = Math.max(knownRevision, revision);
+}
+
 async function writeVsCodeSave(stored: StoredSave) {
   const result = await requestVsCodeStorage<{ revision: number }>({
     operation: "save",
@@ -1319,15 +1347,28 @@ export const loadSave = async (): Promise<SaveLoadResult> => {
   return { save: stored.save, recoveryNotice: stored.recoveryNotice };
 };
 
-export const saveData = async (data: Save) => {
-  const validated = validateSaveForStorage(data);
+type SaveWaiter = {
+  resolve: (value: StoredSave) => void;
+  reject: (reason: unknown) => void;
+};
+
+type PendingSave = {
+  data: Save;
+  waiters: SaveWaiter[];
+};
+
+let pendingSave: PendingSave | null = null;
+let saveDrainPromise: Promise<void> | null = null;
+let saveDrainTimer: ReturnType<typeof setTimeout> | null = null;
+
+async function writeSaveData(validated: Save): Promise<StoredSave> {
   const stored = await withSaveLock(() => {
     const current = readBrowserStoredSave();
     if (current.revision !== localRevision) {
-      throw new SaveConflictError();
+      throw new SaveConflictError(localRevision, current.revision, current.save);
     }
 
-    if (saveFingerprint(current.save) === saveFingerprint(validated)) {
+    if (areSaveContentsEqual(current.save, validated)) {
       return current;
     }
 
@@ -1342,7 +1383,64 @@ export const saveData = async (data: Save) => {
   });
   scheduleVscodeBackup(stored);
   return stored;
-};
+}
+
+async function drainSaveQueue(): Promise<void> {
+  if (saveDrainPromise) return saveDrainPromise;
+
+  saveDrainPromise = (async () => {
+    while (pendingSave) {
+      const batch = pendingSave;
+      pendingSave = null;
+      try {
+        const stored = await writeSaveData(batch.data);
+        batch.waiters.forEach(({ resolve }) => resolve(stored));
+      } catch (error) {
+        batch.waiters.forEach(({ reject }) => reject(error));
+      }
+    }
+  })().finally(() => {
+    saveDrainPromise = null;
+    if (pendingSave && saveDrainTimer === null) {
+      saveDrainTimer = setTimeout(() => {
+        saveDrainTimer = null;
+        void drainSaveQueue();
+      }, SAVE_COALESCE_MS);
+    }
+  });
+
+  return saveDrainPromise;
+}
+
+export function saveData(data: Save): Promise<StoredSave> {
+  let validated: Save;
+  try {
+    validated = validateSaveForStorage(data);
+  } catch (error) {
+    return Promise.reject(error);
+  }
+
+  const promise = new Promise<StoredSave>((resolve, reject) => {
+    if (pendingSave) {
+      pendingSave.data = validated;
+      pendingSave.waiters.push({ resolve, reject });
+    } else {
+      pendingSave = {
+        data: validated,
+        waiters: [{ resolve, reject }],
+      };
+    }
+  });
+
+  if (!saveDrainPromise && saveDrainTimer === null) {
+    saveDrainTimer = setTimeout(() => {
+      saveDrainTimer = null;
+      void drainSaveQueue();
+    }, SAVE_COALESCE_MS);
+  }
+
+  return promise;
+}
 
 export function subscribeToSaveChanges(listener: (revision: number) => void) {
   if (typeof window === "undefined") return () => undefined;
@@ -1392,6 +1490,16 @@ export function subscribeToSaveChanges(listener: (revision: number) => void) {
 
 export function checkSaveRevision() {
   return Promise.resolve(readBrowserStoredSave().revision);
+}
+
+export function checkSaveState(): Promise<StoredSave> {
+  const current = readBrowserStoredSave();
+  return Promise.resolve({
+    revision: current.revision,
+    save: current.save,
+    snapshots: current.snapshots,
+    appVersion: current.appVersion,
+  });
 }
 
 export function downloadSave(data: Save) {

@@ -79,7 +79,9 @@ import {
   blank,
   loadSave,
   saveData,
-  checkSaveRevision,
+  checkSaveState,
+  adoptSaveRevision,
+  areSaveContentsEqual,
   parseSave,
   downloadSave,
   getSaveRevision,
@@ -110,6 +112,7 @@ declare global {
 }
 
 const levels = ["入门", "普通", "进阶", "专家", "大师"];
+const SAVE_RECHECK_DELAY_MS = 50;
 const rounds = [
   "首轮",
   "次轮",
@@ -1101,6 +1104,8 @@ function describeSaveReadFailure(error: unknown) {
 
 export default function App() {
   const [data, setData] = useState<Save>(blank);
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const [ready, setReady] = useState(false);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [page, setPage] = useAppRouter();
@@ -1203,6 +1208,44 @@ export default function App() {
     eliminatedWorker.current?.terminate();
     eliminatedWorker.current = null;
   }, []);
+  const saveFreshnessCheck = useRef<Promise<boolean> | null>(null);
+  const confirmExternalSave = useCallback(() => {
+    if (vscodeEnvironment) return Promise.resolve(true);
+    if (saveFreshnessCheck.current) return saveFreshnessCheck.current;
+
+    const check = (async () => {
+      const first = await checkSaveState();
+      if (first.revision <= getSaveRevision()) return false;
+      if (areSaveContentsEqual(first.save, dataRef.current)) {
+        adoptSaveRevision(first.revision);
+        return false;
+      }
+
+      await new Promise<void>((resolve) => window.setTimeout(resolve, SAVE_RECHECK_DELAY_MS));
+      const second = await checkSaveState();
+      if (second.revision <= getSaveRevision()) return false;
+      if (areSaveContentsEqual(second.save, dataRef.current)) {
+        adoptSaveRevision(second.revision);
+        return false;
+      }
+      return true;
+    })().finally(() => {
+      saveFreshnessCheck.current = null;
+    });
+
+    saveFreshnessCheck.current = check;
+    return check;
+  }, [vscodeEnvironment]);
+  const verifyAndMarkSaveStale = useCallback(() => {
+    void confirmExternalSave()
+      .then((stale) => {
+        if (stale) markSaveStale();
+      })
+      .catch(() => {
+        setSaveError(true);
+        setToast("无法确认本地存档版本，请导出存档备份");
+      });
+  }, [confirmExternalSave, markSaveStale]);
   useEffect(() => {
     return () => {
       if (leaderboardScrollFrame.current != null) cancelAnimationFrame(leaderboardScrollFrame.current);
@@ -1584,34 +1627,21 @@ export default function App() {
   useEffect(() => {
     if (!ready) return;
 
-    const checkForNewerSave = async () => {
-      try {
-        if ((await checkSaveRevision()) !== getSaveRevision()) {
-          markSaveStale();
-        }
-      } catch {
-        // The save effect will surface a write/read error with the backup action.
-      }
-    };
-    const unsubscribe = subscribeToSaveChanges((revision) => {
-      if (revision !== getSaveRevision()) {
-        markSaveStale();
-      }
-    });
-    window.addEventListener("focus", checkForNewerSave);
-    document.addEventListener("visibilitychange", checkForNewerSave);
+    const unsubscribe = subscribeToSaveChanges(() => verifyAndMarkSaveStale());
+    window.addEventListener("focus", verifyAndMarkSaveStale);
+    document.addEventListener("visibilitychange", verifyAndMarkSaveStale);
     return () => {
       unsubscribe();
-      window.removeEventListener("focus", checkForNewerSave);
-      document.removeEventListener("visibilitychange", checkForNewerSave);
+      window.removeEventListener("focus", verifyAndMarkSaveStale);
+      document.removeEventListener("visibilitychange", verifyAndMarkSaveStale);
     };
-  }, [ready, markSaveStale]);
+  }, [ready, verifyAndMarkSaveStale]);
   useEffect(() => {
     if (!ready || saveError || saveStale) return;
     saveData(data)
       .catch((error) => {
         if (isSaveConflictError(error)) {
-          markSaveStale();
+          verifyAndMarkSaveStale();
           return;
         }
         if (isSaveValidationError(error)) {
@@ -1622,7 +1652,7 @@ export default function App() {
         setSaveError(true);
         setToast("自动保存失败，请导出存档备份");
       });
-  }, [data, ready, saveError, saveStale, markSaveStale]);
+  }, [data, ready, saveError, saveStale, verifyAndMarkSaveStale]);
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(""), 5000);
@@ -4315,7 +4345,7 @@ export default function App() {
             <p className="eyebrow">LOCAL SAVE UPDATED</p>
             <h2 id="stale-save-title">页面已过期</h2>
             <p className="muted">
-              另一个标签页已经更新了本地存档。请刷新页面后继续操作。
+              检测到本地存档版本不一致。请刷新页面后继续操作。
             </p>
             <div className="modal-actions">
               <button

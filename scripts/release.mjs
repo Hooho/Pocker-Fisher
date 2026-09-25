@@ -77,8 +77,54 @@ function loadDotEnv() {
 loadDotEnv();
 
 function fail(message) {
-  console.error(`\n发布失败：${message}`);
+  console.error(`\n╭─ 发布失败 ─────────────────────────────────────`);
+  console.error(`│ ${message}`);
+  console.error(`╰─ 请根据上面的失败步骤处理后，再重新运行发布向导。`);
   process.exitCode = 1;
+}
+
+let stepSequence = 0;
+
+function stepIcon(title) {
+  if (title.includes("测试")) return "🧪";
+  if (title.includes("VSIX") || title.includes("打包")) return "📦";
+  if (title.includes("版本") || title.includes("递增")) return "🔢";
+  if (title.includes("提交") || title.includes("暂存")) return "📝";
+  if (title.includes("Tag")) return "🏷️";
+  if (title.includes("推送") || title.includes("发布")) return "🚀";
+  if (title.includes("合并") || title.includes("切换")) return "🔀";
+  return "✨";
+}
+
+function beginStep(title, detail) {
+  const step = ++stepSequence;
+  console.log(`\n╭─ ${stepIcon(title)} 步骤 ${step} · ${title}`);
+  if (detail) {
+    console.log(`│ ${detail}`);
+  }
+  console.log("╰─ 开始执行");
+  return step;
+}
+
+function completeStep(step, title, detail) {
+  console.log(`\n╰─ ✅ 步骤 ${step} · ${title} 已完成`);
+  if (detail) {
+    console.log(`   ${detail}`);
+  }
+}
+
+function failStep(step, title, detail) {
+  console.error(`\n╰─ ❌ 步骤 ${step} · ${title} 失败`);
+  if (detail) {
+    console.error(`   ${detail}`);
+  }
+}
+
+function skipStep(title, detail) {
+  console.log(`\n╰─ ⏭️ ${title}：已跳过`);
+  if (detail) {
+    console.log(`   ${detail}`);
+  }
 }
 
 function readPackageJson() {
@@ -120,7 +166,7 @@ function validateArguments() {
 
 function runCommand(label, command, commandArguments, secrets = []) {
   return new Promise((resolveCommand, rejectCommand) => {
-    console.log(`\n▶ ${label}`);
+    const step = beginStep(label, "正在执行外部命令，请等待命令完成。");
 
     const child = spawn(command, commandArguments, {
       cwd: projectRoot,
@@ -140,15 +186,21 @@ function runCommand(label, command, commandArguments, secrets = []) {
 
     child.stdout.on("data", (chunk) => writeOutput(chunk, process.stdout));
     child.stderr.on("data", (chunk) => writeOutput(chunk, process.stderr));
-    child.on("error", rejectCommand);
+    child.on("error", (error) => {
+      failStep(step, label, error.message);
+      rejectCommand(error);
+    });
     child.on("close", (code, signal) => {
       if (code === 0) {
+        completeStep(step, label, "命令执行成功。");
         resolveCommand();
         return;
       }
 
+      const message = `${label}退出，code=${code ?? "unknown"}, signal=${signal ?? "unknown"}`;
+      failStep(step, label, message);
       rejectCommand(
-        new Error(`${label}退出，code=${code ?? "unknown"}, signal=${signal ?? "unknown"}`),
+        new Error(message),
       );
     });
   });
@@ -222,6 +274,9 @@ async function ask(prompt, readline) {
 }
 
 async function askYesNo(prompt, readline, defaultValue) {
+  const step = beginStep("确认发布选项", prompt);
+  let result;
+
   if (canUseKeyboardSelector()) {
     const selectedOption = await selectWithKeyboard(
       `${prompt}（↑↓移动，Enter确认）`,
@@ -233,17 +288,26 @@ async function askYesNo(prompt, readline, defaultValue) {
       false,
       defaultValue ? 0 : 1,
     );
-    return selectedOption?.value ?? false;
+    result = selectedOption?.value ?? false;
+    completeStep(
+      step,
+      "确认发布选项",
+      selectedOption ? `你的选择：${result ? "是 ✅" : "否"}` : "已取消当前操作。",
+    );
+    return result;
   }
 
   const suffix = defaultValue ? " [Y/n] " : " [y/N] ";
   const answer = (await readline.question(`${prompt}${suffix}`)).trim().toLowerCase();
 
   if (!answer) {
-    return defaultValue;
+    result = defaultValue;
+  } else {
+    result = answer === "y" || answer === "yes" || answer === "是";
   }
 
-  return answer === "y" || answer === "yes" || answer === "是";
+  completeStep(step, "确认发布选项", `你的选择：${result ? "是 ✅" : "否"}`);
+  return result;
 }
 
 function canUseKeyboardSelector() {
@@ -390,6 +454,10 @@ function parsePublishChannels(answer) {
 }
 
 async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
+  const step = beginStep(
+    "选择发布渠道",
+    "可以单选或多选 Web、VS Code Marketplace、Open VSX；直接确认且不勾选会取消发布。",
+  );
   const webDescription = currentBranch === "main"
     ? "push main 和版本 Tag"
     : `合并 ${currentBranch} 到 main 并 push main 和版本 Tag`;
@@ -430,24 +498,30 @@ async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
       true,
     );
     if (!selectedOptions) {
+      completeStep(step, "选择发布渠道", "已取消渠道选择。⏸️");
       return null;
     }
 
-    return {
+    const result = {
       shouldPublishWeb: selectedOptions.some((option) => option.value === "web"),
       shouldPublishVsCode: selectedOptions.some((option) => option.value === "vscode"),
       shouldPublishOpenVsx: selectedOptions.some((option) => option.value === "openvsx"),
     };
+    const selectedLabels = selectedOptions.map((option) => option.label).join("、") || "无";
+    completeStep(step, "选择发布渠道", `已选择：${selectedLabels}。`);
+    return result;
   }
 
   while (true) {
     const answer = await ask("发布渠道：", readline);
     if (!answer) {
-      return {
+      const result = {
         shouldPublishWeb: false,
         shouldPublishVsCode: false,
         shouldPublishOpenVsx: false,
       };
+      completeStep(step, "选择发布渠道", "没有选择渠道，将取消发布。⏸️");
+      return result;
     }
 
     try {
@@ -462,11 +536,13 @@ async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
         throw new Error("Open VSX 发布已被 --skip-openvsx 禁用。");
       }
 
-      return {
+      const result = {
         shouldPublishWeb: channels.has("web"),
         shouldPublishVsCode: channels.has("vscode"),
         shouldPublishOpenVsx: channels.has("openvsx"),
       };
+      completeStep(step, "选择发布渠道", `已选择：${answer}。`);
+      return result;
     } catch (error) {
       console.log(`${error instanceof Error ? error.message : "发布渠道无效"}\n`);
     }
@@ -565,10 +641,16 @@ async function createInteractivePlan() {
   const readline = createPrompt();
 
   try {
+    const versionStep = beginStep(
+      "选择发布版本",
+      `当前版本：${packageJson.version}。请选择 patch、minor、major 或手动版本号。`,
+    );
     const versionPlan = await askVersionPlan(packageJson.version, readline);
     if (!versionPlan) {
+      completeStep(versionStep, "选择发布版本", "未选择版本，已取消发布。⏸️");
       return null;
     }
+    completeStep(versionStep, "选择发布版本", `目标版本：${versionPlan.targetVersion}。`);
 
     const confirmedVersion = await askYesNo(
       `目标版本为 ${versionPlan.targetVersion}，确认继续？`,
@@ -663,7 +745,7 @@ async function createReleaseCommit(version) {
       `chore(release): v${version}`,
     ]);
   } else {
-    console.log("\n版本文件没有变化，跳过空的 Release Commit。");
+    skipStep("创建 Release Commit", "版本文件没有变化，跳过空提交。⏭️");
   }
 }
 
@@ -676,7 +758,7 @@ async function createReleaseTag(version) {
     if (tagCommit !== headCommit) {
       throw new Error(`Tag ${tag} 已存在但不指向当前提交，请先处理冲突。`);
     }
-    console.log(`\nTag ${tag} 已存在且指向当前提交，跳过创建。`);
+    skipStep("创建版本 Tag", `Tag ${tag} 已存在且指向当前提交。⏭️`);
     return;
   }
 
@@ -707,9 +789,23 @@ async function syncMainAndPush(version) {
   const tag = `v${version}`;
   let switchedToMain = false;
 
-  await ensureWorkingTreeClean();
-  await captureCommand(gitCommand, ["remote", "get-url", "origin"]);
-  await captureCommand(gitCommand, ["show-ref", "--verify", "refs/heads/main"]);
+  const syncCheckStep = beginStep(
+    "准备 Web 同步",
+    "确认当前工作区干净、远程 origin 可用，并且本地存在 main 分支。",
+  );
+  try {
+    await ensureWorkingTreeClean();
+    await captureCommand(gitCommand, ["remote", "get-url", "origin"]);
+    await captureCommand(gitCommand, ["show-ref", "--verify", "refs/heads/main"]);
+    completeStep(syncCheckStep, "准备 Web 同步", "Web 同步条件检查通过。🌐");
+  } catch (error) {
+    failStep(
+      syncCheckStep,
+      "准备 Web 同步",
+      error instanceof Error ? error.message : "Web 同步条件检查失败。",
+    );
+    throw error;
+  }
 
   try {
     if (originalBranch !== "main") {
@@ -797,12 +893,26 @@ async function main() {
     console.log("\n▶ 试运行：不修改版本号，也不发布");
   }
 
-  requirePublishTokens(plan);
-  if (!dryRun) {
-    await ensureReleaseFilesClean();
-    if (plan.shouldPublishWeb) {
-      await ensureWorkingTreeClean();
+  const preflightStep = beginStep(
+    "发布前检查",
+    "检查发布令牌、版本文件和 Git 工作区，确保后续操作可以安全进行。",
+  );
+  try {
+    requirePublishTokens(plan);
+    if (!dryRun) {
+      await ensureReleaseFilesClean();
+      if (plan.shouldPublishWeb) {
+        await ensureWorkingTreeClean();
+      }
     }
+    completeStep(preflightStep, "发布前检查", "令牌、版本文件和工作区检查通过。✅");
+  } catch (error) {
+    failStep(
+      preflightStep,
+      "发布前检查",
+      error instanceof Error ? error.message : "检查失败。",
+    );
+    throw error;
   }
 
   if (plan.shouldTest) {
@@ -846,13 +956,13 @@ async function main() {
       throw new Error(`VSIX 未生成：${vsixPath}`);
     }
 
-    console.log(`\nVSIX 已生成：${vsixPath}`);
+    console.log(`\n🎉 VSIX 已生成：${vsixPath}`);
   } else if (shouldPublishVsix) {
     throw new Error("选择了 VS Code 或 Open VSX，但没有构建 VSIX。请返回并确认打包 VSIX。");
   } else if (plan.shouldPublishWeb) {
-    console.log("\n已跳过 VSIX 构建，将继续处理 Web 发布流程。");
+    skipStep("构建 VSIX", "本次只发布 Web，不需要 VSIX。🌐");
   } else {
-    console.log("\n未选择 VS Code 或 Open VSX，跳过 VSIX 构建。");
+    skipStep("构建 VSIX", "没有选择扩展市场渠道。⏭️");
   }
 
   if (dryRun) {
@@ -869,7 +979,7 @@ async function main() {
       console.log("\n已跳过合并和推送；Release Commit 与本地 Tag 已创建。\n");
     }
   } else {
-    console.log("\n已跳过 Release Commit 和 Git Tag；版本文件仍保留在工作区中。\n");
+    skipStep("创建 Release Commit 和 Git Tag", "你选择不创建提交，版本文件会保留在工作区中。⏭️");
   }
 
   const vscePat = process.env.VSCE_PAT;
@@ -920,10 +1030,16 @@ async function main() {
     );
   }
 
+  const resultStep = beginStep("发布结果", "汇总本次发布向导已经完成的渠道和产物。");
   if (plan.shouldPublishWeb || plan.shouldPublishVsCode || plan.shouldPublishOpenVsx) {
-    console.log("\n发布流程完成：已处理你选择的发布渠道。\n");
+    const channels = [
+      plan.shouldPublishWeb ? "Web" : null,
+      plan.shouldPublishVsCode ? "VS Code Marketplace" : null,
+      plan.shouldPublishOpenVsx ? "Open VSX" : null,
+    ].filter(Boolean).join("、");
+    completeStep(resultStep, "发布结果", `发布流程完成，已处理：${channels}。🎉`);
   } else {
-    console.log("\n已完成测试和 VSIX 打包，未发布到任何 Marketplace。\n");
+    completeStep(resultStep, "发布结果", "已完成检查，但没有发布到任何渠道。⏭️");
   }
 }
 

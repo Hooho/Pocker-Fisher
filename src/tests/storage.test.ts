@@ -5,6 +5,7 @@ import {
   loadSave,
   parseSave,
   saveData,
+  isSaveValidationError,
   summarizeSaveRecords,
 } from "../domain/storage/storage";
 import { newGame, hero } from "../domain/game/engine";
@@ -142,6 +143,69 @@ test("import overwrite detection finds progress and personalization", () => {
   );
 });
 
+test("invalid saves are rejected before any storage write", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+
+  try {
+    await assert.rejects(
+      () => saveData({ ...blank, stats: { ...blank.stats, hands: -1 } }),
+      (error: unknown) => isSaveValidationError(error),
+    );
+    assert.equal(values.size, 0);
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
+});
+
+test("a damaged current shard falls back to a whole older snapshot", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+
+  try {
+    await loadSave();
+    const first = { ...blank, stats: { ...blank.stats, hands: 1 } };
+    await saveData(first);
+    await saveData({ ...first, stats: { ...first.stats, hands: 2 } });
+    assert.ok(values.has("river-save-v2:snapshots"));
+
+    values.set("river-save-v2:b:active", "{损坏的 JSON");
+    const recovered = await loadSave();
+    assert.equal(recovered.save.stats.hands, 1);
+    assert.match(recovered.recoveryNotice ?? "", /回退到旧版本/);
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
+});
+
 test("sharded browser storage keeps other data when the active shard is damaged", async () => {
   const previousStorage = globalThis.localStorage;
   const values = new Map<string, string>();
@@ -161,6 +225,7 @@ test("sharded browser storage keeps other data when the active shard is damaged"
   });
 
   try {
+    await loadSave();
     const saved = await saveData({
       ...blank,
       savedAt: new Date().toISOString(),
@@ -184,7 +249,7 @@ test("sharded browser storage keeps other data when the active shard is damaged"
     }
 
     values.set("river-save-v2:a:active", "{损坏的 JSON");
-    const recovered = await loadSave();
+    const recovered = (await loadSave()).save;
     assert.equal(recovered.game, null);
     assert.equal(recovered.stats.hands, 12);
     assert.equal(recovered.settings.difficulty, 4);

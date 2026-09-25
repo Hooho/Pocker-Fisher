@@ -4,9 +4,12 @@ import type { ChampionshipSimulationCheckpoint } from "../tournament/tournament"
 
 const SAVE_STORAGE_KEY = "river-save";
 const SHARDED_STORAGE_PREFIX = "river-save-v2";
+const SNAPSHOT_STORAGE_KEY = `${SHARDED_STORAGE_PREFIX}:snapshots`;
 const SAVE_LOCK_NAME = "river-save-write";
 const SAVE_CHANNEL_NAME = "river-save-sync";
 const GAME_LOG_LIMIT = 15;
+const SNAPSHOT_LIMIT = 5;
+const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 
 const SAVE_SHARDS = ["profile", "active", "history", "characters"] as const;
 type SaveShardName = (typeof SAVE_SHARDS)[number];
@@ -36,11 +39,13 @@ type ShardedSlotPayload = {
 type ShardedStoragePayload = {
   format: 2;
   slots: Partial<Record<SaveSlot, ShardedSlotPayload>>;
+  snapshots?: unknown;
 };
 
 export type StoredSave = {
   revision: number;
   save: Save;
+  snapshots?: SaveSnapshot[];
 };
 
 type SaveChangeMessage = {
@@ -54,6 +59,7 @@ type VsCodeStorageRequest = {
   operation: "load" | "revision" | "save";
   expectedRevision?: number;
   save?: Save;
+  snapshotArchive?: unknown;
 };
 
 type VsCodeStorageResponse =
@@ -107,8 +113,21 @@ export class SaveConflictError extends Error {
   }
 }
 
+export class SaveValidationError extends Error {
+  constructor(public readonly issues: string[]) {
+    const summary = issues.slice(0, 3).join("；");
+    const suffix = issues.length > 3 ? `；另有 ${issues.length - 3} 项问题` : "";
+    super(`存档校验失败，未保存：${summary}${suffix}`);
+    this.name = "SaveValidationError";
+  }
+}
+
 export function isSaveConflictError(error: unknown): error is SaveConflictError {
   return error instanceof SaveConflictError;
+}
+
+export function isSaveValidationError(error: unknown): error is SaveValidationError {
+  return error instanceof SaveValidationError;
 }
 
 function emitSaveChanged(revision: number) {
@@ -469,6 +488,30 @@ export type Save = {
   settings: Settings;
   stats: { hands: number; wins: number; tournaments: number; titles: number };
 };
+export type SaveSnapshot = {
+  revision: number;
+  savedAt: string;
+  checksum: string;
+  save: Save;
+};
+export type SaveLoadResult = {
+  save: Save;
+  recoveryNotice?: string;
+};
+
+function formatValidationIssue(issue: z.ZodIssue): string {
+  const path = issue.path.length ? `${issue.path.join(".")}: ` : "";
+  return `${path}${issue.message}`;
+}
+
+export function validateSaveForStorage(value: unknown): Save {
+  const result = schema.safeParse(value);
+  if (!result.success) {
+    throw new SaveValidationError(result.error.issues.map(formatValidationIssue));
+  }
+  return result.data;
+}
+
 export type PlayerCareerStats = {
   matches: number;
   advances: number;
@@ -761,6 +804,16 @@ const shardedStorageSchema = z.object({
       shards: z.record(z.unknown()),
     }).optional(),
   }),
+  snapshots: z.unknown().optional(),
+});
+const snapshotArchiveSchema = z.object({
+  format: z.literal(2),
+  snapshots: z.array(z.object({
+    revision: z.number().int().nonnegative(),
+    savedAt: z.string(),
+    checksum: z.string().min(1),
+    save: z.unknown(),
+  })).max(SNAPSHOT_LIMIT),
 });
 
 function stableSerialize(value: unknown): string {
@@ -787,6 +840,47 @@ function checksumValue(value: unknown): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
+function parseSnapshotArchive(value: unknown): SaveSnapshot[] {
+  const result = snapshotArchiveSchema.safeParse(value);
+  if (!result.success) return [];
+
+  return result.data.snapshots
+    .flatMap((snapshot) => {
+      if (checksumValue(snapshot.save) !== snapshot.checksum) return [];
+      const saveResult = schema.safeParse(snapshot.save);
+      if (!saveResult.success) return [];
+      return [{ ...snapshot, save: saveResult.data }];
+    })
+    .sort((left, right) => right.revision - left.revision);
+}
+
+function serializeSnapshotArchive(snapshots: SaveSnapshot[]) {
+  return {
+    format: 2 as const,
+    snapshots: snapshots.slice(0, SNAPSHOT_LIMIT),
+  };
+}
+
+function updateSnapshotArchive(current: StoredSave): SaveSnapshot[] {
+  const snapshots = current.snapshots ?? [];
+  if (current.revision <= 0 || current.save.savedAt === "") return snapshots;
+
+  const currentTime = Date.parse(current.save.savedAt) || 0;
+  const latest = snapshots[0];
+  const latestTime = latest ? Date.parse(latest.savedAt) || 0 : 0;
+  if (latest && currentTime - latestTime < SNAPSHOT_INTERVAL_MS) return snapshots;
+
+  const next: SaveSnapshot = {
+    revision: current.revision,
+    savedAt: current.save.savedAt,
+    checksum: checksumValue(current.save),
+    save: current.save,
+  };
+  return [next, ...snapshots.filter((snapshot) => snapshot.revision !== next.revision)]
+    .sort((left, right) => right.revision - left.revision)
+    .slice(0, SNAPSHOT_LIMIT);
+}
+
 function saveFingerprint(save: Save) {
   const { savedAt: _savedAt, ...content } = save;
   return stableSerialize(content);
@@ -798,6 +892,24 @@ function browserManifestKey(slot: SaveSlot) {
 
 function browserShardKey(slot: SaveSlot, shard: SaveShardName) {
   return `${SHARDED_STORAGE_PREFIX}:${slot}:${shard}`;
+}
+
+function readBrowserSnapshotArchive(): SaveSnapshot[] {
+  const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY);
+  if (!raw) return [];
+  try {
+    return parseSnapshotArchive(JSON.parse(raw));
+  } catch {
+    return [];
+  }
+}
+
+function writeBrowserSnapshotArchive(snapshots: SaveSnapshot[]) {
+  if (!snapshots.length) return;
+  localStorage.setItem(
+    SNAPSHOT_STORAGE_KEY,
+    JSON.stringify(serializeSnapshotArchive(snapshots)),
+  );
 }
 
 function createShardedSlot(stored: StoredSave, slot: SaveSlot): ShardedSlotPayload {
@@ -833,13 +945,18 @@ function createShardedSlot(stored: StoredSave, slot: SaveSlot): ShardedSlotPaylo
 type ReadStoredSave = StoredSave & {
   source: "empty" | "legacy" | "sharded";
   slot?: SaveSlot;
+  recoveryNotice?: string;
 };
 
 function readShardedStoragePayload(payload: unknown): ReadStoredSave | null {
   const parsedPayload = shardedStorageSchema.safeParse(payload);
   if (!parsedPayload.success) return null;
 
-  const candidates: Array<ReadStoredSave & { slot: SaveSlot }> = [];
+  const snapshots = parseSnapshotArchive(parsedPayload.data.snapshots);
+  const candidates: Array<{
+    stored: ReadStoredSave & { slot: SaveSlot };
+    complete: boolean;
+  }> = [];
   for (const slot of ["a", "b"] as const) {
     const rawSlot = parsedPayload.data.slots[slot];
     if (!rawSlot) continue;
@@ -848,32 +965,84 @@ function readShardedStoragePayload(payload: unknown): ReadStoredSave | null {
     if (!manifestResult.success || manifestResult.data.slot !== slot) continue;
     const manifest = manifestResult.data;
     const shards: Partial<Record<SaveShardName, unknown>> = {};
+    let complete = true;
 
     for (const shardName of SAVE_SHARDS) {
       const shardResult = persistedShardSchema.safeParse(rawSlot.shards[shardName]);
-      if (!shardResult.success) continue;
+      if (!shardResult.success) {
+        complete = false;
+        continue;
+      }
       if (
         shardResult.data.revision !== manifest.revision ||
         shardResult.data.checksum !== manifest.checksums[shardName] ||
         checksumValue(shardResult.data.data) !== shardResult.data.checksum
       ) {
+        complete = false;
         continue;
       }
 
       const dataResult = saveShardSchemas[shardName].safeParse(shardResult.data.data);
-      if (dataResult.success) shards[shardName] = dataResult.data;
+      if (dataResult.success) {
+        shards[shardName] = dataResult.data;
+      } else {
+        complete = false;
+      }
     }
 
     candidates.push({
-      revision: manifest.revision,
-      save: mergeSaveShards(manifest, shards as Partial<SaveShardData>),
-      source: "sharded",
-      slot,
+      complete,
+      stored: {
+        revision: manifest.revision,
+        save: mergeSaveShards(manifest, shards as Partial<SaveShardData>),
+        source: "sharded",
+        slot,
+        snapshots,
+      },
     });
   }
 
-  candidates.sort((left, right) => right.revision - left.revision);
-  return candidates[0] ?? null;
+  candidates.sort((left, right) => right.stored.revision - left.stored.revision);
+  const newest = candidates[0];
+  if (!newest) {
+    const snapshot = snapshots[0];
+    return snapshot
+      ? {
+        revision: snapshot.revision,
+        save: snapshot.save,
+        source: "sharded",
+        snapshots,
+        recoveryNotice: `当前存档索引损坏，已自动回退到旧版本（版本 ${snapshot.revision}）。`,
+      }
+      : null;
+  }
+  if (newest.complete) return newest.stored;
+
+  const olderComplete = candidates.find(
+    (candidate) => candidate.complete && candidate.stored.revision < newest.stored.revision,
+  );
+  if (olderComplete) {
+    return {
+      ...olderComplete.stored,
+      recoveryNotice: `当前存档（版本 ${newest.stored.revision}）校验失败，已自动回退到旧版本（版本 ${olderComplete.stored.revision}）。`,
+    };
+  }
+
+  const snapshot = snapshots.find((candidate) => candidate.revision < newest.stored.revision);
+  if (snapshot) {
+    return {
+      revision: snapshot.revision,
+      save: snapshot.save,
+      source: "sharded",
+      snapshots,
+      recoveryNotice: `当前存档（版本 ${newest.stored.revision}）损坏，已自动回退到历史版本（版本 ${snapshot.revision}）。`,
+    };
+  }
+
+  return {
+    ...newest.stored,
+    recoveryNotice: `当前存档（版本 ${newest.stored.revision}）部分损坏，未找到完整旧版本，已保留未损坏的数据。`,
+  };
 }
 
 function readBrowserShardedSave(): ReadStoredSave | null {
@@ -899,7 +1068,11 @@ function readBrowserShardedSave(): ReadStoredSave | null {
       }
     }
   }
-  return readShardedStoragePayload({ format: 2, slots });
+  return readShardedStoragePayload({
+    format: 2,
+    slots,
+    snapshots: readBrowserSnapshotArchive(),
+  });
 }
 
 function writeBrowserStoredSave(stored: StoredSave) {
@@ -921,7 +1094,7 @@ function readBrowserStoredSave(): ReadStoredSave {
   if (sharded) return sharded;
 
   const raw = localStorage.getItem(SAVE_STORAGE_KEY);
-  if (!raw) return { revision: 0, save: blank, source: "empty" };
+  if (!raw) return { revision: 0, save: blank, source: "empty", snapshots: readBrowserSnapshotArchive() };
 
   const parsed: unknown = JSON.parse(raw);
   const envelope = storedSaveSchema.safeParse(parsed);
@@ -930,12 +1103,13 @@ function readBrowserStoredSave(): ReadStoredSave {
       revision: envelope.data.revision,
       save: parseSave(envelope.data.save),
       source: "legacy",
+      snapshots: readBrowserSnapshotArchive(),
     };
   }
 
   // Accept a plain Save once so data written by an earlier localStorage build
   // can be upgraded without forcing the user to import a backup.
-  return { revision: 0, save: parseSave(parsed), source: "legacy" };
+  return { revision: 0, save: parseSave(parsed), source: "legacy", snapshots: readBrowserSnapshotArchive() };
 }
 
 async function readVsCodeStoredSave(): Promise<ReadStoredSave> {
@@ -998,6 +1172,7 @@ async function writeVsCodeSave(stored: StoredSave) {
     operation: "save",
     expectedRevision: stored.revision,
     save: stored.save,
+    snapshotArchive: serializeSnapshotArchive(stored.snapshots ?? []),
   });
   if (!Number.isInteger(result.revision) || result.revision !== stored.revision) {
     throw new Error("VS Code 返回了无效的存档版本");
@@ -1023,7 +1198,7 @@ function scheduleVscodeBackup(stored: StoredSave) {
   }, 750);
 }
 
-export const loadSave = async () => {
+export const loadSave = async (): Promise<SaveLoadResult> => {
   const browserSave = readBrowserStoredSave();
   let stored = browserSave;
   if (getVsCodeApi()) {
@@ -1031,6 +1206,7 @@ export const loadSave = async () => {
       const vscodeSave = await readVsCodeStoredSave();
       if (isStoredSaveNewer(vscodeSave, browserSave)) {
         stored = vscodeSave;
+        writeBrowserSnapshotArchive(stored.snapshots ?? []);
         writeBrowserStoredSave(stored);
       }
     } catch {
@@ -1039,31 +1215,49 @@ export const loadSave = async () => {
     }
   }
   if (stored.source === "legacy") {
+    writeBrowserSnapshotArchive(stored.snapshots ?? []);
     writeBrowserStoredSave(stored);
+  }
+  if (stored.recoveryNotice) {
+    const repairedSave = validateSaveForStorage({
+      ...stored.save,
+      savedAt: new Date().toISOString(),
+    });
+    const repairedStored: ReadStoredSave = {
+      ...stored,
+      revision: stored.revision + 1,
+      save: repairedSave,
+      source: "sharded",
+    };
+    writeBrowserStoredSave(repairedStored);
+    stored = repairedStored;
   }
   localRevision = stored.revision;
   knownRevision = stored.revision;
   scheduleVscodeBackup(stored);
-  return stored.save;
+  return { save: stored.save, recoveryNotice: stored.recoveryNotice };
 };
 
 export const saveData = async (data: Save) => {
+  const validated = validateSaveForStorage(data);
   const stored = await withSaveLock(() => {
     const current = readBrowserStoredSave();
     if (current.revision !== localRevision) {
       throw new SaveConflictError();
     }
 
-    if (saveFingerprint(current.save) === saveFingerprint(data)) {
+    if (saveFingerprint(current.save) === saveFingerprint(validated)) {
       return current;
     }
 
     const revision = current.revision + 1;
-    const save = { ...data, savedAt: new Date().toISOString() };
-    writeBrowserStoredSave({ revision, save });
+    const save = { ...validated, savedAt: new Date().toISOString() };
+    const snapshots = updateSnapshotArchive(current);
+    writeBrowserSnapshotArchive(snapshots);
+    writeBrowserStoredSave({ revision, save, snapshots });
     localRevision = revision;
     notifySaveChanged(revision);
-    return { revision, save };
+    return { revision, save, snapshots };
   });
   scheduleVscodeBackup(stored);
   return stored;

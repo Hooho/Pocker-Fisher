@@ -6,6 +6,7 @@ const viewId = "riverClub.gameView";
 const saveGlobalStateKey = "riverClub.save";
 const backupFileName = "river-fisher-save.json";
 const backupBaseName = "river-fisher-save";
+const snapshotBackupFileName = "river-fisher-save-snapshots.json";
 const saveShardNames = ["profile", "active", "history", "characters"] as const;
 type SaveShardName = (typeof saveShardNames)[number];
 type SaveSlot = "a" | "b";
@@ -13,10 +14,12 @@ type SaveSlot = "a" | "b";
 type PersistedSave = {
   revision: number;
   save: unknown;
+  snapshotArchive?: unknown;
 };
 
 type ShardedStoragePayload = {
   format: 2;
+  snapshots?: unknown;
   slots: Partial<Record<SaveSlot, {
     manifest: unknown;
     shards: Partial<Record<SaveShardName, unknown>>;
@@ -29,6 +32,7 @@ type SaveStorageRequest = {
   operation: "load" | "revision" | "save";
   expectedRevision?: number;
   save?: unknown;
+  snapshotArchive?: unknown;
 };
 
 type SaveStorageResponse =
@@ -115,6 +119,10 @@ function getShardBackupFile(
   );
 }
 
+function getSnapshotBackupFile(context: vscode.ExtensionContext) {
+  return vscode.Uri.joinPath(getBackupDirectory(context), snapshotBackupFileName);
+}
+
 async function readJsonBackup(context: vscode.ExtensionContext): Promise<PersistedSave | null> {
   const { directory, file } = getBackupLocation(context);
   const candidates = [file];
@@ -170,7 +178,17 @@ async function readShardedJsonBackup(
     slots[slot] = { manifest, shards };
   }
 
-  return Object.keys(slots).length > 0 ? { format: 2, slots } : null;
+  let snapshots: unknown;
+  try {
+    const contents = await vscode.workspace.fs.readFile(getSnapshotBackupFile(context));
+    snapshots = JSON.parse(new TextDecoder().decode(contents));
+  } catch {
+    // Snapshots are optional; the current shards remain usable without them.
+  }
+
+  return Object.keys(slots).length > 0 || snapshots !== undefined
+    ? { format: 2, slots, snapshots }
+    : null;
 }
 
 function stableSerialize(value: unknown): string {
@@ -250,6 +268,12 @@ async function writeShardedJsonBackup(
 
   const directory = getBackupDirectory(context);
   await vscode.workspace.fs.createDirectory(directory);
+  if (value.snapshotArchive !== undefined) {
+    await vscode.workspace.fs.writeFile(
+      getSnapshotBackupFile(context),
+      new TextEncoder().encode(JSON.stringify(value.snapshotArchive, null, 2) + "\n"),
+    );
+  }
   for (const shard of saveShardNames) {
     const checksum = checksumValue(data[shard]);
     checksums[shard] = checksum;
@@ -471,6 +495,7 @@ export function activate(context: vscode.ExtensionContext): void {
         const next: PersistedSave = {
           revision: message.expectedRevision!,
           save: message.save,
+          snapshotArchive: message.snapshotArchive,
         };
         await writeShardedJsonBackup(context, next);
         return { conflict: false as const, revision: next.revision };

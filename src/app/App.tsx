@@ -21,6 +21,7 @@ import {
   type TableStageSize,
 } from "../components/tableLayout";
 import { TournamentPage } from "../pages/TournamentPage";
+import { CashResultsPage, type CashMatchResult } from "../pages/CashResultsPage";
 import { LeaderboardPage } from "../pages/LeaderboardPage";
 import { useEffect, useRef, useState, useMemo, useCallback, memo, type CSSProperties } from "react";
 import {

@@ -2447,12 +2447,20 @@ input[type="range"] {
 
 .rules-copy {
   font-size: 12px;
-  line-height: 2;
+  line-height: 1.72;
   color: #a9b69f;
 }
 
 .rules-modal {
   width: 620px;
+}
+
+.rules-modal .rules-copy>p {
+  margin-bottom: 10px;
+}
+
+.rules-modal .rules-copy>p:last-child {
+  margin-bottom: 0;
 }
 
 .hand-rank-chart {
@@ -2495,13 +2503,18 @@ input[type="range"] {
 
 .rules-chart-note {
   font-size: 10px;
-  margin: 0 0 14px;
+  line-height: 1.6;
+  margin: 0 0 10px;
 }
 
 @media (max-width: 600px) {
   .rules-modal {
     width: 100%;
     padding: 22px 16px;
+  }
+
+  .rules-modal .points-rule-chart {
+    grid-template-columns: 1fr;
   }
 
   .hand-rank-row {
@@ -8070,17 +8083,19 @@ footer {
 }
 
 .points-rule-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin: 14px 0 16px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 8px;
+  margin: 8px 0 12px;
 }
 
 .points-rule-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 10px;
   border-radius: 6px;
   background: #141d16;
   border: 1px solid #2b3627;
@@ -8088,9 +8103,14 @@ footer {
   color: #d9dfd2;
 }
 
+.points-rule-row span {
+  min-width: 0;
+}
+
 .points-rule-row b {
   color: #f0d586;
   font-family: Georgia, serif;
+  font-size: 13px;
   font-weight: 600;
 }
 

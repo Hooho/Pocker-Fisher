@@ -1363,24 +1363,6 @@ export default function App() {
           ? current
           : nextSeatSize,
       );
-      const nextSeatCardPositions = Array.from(stage.querySelectorAll<HTMLElement>(".seat-cards")).map((card) => {
-        const rect = card.getBoundingClientRect();
-        return rect.width && rect.height
-          ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
-          : null;
-      });
-      setSeatCardPositions((current) => {
-        if (
-          current.length === nextSeatCardPositions.length &&
-          current.every((point, index) =>
-            point?.x === nextSeatCardPositions[index]?.x && point?.y === nextSeatCardPositions[index]?.y,
-          )
-        ) {
-          return current;
-        }
-        return nextSeatCardPositions;
-      });
-      setTableLayoutReady(true);
     };
     updateSize();
     if (typeof ResizeObserver === "undefined") {
@@ -1392,6 +1374,46 @@ export default function App() {
     stage.querySelectorAll<HTMLElement>(".seat").forEach((seat) => observer.observe(seat));
     return () => observer.disconnect();
   }, [page, ready, g?.hand, g?.players.length]);
+  useLayoutEffect(() => {
+    if (
+      page !== "table" ||
+      !tableStageSize.width ||
+      !tableStageSize.height ||
+      !tableSeatSize.width ||
+      !tableSeatSize.height
+    ) {
+      return;
+    }
+    const stage = tableStageRef.current;
+    if (!stage) return;
+    const nextSeatCardPositions = Array.from(stage.querySelectorAll<HTMLElement>(".seat-cards")).map((card) => {
+      const rect = card.getBoundingClientRect();
+      return rect.width && rect.height
+        ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+        : null;
+    });
+    setSeatCardPositions((current) => {
+      if (
+        current.length === nextSeatCardPositions.length &&
+        current.every((point, index) =>
+          point?.x === nextSeatCardPositions[index]?.x && point?.y === nextSeatCardPositions[index]?.y,
+        )
+      ) {
+        return current;
+      }
+      return nextSeatCardPositions;
+    });
+    setTableLayoutReady(true);
+  }, [
+    page,
+    ready,
+    g?.hand,
+    g?.players.length,
+    tableStageSize.width,
+    tableStageSize.height,
+    tableSeatSize.width,
+    tableSeatSize.height,
+  ]);
   const resetTableTimer = () => {
     removeTableTimer(tableTimerState.current?.matchId || data.activeMatch?.id);
     tableTimerState.current = null;
@@ -3127,20 +3149,22 @@ export default function App() {
                   <strong>{tableRoundLabel}</strong>
                   <span>第 {g.hand} 手</span>
                 </div>
-                <Table3D
-                  potValue={pot(g)}
-                  chipUnit={g.bb}
-                  hand={g.hand}
-                  playerTotals={tablePlayerTotals}
-                  playerIds={tablePlayerIds}
-                  playerCardPositions={seatCardPositions}
-                  chipAnimation={data.chipAnimation ?? null}
-                  onChipAnimationStart={markChipAnimationStarted}
-                  done={g.done}
-                  winnerIndices={g.winners}
-                  playerCount={g.players.length}
-                  chipToss={chipToss}
-                />
+                {tableLayoutReady ? (
+                  <Table3D
+                    potValue={pot(g)}
+                    chipUnit={g.bb}
+                    hand={g.hand}
+                    playerTotals={tablePlayerTotals}
+                    playerIds={tablePlayerIds}
+                    playerCardPositions={seatCardPositions}
+                    chipAnimation={data.chipAnimation ?? null}
+                    onChipAnimationStart={markChipAnimationStarted}
+                    done={g.done}
+                    winnerIndices={g.winners}
+                    playerCount={g.players.length}
+                    chipToss={chipToss}
+                  />
+                ) : null}
                 <div className="community">
                   <div className="pot-label">
                     {g.done ? "已派奖" : "底池总额"}{" "}

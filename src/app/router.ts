@@ -6,6 +6,7 @@ export const APP_ROUTES = {
   settings: "/settings",
   players: "/players",
   tournament: "/tournament",
+  cashResults: "/cash-results",
   leaderboard: "/leaderboard",
 } as const;
 

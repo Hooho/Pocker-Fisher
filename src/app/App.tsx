@@ -218,6 +218,44 @@ function createChampionshipRecord(
     standings: championshipStandings(players),
   };
 }
+function recordCashEliminations(eliminated: Character[], before: Game, after: Game): Character[] {
+  const recordedIds = new Set(eliminated.map((player) => player.id));
+  const previousChips = new Map(
+    before.players.map((player) => [player.profile.id, player.chips]),
+  );
+  const newlyEliminated = after.players
+    .filter((player) =>
+      player.chips === 0 &&
+      (previousChips.get(player.profile.id) || 0) > 0 &&
+      !recordedIds.has(player.profile.id),
+    )
+    .map((player) => player.profile);
+  return [...eliminated, ...newlyEliminated].slice(0, 7);
+}
+function createCashMatchResult(game: Game, eliminated: Character[]): CashMatchResult {
+  const chipsById = new Map(game.players.map((player) => [player.profile.id, player.chips]));
+  const standings: Character[] = [];
+  const seen = new Set<number>();
+  const addPlayer = (player: Character | undefined) => {
+    if (!player || seen.has(player.id)) return;
+    seen.add(player.id);
+    standings.push(player);
+  };
+
+  addPlayer(game.players.find((player) => player.chips > 0)?.profile);
+  eliminated.slice().reverse().forEach(addPlayer);
+  game.players.slice().sort((a, b) => b.chips - a.chips).forEach((player) => addPlayer(player.profile));
+
+  return {
+    playedAt: new Date().toISOString(),
+    entrants: game.players.length,
+    standings: standings.map((player, index) => ({
+      place: index + 1,
+      player,
+      chips: chipsById.get(player.id) || 0,
+    })),
+  };
+}
 function getCompletedStandings(
   tournament: Tournament | null,
   records: ChampionshipRecord[],
@@ -901,6 +939,8 @@ export default function App() {
   const [pageVisible, setPageVisible] = useState(
     () => typeof document === "undefined" || document.visibilityState === "visible",
   );
+  const [cashEliminated, setCashEliminated] = useState<Character[]>([]);
+  const [cashMatchResult, setCashMatchResult] = useState<CashMatchResult>();
   const [key, setKey] = useState("");
   const [profileNameDraft, setProfileNameDraft] = useState("本地玩家");
   const [profileAvatarDraft, setProfileAvatarDraft] = useState<string | null>(null);
@@ -1047,6 +1087,12 @@ export default function App() {
     g.players.filter((player) => player.chips > 0).length === 1 &&
     g.players[0]?.profile.id === -1 &&
     g.players[0].chips > 0,
+  );
+  const cashMatchFinished = Boolean(
+    !t &&
+    g &&
+    g.done &&
+    g.players.filter((player) => player.chips > 0).length === 1,
   );
   // Lets openPlayerProfile stay a stable useCallback (see below) while still
   // reading up-to-date page/paused/tournament state at click time.
@@ -1315,6 +1361,9 @@ export default function App() {
       } else {
         playGameSound("win", data.settings.sound);
       }
+    }
+    if (handEnded && !t && g) {
+      setCashEliminated((eliminated) => recordCashEliminations(eliminated, g, next));
     }
     setData((old) => {
       const ended = next.done && !old.game?.done;
@@ -1642,6 +1691,29 @@ export default function App() {
     setPage("table");
     setModal(null);
     setSaveError(false);
+    if (newMode === "cash") {
+      setCashEliminated([]);
+      setCashMatchResult(undefined);
+    }
+  };
+  const finishCashMatch = () => {
+    if (!g || !cashMatchFinished) return;
+    const eliminated = [...cashEliminated];
+    const recordedIds = new Set(eliminated.map((player) => player.id));
+    g.players
+      .filter((player) => player.chips === 0 && !recordedIds.has(player.profile.id))
+      .forEach((player) => eliminated.push(player.profile));
+    setCashMatchResult(createCashMatchResult(g, eliminated));
+    resetTableTimer();
+    setData((old) => {
+      return {
+        ...old,
+        game: null,
+        activeMatch: undefined,
+        matchTimer: undefined,
+      };
+    });
+    setPage("cashResults");
   };
   const nextHand = () => {
     if (!g) return;
@@ -2041,6 +2113,8 @@ export default function App() {
       setKey("");
       setBatchResults([]);
       setBatchOpen(false);
+      setCashEliminated([]);
+      setCashMatchResult(undefined);
       setSelected(null);
       setPreview(null);
       setImported(null);
@@ -2912,11 +2986,19 @@ export default function App() {
                     {!t?.out && !t?.complete ? (
                       <button
                         className="gold-button"
-                        disabled={busy || (alive <= 1 && !t)}
+                        disabled={busy}
                         onClick={() => {
                           if (championshipWon) {
                             advanceTournament();
                             setPage("tournament");
+                            return;
+                          }
+                          if (cashMatchFinished) {
+                            finishCashMatch();
+                            return;
+                          }
+                          if (!t && g.players[0].chips === 0) {
+                            setPage("lobby");
                             return;
                           }
                           nextHand();
@@ -2937,8 +3019,10 @@ export default function App() {
                                 <strong className="advance-button-target">{advancementTargetLabel}</strong>
                               </span>
                             )
-                            : g.players[0].chips === 0
-                              ? "结算比赛"
+                            : cashMatchFinished
+                              ? "比赛结算"
+                              : g.players[0].chips === 0
+                                ? "返回大厅"
                               : "下一手"}
                         <ChevronRight size={17} />
                       </button>
@@ -3106,6 +3190,14 @@ export default function App() {
           />
         ) : page === "players" ? (
           <div className="content-page">{playerDirectoryContent}</div>
+        ) : page === "cashResults" ? (
+          <CashResultsPage
+            result={cashMatchResult}
+            userPlayerName={userPlayer.name}
+            onNewMatch={() => openNew("cash")}
+            onBackToLobby={() => setPage("lobby")}
+            renderAvatar={(player) => <Avatar p={player} playerAvatar={data.playerProfile.avatar} />}
+          />
         ) : page === "tournament" ? (
           <TournamentPage
             tournament={t}

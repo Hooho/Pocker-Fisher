@@ -10132,3 +10132,232 @@ footer {
   font-size: calc(9px * var(--table-scale));
   line-height: 1.2;
 }
+
+.cash-results-page {
+  min-height: 100%;
+}
+
+.cash-results-heading {
+  align-items: flex-end;
+}
+
+.cash-results-heading .eyebrow {
+  margin-bottom: 8px;
+}
+
+.cash-results-heading h1 {
+  margin-bottom: 8px;
+}
+
+.cash-results-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.cash-results-card {
+  max-width: 920px;
+  margin: 32px auto 24px;
+  padding: 24px 28px 12px;
+  border: 1px solid #4b5842;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #1b2820, #151e19 68%, #27261d);
+  box-shadow: 0 20px 70px #05090655;
+}
+
+.cash-results-card-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #354336;
+}
+
+.cash-results-card-heading small {
+  color: #a99c69;
+  font-size: 8px;
+  letter-spacing: 2px;
+}
+
+.cash-results-card-heading h2 {
+  margin: 4px 0 0;
+  color: #eee5d1;
+  font-family: "Noto Serif SC", "Songti SC", "STSong", serif;
+  font-size: 21px;
+}
+
+.cash-results-card-heading>span {
+  color: #94a18b;
+  font-size: 10px;
+}
+
+.cash-results-list {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cash-results-list li {
+  display: grid;
+  grid-template-columns: 44px 42px minmax(0, 1fr) auto 24px;
+  align-items: center;
+  gap: 13px;
+  min-height: 62px;
+  padding: 8px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #d6d8c9;
+}
+
+.cash-results-list li:nth-child(odd) {
+  background: #111a1566;
+}
+
+.cash-results-list li.cash-result-winner {
+  border-color: #877648;
+  background: linear-gradient(100deg, #5b513025, #d6bd6e12);
+}
+
+.cash-result-place {
+  color: #9aa68b;
+  font-family: Georgia, serif;
+  font-size: 18px;
+  text-align: center;
+}
+
+.cash-result-winner .cash-result-place {
+  color: #f0d587;
+}
+
+.cash-result-avatar img,
+.cash-result-avatar .hero-avatar {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #56624b;
+  border-radius: 50%;
+}
+
+.cash-result-winner .cash-result-avatar img,
+.cash-result-winner .cash-result-avatar .hero-avatar {
+  border-color: #d6bd6e;
+  box-shadow: 0 0 18px #d6bd6e2a;
+}
+
+.cash-result-player {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cash-result-player strong {
+  overflow: hidden;
+  color: #eee6d5;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cash-result-player small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #9da991;
+  font-size: 10px;
+}
+
+.cash-result-winner .cash-result-player small {
+  color: #e0c879;
+}
+
+.cash-result-chips {
+  color: #d8c683;
+  font-family: Georgia, serif;
+  font-size: 15px;
+  white-space: nowrap;
+}
+
+.cash-result-chips small {
+  color: #899783;
+  font-family: "Noto Sans SC", sans-serif;
+  font-size: 9px;
+}
+
+.cash-result-trophy {
+  color: #f0d587;
+}
+
+.cash-results-empty {
+  display: flex;
+  min-height: 270px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px dashed #59634a;
+  border-radius: 10px;
+  background: #18221b;
+  color: #d7c27e;
+}
+
+.cash-results-empty strong {
+  color: #eee5d2;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.cash-results-empty span {
+  color: #9aa68f;
+  font-size: 11px;
+}
+
+@media (max-width: 650px) {
+  .cash-results-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cash-results-actions {
+    justify-content: flex-start;
+  }
+
+  .cash-results-card {
+    margin-top: 20px;
+    padding: 18px 12px 10px;
+  }
+
+  .cash-results-card-heading>span {
+    display: none;
+  }
+
+  .cash-results-list li {
+    grid-template-columns: 30px 36px minmax(0, 1fr) auto;
+    gap: 8px;
+    padding: 7px 5px;
+  }
+
+  .cash-result-avatar img,
+  .cash-result-avatar .hero-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .cash-result-place {
+    font-size: 15px;
+  }
+
+  .cash-result-chips {
+    font-size: 12px;
+  }
+
+  .cash-result-chips small,
+  .cash-result-trophy {
+    display: none;
+  }
+}

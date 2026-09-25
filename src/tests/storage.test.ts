@@ -192,12 +192,12 @@ test("a damaged current shard falls back to a whole older snapshot", async () =>
     const first = { ...blank, stats: { ...blank.stats, hands: 1 } };
     await saveData(first);
     await saveData({ ...first, stats: { ...first.stats, hands: 2 } });
-    assert.ok(values.has("river-save-v2:snapshots"));
+    assert.ok(values.has("river-save:snapshots"));
 
-    values.set("river-save-v2:b:active", "{损坏的 JSON");
+    values.set("river-save:active", "{损坏的 JSON");
     const recovered = await loadSave();
     assert.equal(recovered.save.stats.hands, 1);
-    assert.match(recovered.recoveryNotice ?? "", /回退到旧版本/);
+    assert.match(recovered.recoveryNotice ?? "", /回退到(?:旧版本|历史版本)/);
   } finally {
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,
@@ -236,7 +236,7 @@ test("sharded browser storage keeps other data when the active shard is damaged"
     });
     assert.equal(saved.revision, 1);
 
-    const manifestKey = "river-save-v2:a:manifest";
+    const manifestKey = "river-save:manifest";
     const manifest = JSON.parse(values.get(manifestKey)!);
     assert.deepEqual(Object.keys(manifest.checksums).sort(), [
       "active",
@@ -245,10 +245,10 @@ test("sharded browser storage keeps other data when the active shard is damaged"
       "profile",
     ]);
     for (const shard of Object.keys(manifest.checksums)) {
-      assert.ok(values.has(`river-save-v2:a:${shard}`));
+      assert.ok(values.has(`river-save:${shard}`));
     }
 
-    values.set("river-save-v2:a:active", "{损坏的 JSON");
+    values.set("river-save:active", "{损坏的 JSON");
     const recovered = (await loadSave()).save;
     assert.equal(recovered.game, null);
     assert.equal(recovered.stats.hands, 12);

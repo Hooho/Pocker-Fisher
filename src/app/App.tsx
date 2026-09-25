@@ -2729,7 +2729,7 @@ export default function App() {
           <dl className="info-settings-list">
             <div>
               <dt>文件结构</dt>
-              <dd><code>river-fisher-save-a/b-*.json</code></dd>
+              <dd><code>manifest + profile/active/history/characters + snapshots.json</code></dd>
             </div>
             <div>
               <dt>旧版本</dt>

@@ -18,8 +18,14 @@ type PersistedSave = {
 };
 
 type ShardedStoragePayload = {
-  format: 2;
+  version: 1;
+  manifest: unknown;
+  shards: Partial<Record<SaveShardName, unknown>>;
   snapshots?: unknown;
+};
+
+type LegacyShardedStoragePayload = {
+  format: 2;
   slots: Partial<Record<SaveSlot, {
     manifest: unknown;
     shards: Partial<Record<SaveShardName, unknown>>;
@@ -101,7 +107,14 @@ function getBackupLocation(context: vscode.ExtensionContext) {
   return { directory, file: vscode.Uri.joinPath(directory, backupFileName) };
 }
 
-function getManifestBackupFile(context: vscode.ExtensionContext, slot: SaveSlot) {
+function getManifestBackupFile(context: vscode.ExtensionContext) {
+  return vscode.Uri.joinPath(
+    getBackupDirectory(context),
+    `${backupBaseName}-manifest.json`,
+  );
+}
+
+function getLegacyManifestBackupFile(context: vscode.ExtensionContext, slot: SaveSlot) {
   return vscode.Uri.joinPath(
     getBackupDirectory(context),
     `${backupBaseName}-${slot}-manifest.json`,
@@ -109,6 +122,16 @@ function getManifestBackupFile(context: vscode.ExtensionContext, slot: SaveSlot)
 }
 
 function getShardBackupFile(
+  context: vscode.ExtensionContext,
+  shard: SaveShardName,
+) {
+  return vscode.Uri.joinPath(
+    getBackupDirectory(context),
+    `${backupBaseName}-${shard}.json`,
+  );
+}
+
+function getLegacyShardBackupFile(
   context: vscode.ExtensionContext,
   slot: SaveSlot,
   shard: SaveShardName,
@@ -155,12 +178,37 @@ async function readJsonBackup(context: vscode.ExtensionContext): Promise<Persist
 
 async function readShardedJsonBackup(
   context: vscode.ExtensionContext,
-): Promise<ShardedStoragePayload | null> {
-  const slots: ShardedStoragePayload["slots"] = {};
+): Promise<(ShardedStoragePayload | LegacyShardedStoragePayload) | null> {
+  let snapshots: unknown;
+  try {
+    const contents = await vscode.workspace.fs.readFile(getSnapshotBackupFile(context));
+    snapshots = JSON.parse(new TextDecoder().decode(contents));
+  } catch {
+    // Snapshots are optional; the current shards remain usable without them.
+  }
+
+  try {
+    const contents = await vscode.workspace.fs.readFile(getManifestBackupFile(context));
+    const manifest = JSON.parse(new TextDecoder().decode(contents));
+    const shards: Partial<Record<SaveShardName, unknown>> = {};
+    for (const shard of saveShardNames) {
+      try {
+        const shardContents = await vscode.workspace.fs.readFile(getShardBackupFile(context, shard));
+        shards[shard] = JSON.parse(new TextDecoder().decode(shardContents));
+      } catch {
+        // The webview can recover the other shards if one file is damaged.
+      }
+    }
+    return { version: 1, manifest, shards, snapshots };
+  } catch {
+    // Fall back to the previous A/B file layout below.
+  }
+
+  const slots: LegacyShardedStoragePayload["slots"] = {};
   for (const slot of ["a", "b"] as const) {
     let manifest: unknown;
     try {
-      const contents = await vscode.workspace.fs.readFile(getManifestBackupFile(context, slot));
+      const contents = await vscode.workspace.fs.readFile(getLegacyManifestBackupFile(context, slot));
       manifest = JSON.parse(new TextDecoder().decode(contents));
     } catch {
       continue;
@@ -169,21 +217,13 @@ async function readShardedJsonBackup(
     const shards: Partial<Record<SaveShardName, unknown>> = {};
     for (const shard of saveShardNames) {
       try {
-        const contents = await vscode.workspace.fs.readFile(getShardBackupFile(context, slot, shard));
+        const contents = await vscode.workspace.fs.readFile(getLegacyShardBackupFile(context, slot, shard));
         shards[shard] = JSON.parse(new TextDecoder().decode(contents));
       } catch {
         // The webview can recover the other shards if one file is damaged.
       }
     }
     slots[slot] = { manifest, shards };
-  }
-
-  let snapshots: unknown;
-  try {
-    const contents = await vscode.workspace.fs.readFile(getSnapshotBackupFile(context));
-    snapshots = JSON.parse(new TextDecoder().decode(contents));
-  } catch {
-    // Snapshots are optional; the current shards remain usable without them.
   }
 
   return Object.keys(slots).length > 0 || snapshots !== undefined
@@ -215,8 +255,16 @@ function checksumValue(value: unknown): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-function getPayloadRevision(payload: ShardedStoragePayload | null): number {
+function getPayloadRevision(
+  payload: ShardedStoragePayload | LegacyShardedStoragePayload | null,
+): number {
   if (!payload) return 0;
+  if ("manifest" in payload) {
+    const manifest = payload.manifest;
+    return isRecord(manifest) && typeof manifest.revision === "number"
+      ? manifest.revision
+      : 0;
+  }
   return Math.max(
     0,
     ...(["a", "b"] as const).map((slot) => {
@@ -232,12 +280,6 @@ async function writeShardedJsonBackup(
   context: vscode.ExtensionContext,
   value: PersistedSave,
 ): Promise<void> {
-  const current = await readShardedJsonBackup(context);
-  const currentSlot = (["a", "b"] as const).find((slot) => {
-    const manifest = current?.slots[slot]?.manifest;
-    return isRecord(manifest) && manifest.revision === getPayloadRevision(current);
-  });
-  const slot: SaveSlot = currentSlot === "a" ? "b" : "a";
   const source = isRecord(value.save) ? value.save : {};
   const data: Record<SaveShardName, Record<string, unknown>> = {
     profile: {
@@ -247,6 +289,9 @@ async function writeShardedJsonBackup(
     active: {
       game: source.game ?? null,
       tournament: source.tournament ?? null,
+      ...(source.activeMatch !== undefined
+        ? { activeMatch: source.activeMatch }
+        : {}),
       ...(source.pausedTournament !== undefined
         ? { pausedTournament: source.pausedTournament }
         : {}),
@@ -278,9 +323,9 @@ async function writeShardedJsonBackup(
     const checksum = checksumValue(data[shard]);
     checksums[shard] = checksum;
     await vscode.workspace.fs.writeFile(
-      getShardBackupFile(context, slot, shard),
+      getShardBackupFile(context, shard),
       new TextEncoder().encode(JSON.stringify({
-        format: 2,
+        version: 1,
         revision: value.revision,
         checksum,
         data: data[shard],
@@ -289,13 +334,11 @@ async function writeShardedJsonBackup(
   }
 
   await vscode.workspace.fs.writeFile(
-    getManifestBackupFile(context, slot),
+    getManifestBackupFile(context),
     new TextEncoder().encode(JSON.stringify({
-      format: 2,
       version: 1,
       revision: value.revision,
       savedAt: typeof source.savedAt === "string" ? source.savedAt : "",
-      slot,
       checksums,
     }, null, 2) + "\n"),
   );

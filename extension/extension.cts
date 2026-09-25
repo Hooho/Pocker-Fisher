@@ -519,8 +519,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const openGame = (): void => {
     if (panel) {
-      panel.reveal(vscode.ViewColumn.Beside);
-      return;
+      try {
+        panel.reveal(vscode.ViewColumn.Beside);
+        return;
+      } catch {
+        // Cursor can retain a disposed panel object briefly after its Webview is closed.
+        saveWebviews.delete(panel.webview);
+        panel = undefined;
+      }
     }
 
     const distUri = vscode.Uri.joinPath(context.extensionUri, "dist");
@@ -564,7 +570,6 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
   );
 
-  setTimeout(openGame, 800);
 }
 
 export function deactivate(): void {

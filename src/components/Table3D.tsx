@@ -185,6 +185,10 @@ export default function Table3D({
     const chips = new THREE.Group();
     const colors = [0xb99863, 0xad5844, 0x59807f];
     const maxPoolChips = 40;
+    // Pool chips are laid out around this local z anchor. When the same group
+    // flies to a winner, subtract the anchor so the visible chip cluster—not
+    // the group's origin—lands on the winner's card position.
+    const poolChipAnchorZ = 1.96;
     for (let index = 0; index < maxPoolChips; index++) {
       const stack = index % 5;
       const height = Math.floor(index / 5);
@@ -416,7 +420,9 @@ export default function Table3D({
         starts[index] = group.position.clone();
         if (movingToWinners) {
           const winnerSeat = winners[index];
-          destinations[index] = playerDestination(winnerSeat, players, cardPositions[winnerSeat]);
+          const destination = playerDestination(winnerSeat, players, cardPositions[winnerSeat]);
+          destination.z -= poolChipAnchorZ;
+          destinations[index] = destination;
         } else {
           destinations[index] = new THREE.Vector3(0, 0, 0);
         }

@@ -6,8 +6,9 @@ type LobbyPageProps = {
   tournament: Tournament | null;
   pausedTournament: Save["pausedTournament"];
   roundLabel: (round: number) => string;
-  onNew: (mode: "cash" | "tournament") => void;
+  hasActiveCashMatch: boolean;
   onModeDetails: (mode: "cash" | "tournament") => void;
+  onEnterCash: () => void;
   onEnterChampionship: () => void;
 };
 
@@ -15,8 +16,9 @@ export function LobbyPage({
   tournament,
   pausedTournament,
   roundLabel,
-  onNew,
+  hasActiveCashMatch,
   onModeDetails,
+  onEnterCash,
   onEnterChampionship,
 }: LobbyPageProps) {
   const visibleTournament = tournament || pausedTournament?.tournament;
@@ -33,7 +35,7 @@ export function LobbyPage({
     const tournamentDetails = tournamentDetailsRef.current;
     if (!cashCard || !tournamentCard || !cashDetails || !tournamentDetails) return;
 
-    const handleCashCardClick = () => onNew("cash");
+    const handleCashCardClick = () => onEnterCash();
     const handleTournamentCardClick = () => onEnterChampionship();
     const handleCashDetailsClick = () => onModeDetails("cash");
     const handleTournamentDetailsClick = () => onModeDetails("tournament");
@@ -51,7 +53,7 @@ export function LobbyPage({
       cashDetails.removeEventListener("click", handleCashDetailsClick);
       tournamentDetails.removeEventListener("click", handleTournamentDetailsClick);
     };
-  }, [onEnterChampionship, onModeDetails, onNew]);
+  }, [onEnterCash, onEnterChampionship, onModeDetails]);
 
   return (
     <div className="lobby lobby-home">
@@ -87,8 +89,11 @@ export function LobbyPage({
             <div className="mode-title-row">
               <h3>单次赛</h3>
             </div>
-            <p>开启一场独立牌局，与电脑选手对战。</p>
-            <div className="mode-footer"><span>2–8 人牌桌 · 难度自选</span><ArrowUpRight size={20} /></div>
+            <p>{hasActiveCashMatch ? "继续当前牌局，与电脑选手对战。" : "开启一场独立牌局，与电脑选手对战。"}</p>
+            <div className="mode-footer">
+              <span>{hasActiveCashMatch ? "进行中的牌局 · 点击继续" : "2–8 人牌桌 · 难度自选"}</span>
+              <ArrowUpRight size={20} />
+            </div>
           </button>
           <button
             type="button"

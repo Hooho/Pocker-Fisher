@@ -1980,6 +1980,17 @@ export default function App() {
     setNewMode(mode);
     setModal("new");
   };
+  const enterCashMatch = () => {
+    const hasActiveCashMatch = Boolean(
+      data.game && !data.tournament && (!data.activeMatch || data.activeMatch.mode === "cash"),
+    );
+    if (hasActiveCashMatch) {
+      setPaused(false);
+      setPage("table");
+      return;
+    }
+    openNew("cash");
+  };
   const openModeDetails = (mode: "cash" | "tournament") => {
     setModal(mode === "cash" ? "cash-details" : "tournament-details");
   };
@@ -2728,8 +2739,11 @@ export default function App() {
             tournament={t}
             pausedTournament={data.pausedTournament}
             roundLabel={roundLabel}
-            onNew={openNew}
+            hasActiveCashMatch={Boolean(
+              data.game && !data.tournament && (!data.activeMatch || data.activeMatch.mode === "cash"),
+            )}
             onModeDetails={openModeDetails}
+            onEnterCash={enterCashMatch}
             onEnterChampionship={enterChampionship}
           />
         ) : page === "table" ? (

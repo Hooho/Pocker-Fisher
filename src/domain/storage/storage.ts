@@ -1043,19 +1043,22 @@ function readCurrentShardedStoragePayload(payload: unknown): ReadStoredSave | nu
   const manifest = manifestResult.data;
   const shards: Partial<Record<SaveShardName, unknown>> = {};
   let complete = true;
+  let allShardsReadable = true;
+  let checksumMismatch = false;
   for (const shardName of SAVE_SHARDS) {
     const shardResult = persistedShardSchema.safeParse(parsedPayload.data.shards[shardName]);
     if (!shardResult.success) {
       complete = false;
+      allShardsReadable = false;
       continue;
     }
-    if (
+    const checksumsMatch =
       shardResult.data.revision !== manifest.revision ||
       shardResult.data.checksum !== manifest.checksums[shardName] ||
-      checksumValue(shardResult.data.data) !== shardResult.data.checksum
-    ) {
+      checksumValue(shardResult.data.data) !== shardResult.data.checksum;
+    if (checksumsMatch) {
       complete = false;
-      continue;
+      checksumMismatch = true;
     }
 
     const dataResult = saveShardSchemas[shardName].safeParse(shardResult.data.data);
@@ -1063,6 +1066,7 @@ function readCurrentShardedStoragePayload(payload: unknown): ReadStoredSave | nu
       shards[shardName] = dataResult.data;
     } else {
       complete = false;
+      allShardsReadable = false;
     }
   }
 
@@ -1074,6 +1078,13 @@ function readCurrentShardedStoragePayload(payload: unknown): ReadStoredSave | nu
     appVersion: manifest.app.version,
   };
   if (complete) return stored;
+
+  if (checksumMismatch && allShardsReadable) {
+    return {
+      ...stored,
+      recoveryNotice: `当前存档（版本 ${manifest.revision}）的校验和与内容不一致，已保留可读取数据并准备修复。`,
+    };
+  }
 
   const snapshot = snapshots.find((candidate) => candidate.revision < manifest.revision);
   if (snapshot) {

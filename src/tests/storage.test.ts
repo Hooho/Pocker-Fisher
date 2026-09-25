@@ -295,6 +295,47 @@ test("championship saves with optional undefined fields survive a reload", async
   }
 });
 
+test("readable shard checksum mismatches preserve current data during repair", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+
+  try {
+    await loadSave();
+    const game = newGame([hero, { ...hero, id: 0 }]);
+    await saveData({ ...blank, game });
+    const active = JSON.parse(values.get("river-save:active")!);
+    const manifest = JSON.parse(values.get("river-save:manifest")!);
+    active.checksum = "legacy-checksum";
+    manifest.checksums.active = "legacy-checksum";
+    values.set("river-save:active", JSON.stringify(active));
+    values.set("river-save:manifest", JSON.stringify(manifest));
+
+    const loaded = await loadSave();
+    assert.equal(loaded.save.game?.players.length, 2);
+    assert.match(loaded.recoveryNotice ?? "", /保留可读取数据/);
+
+    const repairedActive = JSON.parse(values.get("river-save:active")!);
+    const repairedManifest = JSON.parse(values.get("river-save:manifest")!);
+    assert.equal(repairedActive.checksum, repairedManifest.checksums.active);
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
+});
+
 test("save conflicts expose both revisions for a second validation", async () => {
   const previousStorage = globalThis.localStorage;
   const values = new Map<string, string>();

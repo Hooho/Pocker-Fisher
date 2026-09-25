@@ -1476,6 +1476,12 @@ footer>span:last-child {
   box-shadow: inset 0 0 14px #d7b8670a;
 }
 
+.current-hand-action .current-hand-hint {
+  margin-top: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
 .current-hand-hint span {
   color: #899783;
   font-size: 8px;
@@ -1682,15 +1688,25 @@ input[type="range"] {
   border-color: #7a5c4c;
 }
 
-.action-buttons .call-button {
+.action-buttons .call-button,
+.action-buttons .check-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
   white-space: nowrap;
+}
+
+.action-buttons .call-button {
   background: #1f3324;
   border-color: #4f8a5c;
   color: #bfe3b0;
+}
+
+.action-buttons .check-button {
+  background: #1c2d38;
+  border-color: #4e7f96;
+  color: #b8d8e7;
 }
 
 .action-buttons .action-amount {
@@ -1704,6 +1720,11 @@ input[type="range"] {
 .action-buttons .call-button:hover:not(:disabled) {
   background: #27402c;
   border-color: #63a86f;
+}
+
+.action-buttons .check-button:hover:not(:disabled) {
+  background: #243c4a;
+  border-color: #6ca5c3;
 }
 
 .key-hint {
@@ -2387,6 +2408,34 @@ input[type="range"] {
   min-height: 78px;
 }
 
+.save-code-modal {
+  width: 620px;
+}
+
+.save-code-textarea {
+  min-height: 180px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  word-break: break-all;
+}
+
+.save-transfer-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 18px 0 14px;
+}
+
+.save-transfer-actions button {
+  font-size: 11px;
+}
+
+.save-code-help {
+  line-height: 1.7;
+}
+
 .full {
   width: 100%;
 }
@@ -2411,6 +2460,10 @@ input[type="range"] {
 
 .modal-actions button {
   font-size: 11px;
+}
+
+.save-code-modal .modal-actions {
+  flex-wrap: nowrap;
 }
 
 .import-warning {

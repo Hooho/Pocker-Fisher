@@ -89,22 +89,27 @@ function isPersistedSave(value: unknown): value is PersistedSave {
 }
 
 function getBackupDirectory(context: vscode.ExtensionContext) {
-  const workspace = vscode.workspace.workspaceFolders?.[0]?.uri;
-  if (workspace) {
-    return vscode.Uri.joinPath(workspace, ".vscode");
-  }
-
   return context.globalStorageUri;
 }
 
-function getBackupLocation(context: vscode.ExtensionContext) {
-  const directory = getBackupDirectory(context);
-  return { directory, file: vscode.Uri.joinPath(directory, backupFileName) };
+function getLegacyWorkspaceBackupDirectory(context: vscode.ExtensionContext) {
+  const workspace = vscode.workspace.workspaceFolders?.[0]?.uri;
+  return workspace ? vscode.Uri.joinPath(workspace, ".vscode") : undefined;
 }
 
-function getManifestBackupFile(context: vscode.ExtensionContext) {
+function getBackupDirectories(context: vscode.ExtensionContext): vscode.Uri[] {
+  const directories = [getBackupDirectory(context)];
+  const legacyDirectory = getLegacyWorkspaceBackupDirectory(context);
+  if (legacyDirectory) directories.push(legacyDirectory);
+  return directories;
+}
+
+function getManifestBackupFile(
+  context: vscode.ExtensionContext,
+  directory = getBackupDirectory(context),
+) {
   return vscode.Uri.joinPath(
-    getBackupDirectory(context),
+    directory,
     `${backupBaseName}-manifest.json`,
   );
 }
@@ -112,65 +117,77 @@ function getManifestBackupFile(context: vscode.ExtensionContext) {
 function getShardBackupFile(
   context: vscode.ExtensionContext,
   shard: SaveShardName,
+  directory = getBackupDirectory(context),
 ) {
   return vscode.Uri.joinPath(
-    getBackupDirectory(context),
+    directory,
     `${backupBaseName}-${shard}.json`,
   );
 }
 
-function getSnapshotBackupFile(context: vscode.ExtensionContext) {
-  return vscode.Uri.joinPath(getBackupDirectory(context), snapshotBackupFileName);
+function getSnapshotBackupFile(
+  context: vscode.ExtensionContext,
+  directory = getBackupDirectory(context),
+) {
+  return vscode.Uri.joinPath(directory, snapshotBackupFileName);
 }
 
 async function readJsonBackup(context: vscode.ExtensionContext): Promise<PersistedSave | null> {
-  const { directory, file } = getBackupLocation(context);
-  const candidates = [file];
-  try {
-    const entries = await vscode.workspace.fs.readDirectory(directory);
-    for (const [name, type] of entries) {
-      if (
-        type === vscode.FileType.File &&
-        name.endsWith("-save.json") &&
-        name !== backupFileName
-      ) {
-        candidates.push(vscode.Uri.joinPath(directory, name));
-      }
-    }
-  } catch {
-    // The directory may not exist until the first save.
-  }
-
-  for (const candidate of candidates) {
+  for (const directory of getBackupDirectories(context)) {
+    const candidates = [vscode.Uri.joinPath(directory, backupFileName)];
     try {
-      const contents = await vscode.workspace.fs.readFile(candidate);
-      const value: unknown = JSON.parse(new TextDecoder().decode(contents));
-      if (isPersistedSave(value)) return value;
+      const entries = await vscode.workspace.fs.readDirectory(directory);
+      for (const [name, type] of entries) {
+        if (
+          type === vscode.FileType.File &&
+          name.endsWith("-save.json") &&
+          name !== backupFileName
+        ) {
+          candidates.push(vscode.Uri.joinPath(directory, name));
+        }
+      }
     } catch {
-      // Try the next candidate or start with the browser save.
+      // The directory may not exist until the first save.
+    }
+
+    for (const candidate of candidates) {
+      try {
+        const contents = await vscode.workspace.fs.readFile(candidate);
+        const value: unknown = JSON.parse(new TextDecoder().decode(contents));
+        if (isPersistedSave(value)) return value;
+      } catch {
+        // Try the next candidate or start with the browser save.
+      }
     }
   }
   return null;
 }
 
-async function readShardedJsonBackup(
+async function readShardedJsonBackupFromDirectory(
   context: vscode.ExtensionContext,
+  directory: vscode.Uri,
 ): Promise<ShardedStoragePayload | null> {
   let snapshots: unknown;
   try {
-    const contents = await vscode.workspace.fs.readFile(getSnapshotBackupFile(context));
+    const contents = await vscode.workspace.fs.readFile(
+      getSnapshotBackupFile(context, directory),
+    );
     snapshots = JSON.parse(new TextDecoder().decode(contents));
   } catch {
     // Snapshots are optional; the current shards remain usable without them.
   }
 
   try {
-    const contents = await vscode.workspace.fs.readFile(getManifestBackupFile(context));
+    const contents = await vscode.workspace.fs.readFile(
+      getManifestBackupFile(context, directory),
+    );
     const manifest = JSON.parse(new TextDecoder().decode(contents));
     const shards: Partial<Record<SaveShardName, unknown>> = {};
     for (const shard of saveShardNames) {
       try {
-        const shardContents = await vscode.workspace.fs.readFile(getShardBackupFile(context, shard));
+        const shardContents = await vscode.workspace.fs.readFile(
+          getShardBackupFile(context, shard, directory),
+        );
         shards[shard] = JSON.parse(new TextDecoder().decode(shardContents));
       } catch {
         // The webview can recover the other shards if one file is damaged.
@@ -179,6 +196,16 @@ async function readShardedJsonBackup(
     return { version: 1, manifest, shards, snapshots };
   } catch {
     // The legacy single-file backup is handled by readJsonBackup.
+  }
+  return null;
+}
+
+async function readShardedJsonBackup(
+  context: vscode.ExtensionContext,
+): Promise<ShardedStoragePayload | null> {
+  for (const directory of getBackupDirectories(context)) {
+    const backup = await readShardedJsonBackupFromDirectory(context, directory);
+    if (backup) return backup;
   }
   return null;
 }
@@ -519,12 +546,23 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const openGame = (): void => {
     if (panel) {
-      panel.reveal(vscode.ViewColumn.Beside);
-      return;
+      const existingPanel = panel;
+      try {
+        existingPanel.reveal(vscode.ViewColumn.Beside);
+        return;
+      } catch {
+        // Cursor can retain a disposed panel object briefly after its Webview is closed.
+        panel = undefined;
+        try {
+          saveWebviews.delete(existingPanel.webview);
+        } catch {
+          // The Webview getter can also fail after Cursor has disposed it.
+        }
+      }
     }
 
     const distUri = vscode.Uri.joinPath(context.extensionUri, "dist");
-    panel = vscode.window.createWebviewPanel(
+    const gamePanel = vscode.window.createWebviewPanel(
       "riverClub.game",
       "摸鱼德州",
       vscode.ViewColumn.One,
@@ -534,23 +572,24 @@ export function activate(context: vscode.ExtensionContext): void {
         localResourceRoots: [distUri],
       },
     );
-    const gamePanel = panel;
+    panel = gamePanel;
+    const gameWebview = gamePanel.webview;
     try {
-      gamePanel.webview.html = createWebviewHtml(gamePanel.webview, context.extensionUri);
+      gameWebview.html = createWebviewHtml(gameWebview, context.extensionUri);
     } catch (error) {
-      gamePanel.webview.html = showBuildHint(error);
+      gameWebview.html = showBuildHint(error);
     }
-    saveWebviews.add(gamePanel.webview);
-    const storageSubscription = gamePanel.webview.onDidReceiveMessage(
+    saveWebviews.add(gameWebview);
+    const storageSubscription = gameWebview.onDidReceiveMessage(
       (message: unknown) => {
         if (isSaveStorageRequest(message)) {
-          void handleStorageMessage(gamePanel.webview, message);
+          void handleStorageMessage(gameWebview, message);
         }
       },
     );
     gamePanel.onDidDispose(() => {
       storageSubscription.dispose();
-      saveWebviews.delete(gamePanel.webview);
+      saveWebviews.delete(gameWebview);
       if (panel === gamePanel) panel = undefined;
     });
   };
@@ -564,7 +603,17 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
   );
 
-  setTimeout(openGame, 800);
+  const statusBarItem = vscode.window.createStatusBarItem(
+    vscode.StatusBarAlignment.Right,
+    100,
+  );
+  statusBarItem.name = "摸鱼德州";
+  statusBarItem.text = "$(play) 摸鱼德州";
+  statusBarItem.tooltip = "打开摸鱼德州";
+  statusBarItem.command = "riverClub.openGame";
+  statusBarItem.show();
+  context.subscriptions.push(statusBarItem);
+
 }
 
 export function deactivate(): void {

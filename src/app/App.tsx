@@ -36,6 +36,7 @@ import {
   Trophy,
   Spade,
   Download,
+  Copy,
   Upload,
   Play,
   Pause,
@@ -70,6 +71,7 @@ import {
   suit,
   pot,
   evaluate,
+  currentHandName,
   previewBoard,
   type Character,
   type Game,
@@ -82,7 +84,9 @@ import {
   checkSaveState,
   adoptSaveRevision,
   areSaveContentsEqual,
-  parseSave,
+  createSaveCode,
+  parseSaveImport,
+  parseSaveCode,
   downloadSave,
   getSaveRevision,
   isSaveConflictError,
@@ -127,6 +131,36 @@ const championshipQualifyingStages = [
   { round: "半决赛", players: "16 人", tables: "2 桌" },
   { round: "总决赛", players: "8 强", tables: "冠军桌" },
 ] as const;
+
+async function copyTextToClipboard(value: string) {
+  if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return true;
+    } catch {
+      // Fall back to a selection-based copy for older mobile webviews.
+    }
+  }
+
+  if (typeof document === "undefined") return false;
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "0";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  let copied = false;
+  try {
+    copied = document.execCommand("copy");
+  } catch {
+    copied = false;
+  }
+  textarea.remove();
+  return copied;
+}
+
 // One concrete five-card example per hand ranking, highest to lowest, used to
 // illustrate the rules with real cards instead of just naming them.
 const handRankExamples = [
@@ -305,7 +339,8 @@ async function prepareAvatar(file: File) {
   if (file.size > 8 * 1024 * 1024) throw new Error("图片不能超过 8 MB");
   const bitmap = await createImageBitmap(file);
   try {
-    const size = 256;
+    const size = 160;
+    const quality = 0.78;
     const scale = Math.max(size / bitmap.width, size / bitmap.height);
     const width = bitmap.width * scale;
     const height = bitmap.height * scale;
@@ -317,7 +352,10 @@ async function prepareAvatar(file: File) {
     context.fillStyle = "#324635";
     context.fillRect(0, 0, size, size);
     context.drawImage(bitmap, (size - width) / 2, (size - height) / 2, width, height);
-    return canvas.toDataURL("image/jpeg", 0.82);
+    const webp = canvas.toDataURL("image/webp", quality);
+    return webp.startsWith("data:image/webp")
+      ? webp
+      : canvas.toDataURL("image/jpeg", quality);
   } finally {
     bitmap.close();
   }
@@ -1146,6 +1184,9 @@ export default function App() {
   const [progress, setProgress] = useState("");
   const [eliminatedProgress, setEliminatedProgress] = useState<ChampionshipSimulationProgress | null>(null);
   const [imported, setImported] = useState<Save | null>(null);
+  const [saveCodeModal, setSaveCodeModal] = useState<"download" | "upload" | null>(null);
+  const [saveCodeText, setSaveCodeText] = useState("");
+  const [saveCodePasteOpen, setSaveCodePasteOpen] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [saveLoadIssue, setSaveLoadIssue] = useState<{
     title: string;
@@ -1201,6 +1242,9 @@ export default function App() {
     setMoreMenuOpen(false);
     setModal(null);
     setImported(null);
+    setSaveCodeModal(null);
+    setSaveCodeText("");
+    setSaveCodePasteOpen(false);
     setConfirmDialog(null);
     setSelected(null);
     setBatchOpen(false);
@@ -1210,7 +1254,7 @@ export default function App() {
   }, []);
   const saveFreshnessCheck = useRef<Promise<boolean> | null>(null);
   const confirmExternalSave = useCallback(() => {
-    if (vscodeEnvironment) return Promise.resolve(true);
+    if (vscodeEnvironment) return Promise.resolve(false);
     if (saveFreshnessCheck.current) return saveFreshnessCheck.current;
 
     const check = (async () => {
@@ -1574,6 +1618,9 @@ export default function App() {
     g && g.board.length >= 3
       ? evaluate([...g.players[0].cards, ...g.board]).best
       : [];
+  const localHandName = g
+    ? currentHandName([...g.players[0].cards, ...g.board])
+    : "等待发牌";
   const userPlayer = { ...hero, name: data.playerProfile.name.trim() || "本地玩家" };
   const userPlayerRef = useRef(userPlayer);
   userPlayerRef.current = userPlayer;
@@ -2316,7 +2363,7 @@ export default function App() {
       return;
     }
     try {
-      const nextSave = parseSave(JSON.parse(await f.text()));
+      const nextSave = parseSaveImport(JSON.parse(await f.text()));
       if (summarizeSaveRecords(data).hasExistingData) {
         setImported(nextSave);
       } else {
@@ -2326,6 +2373,77 @@ export default function App() {
       setToast("存档格式或版本无效，现有数据未修改");
     }
     if (file.current) file.current.value = "";
+  };
+  const openDownloadSaveModal = async () => {
+    setSaveCodeText("");
+    setSaveCodeModal("download");
+    setSaveCodePasteOpen(false);
+    setMoreMenuOpen(false);
+    try {
+      setSaveCodeText(await createSaveCode(data));
+    } catch {
+      setToast("存档码生成失败，请改用下载 JSON 存档");
+    }
+  };
+  const openUploadSaveModal = () => {
+    setSaveCodeText("");
+    setSaveCodeModal("upload");
+    setSaveCodePasteOpen(false);
+    setMoreMenuOpen(false);
+  };
+  const closeSaveCodeModal = () => {
+    setSaveCodeModal(null);
+    setSaveCodeText("");
+    setSaveCodePasteOpen(false);
+  };
+  const uploadJsonSave = () => {
+    closeSaveCodeModal();
+    file.current?.click();
+  };
+  const openSaveCodePaste = async () => {
+    setSaveCodePasteOpen(true);
+    setSaveCodeText("");
+    if (!navigator.clipboard?.readText) {
+      setToast("当前环境无法读取剪贴板，请先复制存档码后重试");
+      return;
+    }
+    try {
+      const pasted = await navigator.clipboard.readText();
+      if (!pasted.trim()) {
+        setToast("剪贴板里没有内容，请先复制存档码再点击此按钮");
+        return;
+      }
+      setSaveCodeText(pasted.trim());
+    } catch {
+      setToast("无法读取剪贴板，请先复制存档码后重试");
+    }
+  };
+  const copySaveCode = async () => {
+    if (!saveCodeText.trim()) {
+      setToast("存档码正在生成，请稍候再试");
+      return;
+    }
+    const copied = await copyTextToClipboard(saveCodeText);
+    setToast(
+      copied
+        ? "存档码已复制，可直接发到微信或粘贴到另一台设备"
+        : "复制失败，请长按文本框并选择“全选—复制”",
+    );
+  };
+  const applySaveCode = async () => {
+    let nextSave: Save;
+    try {
+      nextSave = await parseSaveCode(saveCodeText);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "存档码无效，现有数据未修改");
+      return;
+    }
+    closeSaveCodeModal();
+    if (summarizeSaveRecords(data).hasExistingData) {
+      setImported(nextSave);
+    } else {
+      applyImportedSave(nextSave, false);
+    }
   };
   const openNew = (mode: "cash" | "tournament") => {
     setNewMode(mode);
@@ -2797,7 +2915,7 @@ export default function App() {
           </div>
           <div className="profile-avatar-actions">
             <strong>头像</strong>
-            <p className="muted">选择图片后会自动裁切为正方形。</p>
+            <p className="muted">选择图片后会自动裁切并压缩为头像。</p>
             <div>
               <button type="button" onClick={() => avatarFile.current?.click()}>
                 <Upload size={15} /> 更换头像
@@ -2878,7 +2996,6 @@ export default function App() {
               <h2>应用信息</h2>
             </div>
           </div>
-          <p>当前运行的游戏使用以下构建信息。</p>
           <dl className="info-settings-list">
             <div>
               <dt>当前版本</dt>
@@ -2936,22 +3053,22 @@ export default function App() {
             </div>
           </div>
           <p>
-            你可以随时导出一份 JSON 存档，也可以在另一台设备导入它来继续游戏。
-            完全离线，不联网
+            点击顶部的“下载存档”或“导入存档”，即可选择 JSON 文件或存档码。
+            完全离线，不联网。
           </p>
           <div className="info-settings-transfer">
-            <span><Download size={14} /> 导出最新存档</span>
-            <span><Upload size={14} /> 导入并恢复进度</span>
+            <span><Download size={14} /> 下载 JSON / 复制存档码</span>
+            <span><Upload size={14} /> 上传 JSON / 粘贴存档码</span>
           </div>
           <div className="info-settings-browser-actions">
-            支持跨端使用：只要在不同设备之间保持同一份最新存档文件，并在切换设备时导入即可。不同设备之间不会自动同步。
+            如果微信提示不支持下载，可在下载弹窗中复制存档码；之后在导入弹窗粘贴即可恢复。
           </div>
         </article>
         <section className="reset-settings" aria-labelledby="reset-settings-title">
           <div className="reset-danger-panel">
             <h2>重置所有数据</h2>
             <p>
-              此操作会删除当前环境中的全部游戏进度和个性化内容，无法撤销。头像文件和应用资源不会受到影响。
+              此操作会删除当前环境中的全部游戏进度和个性化内容，无法撤销。
             </p>
             <div className="reset-data-summary" aria-label="当前存档摘要">
               <span>手数 <strong>{currentSaveSummary.hands.toLocaleString()}</strong></span>
@@ -3010,10 +3127,7 @@ export default function App() {
               className="icon-btn"
               aria-label="导出存档"
               title="导出存档"
-              onClick={() => {
-                exportCurrentSave();
-                setMoreMenuOpen(false);
-              }}
+              onClick={() => void openDownloadSaveModal()}
             >
               <Download size={17} />
               <span className="tool-label">导出存档</span>
@@ -3022,10 +3136,7 @@ export default function App() {
               className="icon-btn"
               aria-label="导入存档"
               title="导入存档"
-              onClick={() => {
-                file.current?.click();
-                setMoreMenuOpen(false);
-              }}
+              onClick={openUploadSaveModal}
             >
               <Upload size={17} />
               <span className="tool-label">导入存档</span>
@@ -3315,23 +3426,26 @@ export default function App() {
                           <b>{p.chips.toLocaleString()}</b>
                         </div>
                       </div>
-                      {!p.last && !g.done && g.turn === i ? (
+                      {!g.done && i === 0 && !p.folded ? (
+                        <div className="seat-action current-hand-action" aria-live="polite">
+                          <span className="current-hand-hint">
+                            <span>当前牌型</span>
+                            <b>{localHandName}</b>
+                          </span>
+                        </div>
+                      ) : !p.last && !g.done && g.turn === i ? (
                         <div className="seat-action">
-                          {i === 0
-                            ? "轮到你行动"
-                            : (
-                              <span className="thinking">
-                                正在思考
-                                <span
-                                  className="thinking-bar"
-                                  style={
-                                    {
-                                      "--think-ms": `${Math.round(data.settings.speed * 1.07)}ms`,
-                                    } as CSSProperties
-                                  }
-                                />
-                              </span>
-                            )}
+                          <span className="thinking">
+                            正在思考
+                            <span
+                              className="thinking-bar"
+                              style={
+                                {
+                                  "--think-ms": `${Math.round(data.settings.speed * 1.07)}ms`,
+                                } as CSSProperties
+                              }
+                            />
+                          </span>
                         </div>
                       ) : null}
                       {g.done && show && g.board.length === 5 ? (
@@ -3515,7 +3629,7 @@ export default function App() {
                           弃牌<span className="key-hint">F</span>
                         </button>
                         <button
-                          className="call-button"
+                          className={limits?.toCall ? "call-button" : "check-button"}
                           title={`${limits?.toCall ? `跟注 ${limits.toCall}` : "过牌"}（快捷键 C）`}
                           disabled={!active}
                           onClick={() => commit(act(g, { type: "call" }))}
@@ -4248,6 +4362,112 @@ export default function App() {
                 应用 {batchResults.length} 位人物的新性格
               </button>
             ) : null}
+          </section>
+        </div>
+      ) : null}
+      {saveCodeModal ? (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeSaveCodeModal();
+          }}
+        >
+          <section
+            className="modal save-code-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="save-code-title"
+          >
+            <button
+              type="button"
+              className="close"
+              aria-label="关闭"
+              onClick={closeSaveCodeModal}
+            >
+              <X size={17} />
+            </button>
+            <p className="eyebrow">WECHAT SAVE</p>
+            <h2 id="save-code-title">
+              {saveCodeModal === "download" ? "下载存档" : "导入存档"}
+            </h2>
+            {saveCodeModal === "download" ? (
+              <>
+                <p className="muted">
+                  优先点击“下载 JSON 存档”。如果微信提示不支持下载，点击“复制存档码”，再发给自己或保存到文件传输助手。
+                </p>
+                <div className="save-transfer-actions">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exportCurrentSave();
+                      setToast("如果微信没有出现下载文件，请改用“复制存档码”");
+                    }}
+                  >
+                    <Download size={14} /> 下载 JSON 存档
+                  </button>
+                  <button type="button" className="gold-button" onClick={() => void copySaveCode()}>
+                    <Copy size={14} /> 复制存档码
+                  </button>
+                </div>
+                <textarea
+                  className="save-code-textarea"
+                  value={saveCodeText}
+                  onFocus={(event) => event.currentTarget.select()}
+                  readOnly
+                  rows={8}
+                  spellCheck={false}
+                  aria-label="存档码"
+                />
+                <p className="save-code-help muted">
+                  复制按钮无效时，可长按上方文字，选择“全选—复制”。
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="muted">
+                  可以上传之前下载的 JSON 文件；如果微信不支持下载文件，先复制存档码，再点击“粘贴存档码”自动读取。
+                </p>
+                <div className="save-transfer-actions">
+                  <button type="button" onClick={uploadJsonSave}>
+                    <Upload size={14} /> 上传 JSON 存档
+                  </button>
+                  <button
+                    type="button"
+                    className={saveCodePasteOpen ? "gold-button" : undefined}
+                    onClick={() => void openSaveCodePaste()}
+                  >
+                    <Copy size={14} /> 粘贴存档码
+                  </button>
+                </div>
+                {saveCodePasteOpen ? (
+                  <>
+                    <textarea
+                      className="save-code-textarea"
+                      value={saveCodeText}
+                      placeholder="请粘贴 RIVER-SAVE-V2. 开头的存档码（兼容 V1）"
+                      rows={8}
+                      spellCheck={false}
+                      autoFocus
+                      readOnly
+                      aria-label="粘贴存档码"
+                    />
+                  </>
+                ) : null}
+              </>
+            )}
+            <div className="modal-actions">
+              {saveCodeModal === "upload" && saveCodePasteOpen ? (
+                <button
+                  type="button"
+                  className="gold-button"
+                  disabled={!saveCodeText.trim()}
+                  onClick={() => void applySaveCode()}
+                >
+                  恢复存档
+                </button>
+              ) : null}
+              <button type="button" onClick={closeSaveCodeModal}>关闭</button>
+            </div>
           </section>
         </div>
       ) : null}

@@ -2,7 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   blank,
+  createSaveCode,
+  exportSave,
   loadSave,
+  parseSaveImport,
+  parseSaveCode,
   parseSave,
   saveData,
   checkSaveState,
@@ -124,6 +128,55 @@ test("duplicate cards and negative chips in imports are rejected", () => {
 test("import overwrite detection ignores a blank save", () => {
   assert.equal(summarizeSaveRecords(blank).hasExistingData, false);
 });
+
+test("compact exports omit defaults and restore into a full save", () => {
+  const save = {
+    ...blank,
+    stats: { ...blank.stats, hands: 12 },
+    savedAt: new Date().toISOString(),
+  };
+  const exported = exportSave(save);
+
+  assert.equal(exported.v, 2);
+  assert.equal("settings" in exported, false);
+  assert.equal("game" in exported, false);
+  const restored = parseSaveImport(exported);
+  assert.equal(restored.stats.hands, 12);
+  assert.equal(restored.settings.mode, blank.settings.mode);
+  assert.equal(restored.game, null);
+});
+
+test("save codes round-trip UTF-8 progress and tolerate copied whitespace", async () => {
+  const save = {
+    ...blank,
+    playerProfile: { ...blank.playerProfile, name: "阿河的牌局" },
+    stats: { ...blank.stats, hands: 12, wins: 4 },
+    savedAt: new Date().toISOString(),
+  };
+  const code = await createSaveCode(save);
+
+  assert.match(code, /^RIVER-SAVE-V2\.(G|P)\./);
+  assert.equal(
+    areSaveContentsEqual(
+      await parseSaveCode(code.replace(/(.{32})/g, "$1\n")),
+      parseSave(save),
+    ),
+    true,
+  );
+});
+
+test("save codes reject tampered progress", async () => {
+  const code = await createSaveCode({
+    ...blank,
+    stats: { ...blank.stats, hands: 2 },
+  });
+
+  const tamperedIndex = code.length - 3;
+  const tamperedCharacter = code[tamperedIndex] === "A" ? "B" : "A";
+  const tamperedCode = code.slice(0, tamperedIndex) + tamperedCharacter + code.slice(tamperedIndex + 1);
+  await assert.rejects(() => parseSaveCode(tamperedCode));
+});
+
 test("import overwrite detection finds progress and personalization", () => {
   const withProgress = {
     ...blank,

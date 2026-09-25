@@ -1,6 +1,6 @@
 {
   "name": "moyu-dezhou",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "publisher": "river-fisher",
   "displayName": "摸鱼德州",
@@ -16,7 +16,7 @@
   "license": "MIT",
   "icon": "media/marketplace-icon.png",
   "engines": {
-    "vscode": "^1.138.0"
+    "vscode": "^1.128.0"
   },
   "categories": [
     "Other"
@@ -75,7 +75,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/three": "^0.180.0",
-    "@types/vscode": "^1.138.0",
+    "@types/vscode": "^1.128.0",
     "@vscode/vsce": "^4.0.0",
     "ovsx": "^1.2.0",
     "tsx": "^4.19.0",

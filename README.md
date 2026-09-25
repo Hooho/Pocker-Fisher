@@ -69,7 +69,7 @@ npm run release -- --skip-push  # 只提交并创建本地 Tag，不合并、不
 2. VS Code Marketplace
 3. Open VSX（Cursor）
 
-输入 1,2,3 表示全部发布，输入 1,3 表示只发布 Web 和 Open VSX，直接回车表示不发布。
+输入 1,2,3 表示全部发布，输入 1,3 表示只发布 Web 和 Open VSX，直接回车表示取消整个发布流程。
 ```
 
 选择 Web 后，脚本会从当前分支合并到 `main`，依次推送 `main` 和版本 Tag。发布成功后会生成类似下面的 Git 历史：

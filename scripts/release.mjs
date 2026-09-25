@@ -395,7 +395,7 @@ async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
     : `合并 ${currentBranch} 到 main 并 push main 和版本 Tag`;
   const vsCodeStatus = skipVsCode ? "（已禁用）" : "";
   const openVsxStatus = skipOpenVsx ? "（已禁用）" : "";
-  console.log("\n请选择发布渠道（可多选，使用逗号分隔；直接回车表示不发布）：");
+  console.log("\n请选择发布渠道（可多选，使用逗号分隔；直接回车取消发布）：");
   console.log(
     `  1. Web${shouldCommit && !skipPush ? `（${webDescription}）` : "（当前不可用）"}`,
   );
@@ -597,6 +597,14 @@ async function createInteractivePlan() {
     ]);
     const publishChannels = await askPublishChannels({ currentBranch, shouldCommit }, readline);
     if (!publishChannels) {
+      return null;
+    }
+    if (
+      !publishChannels.shouldPublishWeb &&
+      !publishChannels.shouldPublishVsCode &&
+      !publishChannels.shouldPublishOpenVsx
+    ) {
+      console.log("\n未选择任何发布渠道，已取消发布。\n");
       return null;
     }
 

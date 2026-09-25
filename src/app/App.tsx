@@ -2758,7 +2758,7 @@ export default function App() {
             </div>
             <div>
               <dt>旧格式兼容</dt>
-              <dd>支持读取旧版 A/B 和 v2 存档，首次读取后自动迁移，不删除原数据。</dd>
+              <dd>支持读取旧版 river-save 存档，首次读取后自动迁移，不删除原数据。</dd>
             </div>
             <div>
               <dt>读取时机</dt>

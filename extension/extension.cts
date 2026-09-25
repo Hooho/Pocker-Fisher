@@ -9,7 +9,6 @@ const backupBaseName = "river-fisher-save";
 const snapshotBackupFileName = "river-fisher-save-snapshots.json";
 const saveShardNames = ["profile", "active", "history", "characters"] as const;
 type SaveShardName = (typeof saveShardNames)[number];
-type SaveSlot = "a" | "b";
 
 type PersistedSave = {
   revision: number;
@@ -22,14 +21,6 @@ type ShardedStoragePayload = {
   manifest: unknown;
   shards: Partial<Record<SaveShardName, unknown>>;
   snapshots?: unknown;
-};
-
-type LegacyShardedStoragePayload = {
-  format: 2;
-  slots: Partial<Record<SaveSlot, {
-    manifest: unknown;
-    shards: Partial<Record<SaveShardName, unknown>>;
-  }>>;
 };
 
 type SaveStorageRequest = {
@@ -114,13 +105,6 @@ function getManifestBackupFile(context: vscode.ExtensionContext) {
   );
 }
 
-function getLegacyManifestBackupFile(context: vscode.ExtensionContext, slot: SaveSlot) {
-  return vscode.Uri.joinPath(
-    getBackupDirectory(context),
-    `${backupBaseName}-${slot}-manifest.json`,
-  );
-}
-
 function getShardBackupFile(
   context: vscode.ExtensionContext,
   shard: SaveShardName,
@@ -128,17 +112,6 @@ function getShardBackupFile(
   return vscode.Uri.joinPath(
     getBackupDirectory(context),
     `${backupBaseName}-${shard}.json`,
-  );
-}
-
-function getLegacyShardBackupFile(
-  context: vscode.ExtensionContext,
-  slot: SaveSlot,
-  shard: SaveShardName,
-) {
-  return vscode.Uri.joinPath(
-    getBackupDirectory(context),
-    `${backupBaseName}-${slot}-${shard}.json`,
   );
 }
 
@@ -178,7 +151,7 @@ async function readJsonBackup(context: vscode.ExtensionContext): Promise<Persist
 
 async function readShardedJsonBackup(
   context: vscode.ExtensionContext,
-): Promise<(ShardedStoragePayload | LegacyShardedStoragePayload) | null> {
+): Promise<ShardedStoragePayload | null> {
   let snapshots: unknown;
   try {
     const contents = await vscode.workspace.fs.readFile(getSnapshotBackupFile(context));
@@ -201,34 +174,9 @@ async function readShardedJsonBackup(
     }
     return { version: 1, manifest, shards, snapshots };
   } catch {
-    // Fall back to the previous A/B file layout below.
+    // The legacy single-file backup is handled by readJsonBackup.
   }
-
-  const slots: LegacyShardedStoragePayload["slots"] = {};
-  for (const slot of ["a", "b"] as const) {
-    let manifest: unknown;
-    try {
-      const contents = await vscode.workspace.fs.readFile(getLegacyManifestBackupFile(context, slot));
-      manifest = JSON.parse(new TextDecoder().decode(contents));
-    } catch {
-      continue;
-    }
-
-    const shards: Partial<Record<SaveShardName, unknown>> = {};
-    for (const shard of saveShardNames) {
-      try {
-        const contents = await vscode.workspace.fs.readFile(getLegacyShardBackupFile(context, slot, shard));
-        shards[shard] = JSON.parse(new TextDecoder().decode(contents));
-      } catch {
-        // The webview can recover the other shards if one file is damaged.
-      }
-    }
-    slots[slot] = { manifest, shards };
-  }
-
-  return Object.keys(slots).length > 0 || snapshots !== undefined
-    ? { format: 2, slots, snapshots }
-    : null;
+  return null;
 }
 
 function stableSerialize(value: unknown): string {
@@ -255,25 +203,12 @@ function checksumValue(value: unknown): string {
   return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
-function getPayloadRevision(
-  payload: ShardedStoragePayload | LegacyShardedStoragePayload | null,
-): number {
+function getPayloadRevision(payload: ShardedStoragePayload | null): number {
   if (!payload) return 0;
-  if ("manifest" in payload) {
-    const manifest = payload.manifest;
-    return isRecord(manifest) && typeof manifest.revision === "number"
-      ? manifest.revision
-      : 0;
-  }
-  return Math.max(
-    0,
-    ...(["a", "b"] as const).map((slot) => {
-      const manifest = payload.slots[slot]?.manifest;
-      return isRecord(manifest) && typeof manifest.revision === "number"
-        ? manifest.revision
-        : 0;
-    }),
-  );
+  const manifest = payload.manifest;
+  return isRecord(manifest) && typeof manifest.revision === "number"
+    ? manifest.revision
+    : 0;
 }
 
 async function writeShardedJsonBackup(

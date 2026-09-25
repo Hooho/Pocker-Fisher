@@ -172,6 +172,40 @@ test("invalid saves are rejected before any storage write", async () => {
   }
 });
 
+test("legacy river-save data is migrated to the sharded format", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+
+  try {
+    const legacySave = {
+      ...blank,
+      savedAt: new Date().toISOString(),
+      stats: { ...blank.stats, hands: 7 },
+    };
+    values.set("river-save", JSON.stringify({ revision: 4, save: legacySave }));
+
+    const loaded = await loadSave();
+    assert.equal(loaded.save.stats.hands, 7);
+    assert.equal(JSON.parse(values.get("river-save:manifest")!).revision, 4);
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
+});
+
 test("a damaged current shard falls back to a whole older snapshot", async () => {
   const previousStorage = globalThis.localStorage;
   const values = new Map<string, string>();

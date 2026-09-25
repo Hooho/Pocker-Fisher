@@ -4,9 +4,7 @@ import type { ChampionshipSimulationCheckpoint } from "../tournament/tournament"
 
 const SAVE_STORAGE_KEY = "river-save";
 const SHARDED_STORAGE_PREFIX = "river-save";
-const LEGACY_SHARDED_STORAGE_PREFIX = "river-save-v2";
 const SNAPSHOT_STORAGE_KEY = `${SHARDED_STORAGE_PREFIX}:snapshots`;
-const LEGACY_SNAPSHOT_STORAGE_KEY = `${LEGACY_SHARDED_STORAGE_PREFIX}:snapshots`;
 const SAVE_LOCK_NAME = "river-save-write";
 const SAVE_CHANNEL_NAME = "river-save-sync";
 const GAME_LOG_LIMIT = 15;
@@ -15,7 +13,6 @@ const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 
 const SAVE_SHARDS = ["profile", "active", "history", "characters"] as const;
 type SaveShardName = (typeof SAVE_SHARDS)[number];
-type SaveSlot = "a" | "b";
 
 type PersistedShard = {
   version: 1;
@@ -35,33 +32,6 @@ type ShardedStoragePayload = {
   version: 1;
   manifest: unknown;
   shards: Partial<Record<SaveShardName, unknown>>;
-  snapshots?: unknown;
-};
-
-type LegacyPersistedShard = {
-  format: 2;
-  revision: number;
-  checksum: string;
-  data: unknown;
-};
-
-type LegacySaveManifest = {
-  format: 2;
-  version: 1;
-  revision: number;
-  savedAt: string;
-  slot: SaveSlot;
-  checksums: Record<SaveShardName, string>;
-};
-
-type LegacyShardedSlotPayload = {
-  manifest: unknown;
-  shards: Partial<Record<SaveShardName, unknown>>;
-};
-
-type LegacyShardedStoragePayload = {
-  format: 2;
-  slots: Partial<Record<SaveSlot, LegacyShardedSlotPayload>>;
   snapshots?: unknown;
 };
 
@@ -639,7 +609,7 @@ function splitSave(save: Save): SaveShardData {
 }
 
 function mergeSaveShards(
-  manifest: Pick<SaveManifest, "savedAt"> | Pick<LegacySaveManifest, "savedAt">,
+  manifest: Pick<SaveManifest, "savedAt">,
   shards: Partial<SaveShardData>,
 ): Save {
   return parseSave({
@@ -838,50 +808,8 @@ const shardedStorageSchema = z.object({
   shards: z.record(z.unknown()),
   snapshots: z.unknown().optional(),
 });
-const legacyPersistedShardSchema = z.object({
-  format: z.literal(2),
-  revision: z.number().int().nonnegative(),
-  checksum: z.string().min(1),
-  data: z.unknown(),
-});
-const legacySaveManifestSchema = z.object({
-  format: z.literal(2),
-  version: z.literal(1),
-  revision: z.number().int().nonnegative(),
-  savedAt: z.string(),
-  slot: z.enum(["a", "b"]),
-  checksums: z.object({
-    profile: z.string().min(1),
-    active: z.string().min(1),
-    history: z.string().min(1),
-    characters: z.string().min(1),
-  }),
-});
-const legacyShardedStorageSchema = z.object({
-  format: z.literal(2),
-  slots: z.object({
-    a: z.object({
-      manifest: z.unknown(),
-      shards: z.record(z.unknown()),
-    }).optional(),
-    b: z.object({
-      manifest: z.unknown(),
-      shards: z.record(z.unknown()),
-    }).optional(),
-  }),
-  snapshots: z.unknown().optional(),
-});
 const snapshotArchiveSchema = z.object({
   version: z.literal(1),
-  snapshots: z.array(z.object({
-    revision: z.number().int().nonnegative(),
-    savedAt: z.string(),
-    checksum: z.string().min(1),
-    save: z.unknown(),
-  })).max(SNAPSHOT_LIMIT),
-});
-const legacySnapshotArchiveSchema = z.object({
-  format: z.literal(2),
   snapshots: z.array(z.object({
     revision: z.number().int().nonnegative(),
     savedAt: z.string(),
@@ -916,15 +844,9 @@ function checksumValue(value: unknown): string {
 
 function parseSnapshotArchive(value: unknown): SaveSnapshot[] {
   const result = snapshotArchiveSchema.safeParse(value);
-  const legacyResult = legacySnapshotArchiveSchema.safeParse(value);
-  const snapshots = result.success
-    ? result.data.snapshots
-    : legacyResult.success
-      ? legacyResult.data.snapshots
-      : null;
-  if (!snapshots) return [];
+  if (!result.success) return [];
 
-  return snapshots
+  return result.data.snapshots
     .flatMap((snapshot) => {
       if (checksumValue(snapshot.save) !== snapshot.checksum) return [];
       try {
@@ -976,17 +898,8 @@ function browserShardKey(shard: SaveShardName) {
   return `${SHARDED_STORAGE_PREFIX}:${shard}`;
 }
 
-function legacyBrowserManifestKey(slot: SaveSlot) {
-  return `${LEGACY_SHARDED_STORAGE_PREFIX}:${slot}:manifest`;
-}
-
-function legacyBrowserShardKey(slot: SaveSlot, shard: SaveShardName) {
-  return `${LEGACY_SHARDED_STORAGE_PREFIX}:${slot}:${shard}`;
-}
-
 function readBrowserSnapshotArchive(): SaveSnapshot[] {
-  const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY)
-    ?? localStorage.getItem(LEGACY_SNAPSHOT_STORAGE_KEY);
+  const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY);
   if (!raw) return [];
   try {
     return parseSnapshotArchive(JSON.parse(raw));
@@ -1034,8 +947,6 @@ function createShardedPayload(stored: StoredSave): ShardedStoragePayload {
 
 type ReadStoredSave = StoredSave & {
   source: "empty" | "legacy" | "sharded";
-  slot?: SaveSlot;
-  needsMigration?: boolean;
   recoveryNotice?: string;
 };
 
@@ -1109,109 +1020,8 @@ function readCurrentShardedStoragePayload(payload: unknown): ReadStoredSave | nu
   };
 }
 
-function readLegacyShardedStoragePayload(payload: unknown): ReadStoredSave | null {
-  const parsedPayload = legacyShardedStorageSchema.safeParse(payload);
-  if (!parsedPayload.success) return null;
-
-  const snapshots = parseSnapshotArchive(parsedPayload.data.snapshots);
-  const candidates: Array<{
-    stored: ReadStoredSave & { slot: SaveSlot };
-    complete: boolean;
-  }> = [];
-  for (const slot of ["a", "b"] as const) {
-    const rawSlot = parsedPayload.data.slots[slot];
-    if (!rawSlot) continue;
-
-    const manifestResult = legacySaveManifestSchema.safeParse(rawSlot.manifest);
-    if (!manifestResult.success || manifestResult.data.slot !== slot) continue;
-    const manifest = manifestResult.data;
-    const shards: Partial<Record<SaveShardName, unknown>> = {};
-    let complete = true;
-
-    for (const shardName of SAVE_SHARDS) {
-      const shardResult = legacyPersistedShardSchema.safeParse(rawSlot.shards[shardName]);
-      if (!shardResult.success) {
-        complete = false;
-        continue;
-      }
-      if (
-        shardResult.data.revision !== manifest.revision ||
-        shardResult.data.checksum !== manifest.checksums[shardName] ||
-        checksumValue(shardResult.data.data) !== shardResult.data.checksum
-      ) {
-        complete = false;
-        continue;
-      }
-
-      const dataResult = saveShardSchemas[shardName].safeParse(shardResult.data.data);
-      if (dataResult.success) {
-        shards[shardName] = dataResult.data;
-      } else {
-        complete = false;
-      }
-    }
-
-    candidates.push({
-      complete,
-      stored: {
-        revision: manifest.revision,
-        save: mergeSaveShards(manifest, shards as Partial<SaveShardData>),
-        source: "sharded",
-        slot,
-        snapshots,
-        needsMigration: true,
-      },
-    });
-  }
-
-  candidates.sort((left, right) => right.stored.revision - left.stored.revision);
-  const newest = candidates[0];
-  if (!newest) {
-    const snapshot = snapshots[0];
-    return snapshot
-      ? {
-        revision: snapshot.revision,
-        save: snapshot.save,
-        source: "sharded",
-        snapshots,
-        needsMigration: true,
-        recoveryNotice: `当前存档索引损坏，已自动回退到旧版本（版本 ${snapshot.revision}）。`,
-      }
-      : null;
-  }
-  if (newest.complete) return newest.stored;
-
-  const olderComplete = candidates.find(
-    (candidate) => candidate.complete && candidate.stored.revision < newest.stored.revision,
-  );
-  if (olderComplete) {
-    return {
-      ...olderComplete.stored,
-      recoveryNotice: `当前存档（版本 ${newest.stored.revision}）校验失败，已自动回退到旧版本（版本 ${olderComplete.stored.revision}）。`,
-    };
-  }
-
-  const snapshot = snapshots.find((candidate) => candidate.revision < newest.stored.revision);
-  if (snapshot) {
-    return {
-      revision: snapshot.revision,
-      save: snapshot.save,
-      source: "sharded",
-      snapshots,
-      needsMigration: true,
-      recoveryNotice: `当前存档（版本 ${newest.stored.revision}）损坏，已自动回退到历史版本（版本 ${snapshot.revision}）。`,
-    };
-  }
-
-  return {
-    ...newest.stored,
-    recoveryNotice: `当前存档（版本 ${newest.stored.revision}）部分损坏，未找到完整旧版本，已保留未损坏的数据。`,
-  };
-}
-
 function readShardedStoragePayload(payload: unknown): ReadStoredSave | null {
-  return readCurrentShardedStoragePayload(payload)
-    ?? readLegacyShardedStoragePayload(payload);
+  return readCurrentShardedStoragePayload(payload);
 }
 
 function readBrowserShardedSave(): ReadStoredSave | null {
@@ -1239,40 +1049,10 @@ function readBrowserShardedSave(): ReadStoredSave | null {
       });
       if (current) return current;
     } catch {
-      // A malformed current manifest can still fall back to the legacy slots.
+      // A malformed current manifest can still fall back to the legacy river-save value.
     }
   }
-
-  const slots: Partial<Record<SaveSlot, LegacyShardedSlotPayload>> = {};
-  for (const slot of ["a", "b"] as const) {
-    const legacyManifestRaw = localStorage.getItem(legacyBrowserManifestKey(slot));
-    if (!legacyManifestRaw) continue;
-
-    try {
-      slots[slot] = { manifest: JSON.parse(legacyManifestRaw), shards: {} };
-    } catch {
-      // A malformed slot is ignored; the other slot or legacy save may still work.
-      continue;
-    }
-
-    for (const shardName of SAVE_SHARDS) {
-      const shardRaw = localStorage.getItem(legacyBrowserShardKey(slot, shardName));
-      if (!shardRaw) continue;
-      try {
-        slots[slot]!.shards[shardName] = JSON.parse(shardRaw);
-      } catch {
-        // Leave only this shard unavailable; the other shards remain recoverable.
-      }
-    }
-  }
-  return readShardedStoragePayload({
-    format: 2,
-    slots,
-    snapshots: {
-      version: 1,
-      snapshots: readBrowserSnapshotArchive(),
-    },
-  });
+  return null;
 }
 
 function writeBrowserStoredSave(stored: StoredSave) {
@@ -1412,7 +1192,7 @@ export const loadSave = async (): Promise<SaveLoadResult> => {
       // optional VS Code JSON backup is unavailable.
     }
   }
-  if (stored.source === "legacy" || stored.needsMigration) {
+  if (stored.source === "legacy") {
     writeBrowserSnapshotArchive(stored.snapshots ?? []);
     writeBrowserStoredSave(stored);
   }
@@ -1481,17 +1261,13 @@ export function subscribeToSaveChanges(listener: (revision: number) => void) {
   };
   const onStorage = (event: StorageEvent) => {
     const isManifestChange =
-      event.key === browserManifestKey() ||
-      event.key === legacyBrowserManifestKey("a") ||
-      event.key === legacyBrowserManifestKey("b");
+      event.key === browserManifestKey();
     if (!event.newValue || (event.key !== SAVE_STORAGE_KEY && !isManifestChange)) return;
     try {
       if (isManifestChange) {
         const value = JSON.parse(event.newValue);
         const manifest = saveManifestSchema.safeParse(value);
-        const legacyManifest = legacySaveManifestSchema.safeParse(value);
         if (manifest.success) listener(manifest.data.revision);
-        else if (legacyManifest.success) listener(legacyManifest.data.revision);
         return;
       }
 

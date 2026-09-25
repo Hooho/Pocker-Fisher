@@ -231,6 +231,75 @@ async function askYesNo(prompt, readline, defaultValue) {
   return answer === "y" || answer === "yes" || answer === "是";
 }
 
+function parsePublishChannels(answer) {
+  const channels = new Set();
+  const aliases = new Map([
+    ["1", "web"],
+    ["web", "web"],
+    ["网页", "web"],
+    ["2", "vscode"],
+    ["vscode", "vscode"],
+    ["vs-code", "vscode"],
+    ["3", "openvsx"],
+    ["openvsx", "openvsx"],
+  ]);
+
+  for (const value of answer.split(/[,，、\s]+/).filter(Boolean)) {
+    const channel = aliases.get(value.toLowerCase());
+    if (!channel) {
+      throw new Error(`无法识别发布渠道：${value}`);
+    }
+    channels.add(channel);
+  }
+
+  return channels;
+}
+
+async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
+  const webDescription = currentBranch === "main"
+    ? "push main 和版本 Tag"
+    : `合并 ${currentBranch} 到 main 并 push main 和版本 Tag`;
+  console.log("\n请选择发布渠道（可多选，使用逗号分隔；直接回车表示不发布）：");
+  console.log(
+    `  1. Web${shouldCommit && !skipPush ? `（${webDescription}）` : "（当前不可用）"}`,
+  );
+  console.log(`  2. VS Code Marketplace${skipVsCode ? "（已禁用）" : ""}`);
+  console.log(`  3. Open VSX（Cursor）${skipOpenVsx ? "（已禁用）" : ""}`);
+  console.log("例如：1,2,3 或 1,3");
+
+  while (true) {
+    const answer = await ask("发布渠道：", readline);
+    if (!answer) {
+      return {
+        shouldPublishWeb: false,
+        shouldPublishVsCode: false,
+        shouldPublishOpenVsx: false,
+      };
+    }
+
+    try {
+      const channels = parsePublishChannels(answer);
+      if (channels.has("web") && (!shouldCommit || skipPush || currentBranch === "HEAD")) {
+        throw new Error("Web 发布需要创建版本提交，且当前分支必须能合并到 main。请移除 Web 选项后重试。");
+      }
+      if (channels.has("vscode") && skipVsCode) {
+        throw new Error("VS Code 发布已被 --skip-vscode 禁用。");
+      }
+      if (channels.has("openvsx") && skipOpenVsx) {
+        throw new Error("Open VSX 发布已被 --skip-openvsx 禁用。");
+      }
+
+      return {
+        shouldPublishWeb: channels.has("web"),
+        shouldPublishVsCode: channels.has("vscode"),
+        shouldPublishOpenVsx: channels.has("openvsx"),
+      };
+    } catch (error) {
+      console.log(`${error instanceof Error ? error.message : "发布渠道无效"}\n`);
+    }
+  }
+}
+
 async function askVersionPlan(currentVersion, readline) {
   if (exactVersion) {
     if (compareCoreVersions(exactVersion, currentVersion) < 0) {
@@ -352,30 +421,14 @@ async function createInteractivePlan() {
       "--abbrev-ref",
       "HEAD",
     ]);
-    const shouldSyncMain = shouldCommit && !skipPush
-      ? await askYesNo(
-          currentBranch === "main"
-            ? "是否推送 main，并推送版本 Tag？"
-            : `是否将当前分支 ${currentBranch} 合并到 main，并推送 main 和版本 Tag？`,
-          readline,
-          true,
-        )
-      : false;
-    const shouldPublishVsCode = skipVsCode
-      ? false
-      : await askYesNo("是否发布到 VS Code Marketplace？", readline, false);
-    const shouldPublishOpenVsx = skipOpenVsx
-      ? false
-      : await askYesNo("是否发布到 Open VSX（Cursor 可从这里获取扩展）？", readline, false);
+    const publishChannels = await askPublishChannels({ currentBranch, shouldCommit }, readline);
 
     return {
       ...versionPlan,
       shouldTest,
       shouldPackage,
       shouldCommit,
-      shouldSyncMain,
-      shouldPublishVsCode,
-      shouldPublishOpenVsx,
+      ...publishChannels,
     };
   } finally {
     readline.close();
@@ -543,7 +596,7 @@ async function main() {
         shouldTest: true,
         shouldPackage: true,
         shouldCommit: false,
-        shouldSyncMain: false,
+        shouldPublishWeb: false,
         shouldPublishVsCode: false,
         shouldPublishOpenVsx: false,
       }
@@ -561,7 +614,7 @@ async function main() {
   requirePublishTokens(plan);
   if (!dryRun) {
     await ensureReleaseFilesClean();
-    if (plan.shouldSyncMain) {
+    if (plan.shouldPublishWeb) {
       await ensureWorkingTreeClean();
     }
   }
@@ -617,7 +670,7 @@ async function main() {
 
   if (plan.shouldCommit) {
     await createReleaseCommit(packageJson.version);
-    if (plan.shouldSyncMain) {
+    if (plan.shouldPublishWeb) {
       await syncMainAndPush(packageJson.version);
     } else {
       await createReleaseTag(packageJson.version);
@@ -675,7 +728,7 @@ async function main() {
     );
   }
 
-  if (plan.shouldPublishVsCode || plan.shouldPublishOpenVsx) {
+  if (plan.shouldPublishWeb || plan.shouldPublishVsCode || plan.shouldPublishOpenVsx) {
     console.log("\n发布流程完成：已处理你选择的发布渠道。\n");
   } else {
     console.log("\n已完成测试和 VSIX 打包，未发布到任何 Marketplace。\n");

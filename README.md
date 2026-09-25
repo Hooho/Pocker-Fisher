@@ -24,7 +24,7 @@ npm run dev
 
 ## 一键发布扩展
 
-`npm run release` 是一个交互式发布向导。它会逐步询问版本类型、是否运行测试、是否打包 VSIX、是否创建 Release Commit、是否将当前分支合并到 `main` 并推送 `main` 与版本 Tag，以及是否发布到 VS Code Marketplace 和 Open VSX（Cursor 可使用的第三方扩展注册表）。合并推送和发布渠道都会单独询问确认。
+`npm run release` 是一个交互式发布向导。它会逐步询问版本类型、是否运行测试、是否打包 VSIX、是否创建 Release Commit，以及发布渠道。发布渠道支持多选：Web、VS Code Marketplace、Open VSX（Cursor 可使用的第三方扩展注册表）。
 
 如果在向导中选择发布，可以使用项目根目录的 `.env` 文件配置令牌；只打包或只做检查时不需要令牌。先复制模板并填写：
 
@@ -62,7 +62,17 @@ npm run release -- --skip-push  # 只提交并创建本地 Tag，不合并、不
 
 向导中的版本选项对应 SemVer：修复问题使用 `patch`，新增功能使用 `minor`，重大不兼容变更使用 `major`。首次发布可以选择“保持当前版本号”或手动输入当前版本；如果只想生成 VSIX，发布问题选择“否”即可。
 
-确认合并推送后，脚本会从当前分支合并到 `main`，依次推送 `main` 和版本 Tag。发布成功后会生成类似下面的 Git 历史：
+发布渠道会统一询问一次，使用逗号多选：
+
+```text
+1. Web：合并当前分支到 main，并 push main 和版本 Tag
+2. VS Code Marketplace
+3. Open VSX（Cursor）
+
+输入 1,2,3 表示全部发布，输入 1,3 表示只发布 Web 和 Open VSX，直接回车表示不发布。
+```
+
+选择 Web 后，脚本会从当前分支合并到 `main`，依次推送 `main` 和版本 Tag。发布成功后会生成类似下面的 Git 历史：
 
 ```text
 chore(release): v1.0.1

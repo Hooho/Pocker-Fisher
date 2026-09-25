@@ -2400,9 +2400,23 @@ export default function App() {
     closeSaveCodeModal();
     file.current?.click();
   };
-  const openSaveCodePaste = () => {
+  const openSaveCodePaste = async () => {
     setSaveCodePasteOpen(true);
     setSaveCodeText("");
+    if (!navigator.clipboard?.readText) {
+      setToast("当前环境无法读取剪贴板，请先复制存档码后重试");
+      return;
+    }
+    try {
+      const pasted = await navigator.clipboard.readText();
+      if (!pasted.trim()) {
+        setToast("剪贴板里没有内容，请先复制存档码再点击此按钮");
+        return;
+      }
+      setSaveCodeText(pasted.trim());
+    } catch {
+      setToast("无法读取剪贴板，请先复制存档码后重试");
+    }
   };
   const copySaveCode = async () => {
     if (!saveCodeText.trim()) {
@@ -4411,7 +4425,7 @@ export default function App() {
             ) : (
               <>
                 <p className="muted">
-                  可以上传之前下载的 JSON 文件；如果微信不支持下载文件，就点击“粘贴存档码”恢复。
+                  可以上传之前下载的 JSON 文件；如果微信不支持下载文件，先复制存档码，再点击“粘贴存档码”自动读取。
                 </p>
                 <div className="save-transfer-actions">
                   <button type="button" onClick={uploadJsonSave}>
@@ -4420,7 +4434,7 @@ export default function App() {
                   <button
                     type="button"
                     className={saveCodePasteOpen ? "gold-button" : undefined}
-                    onClick={openSaveCodePaste}
+                    onClick={() => void openSaveCodePaste()}
                   >
                     <Copy size={14} /> 粘贴存档码
                   </button>
@@ -4430,28 +4444,28 @@ export default function App() {
                     <textarea
                       className="save-code-textarea"
                       value={saveCodeText}
-                      onChange={(event) => setSaveCodeText(event.target.value)}
                       placeholder="请粘贴 RIVER-SAVE-V2. 开头的存档码（兼容 V1）"
                       rows={8}
                       spellCheck={false}
                       autoFocus
+                      readOnly
                       aria-label="粘贴存档码"
                     />
-                    <div className="modal-actions">
-                      <button
-                        type="button"
-                        className="gold-button"
-                        disabled={!saveCodeText.trim()}
-                        onClick={() => void applySaveCode()}
-                      >
-                        恢复存档
-                      </button>
-                    </div>
                   </>
                 ) : null}
               </>
             )}
             <div className="modal-actions">
+              {saveCodeModal === "upload" && saveCodePasteOpen ? (
+                <button
+                  type="button"
+                  className="gold-button"
+                  disabled={!saveCodeText.trim()}
+                  onClick={() => void applySaveCode()}
+                >
+                  恢复存档
+                </button>
+              ) : null}
               <button type="button" onClick={closeSaveCodeModal}>关闭</button>
             </div>
           </section>

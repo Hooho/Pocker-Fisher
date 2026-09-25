@@ -2422,8 +2422,8 @@ input[type="range"] {
 }
 
 .save-transfer-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 18px 0 14px;
 }
@@ -2460,6 +2460,10 @@ input[type="range"] {
 
 .modal-actions button {
   font-size: 11px;
+}
+
+.save-code-modal .modal-actions {
+  flex-wrap: nowrap;
 }
 
 .import-warning {

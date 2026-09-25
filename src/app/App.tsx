@@ -2758,7 +2758,6 @@ export default function App() {
           <div className="info-settings-card-heading">
             <span className="info-settings-icon"><Info size={17} /></span>
             <div>
-              <p className="eyebrow">APPLICATION</p>
               <h2>应用信息</h2>
             </div>
           </div>
@@ -2779,7 +2778,6 @@ export default function App() {
             <div className="info-settings-card-heading">
               <span className="info-settings-icon"><Info size={17} /></span>
               <div>
-                <p className="eyebrow">VSCODE EXTENSION</p>
                 <h2>VS Code 扩展存档</h2>
               </div>
             </div>
@@ -2813,12 +2811,12 @@ export default function App() {
           <div className="info-settings-card-heading">
             <span className="info-settings-icon info-settings-icon-muted"><Upload size={17} /></span>
             <div>
-              <p className="eyebrow">BACKUP &amp; TRANSFER</p>
               <h2>下载存档，上传恢复</h2>
             </div>
           </div>
           <p>
             你可以随时导出一份 JSON 存档，也可以在另一台设备导入它来继续游戏。
+            完全离线，不联网
           </p>
           <div className="info-settings-transfer">
             <span><Download size={14} /> 导出最新存档</span>
@@ -2829,10 +2827,6 @@ export default function App() {
           </div>
         </article>
         <section className="reset-settings" aria-labelledby="reset-settings-title">
-          <div className="settings-section-heading">
-            <h2 id="reset-settings-title">重置</h2>
-            <p className="muted">清理本机保存的牌局、战绩、人物修改、个人资料和设置。</p>
-          </div>
           <div className="reset-danger-panel">
             <h2>重置所有数据</h2>
             <p>
@@ -2849,7 +2843,7 @@ export default function App() {
               disabled={resetting}
               onClick={() => setResetConfirmOpen(true)}
             >
-              <RotateCcw size={15} /> {resetting ? "正在重置…" : "重置所有数据"}
+              <RotateCcw size={15} /> {resetting ? "正在重置…" : "重置应用"}
             </button>
           </div>
         </section>

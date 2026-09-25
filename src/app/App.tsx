@@ -1744,7 +1744,7 @@ export default function App() {
         g,
         t
           ? Math.min(102400, 100 * 2 ** Math.floor(g.hand / (t?.pace || 10)))
-          : 100,
+          : Math.min(102400, 100 * 2 ** Math.floor(g.hand / data.settings.pace)),
       ),
     );
   };
@@ -3363,34 +3363,32 @@ export default function App() {
                     ))}
                   </select>
                 </label>
+                <label>
+                  涨盲节奏
+                  <select
+                    value={data.settings.pace}
+                    onChange={(e) =>
+                      updateSettings({ pace: +e.target.value })
+                    }
+                  >
+                    <option value={5}>快速 · 每 5 手涨盲</option>
+                    <option value={10}>标准 · 每 10 手涨盲</option>
+                    <option value={20}>深度 · 每 20 手涨盲</option>
+                  </select>
+                </label>
                 {newMode === "tournament" ? (
-                  <>
-                    <label>
-                      比赛节奏
-                      <select
-                        value={data.settings.pace}
-                        onChange={(e) =>
-                          updateSettings({ pace: +e.target.value })
-                        }
-                      >
-                        <option value={5}>快速 · 每 5 手涨盲</option>
-                        <option value={10}>标准 · 每 10 手涨盲</option>
-                        <option value={20}>深度 · 每 20 手涨盲</option>
-                      </select>
-                    </label>
-                    <label className="modal-toggle">
-                      <span className="modal-toggle-copy">
-                        <strong>进入下一轮重置筹码</strong>
-                        <small>{resetTournamentStacks ? "全部选手重置为 10,000" : "保留选手当前筹码"}</small>
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={resetTournamentStacks}
-                        onChange={(e) => setResetTournamentStacks(e.target.checked)}
-                      />
-                      <span className="modal-toggle-track" aria-hidden="true" />
-                    </label>
-                  </>
+                  <label className="modal-toggle">
+                    <span className="modal-toggle-copy">
+                      <strong>进入下一轮重置筹码</strong>
+                      <small>{resetTournamentStacks ? "全部选手重置为 10,000" : "保留选手当前筹码"}</small>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={resetTournamentStacks}
+                      onChange={(e) => setResetTournamentStacks(e.target.checked)}
+                    />
+                    <span className="modal-toggle-track" aria-hidden="true" />
+                  </label>
                 ) : null}
                 <button
                   className="gold-button full"
@@ -3406,7 +3404,7 @@ export default function App() {
                 <ul className="mode-details-list">
                   <li>2–8 人同桌，与电脑选手进行一场独立牌局。</li>
                   <li>人数和难度可自由选择。</li>
-                  <li>起始筹码统一为 10,000，不设晋级流程。</li>
+                  <li>起始筹码统一为 10,000，可设置每 5、10 或 20 手涨盲，不设晋级流程。</li>
                 </ul>
               </>
             ) : modal === "tournament-details" ? (

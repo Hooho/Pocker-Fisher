@@ -975,7 +975,7 @@ footer>span:last-child {
   color: #d7dfc354;
   font-family: "Noto Sans SC", sans-serif;
   font-size: clamp(13px, 1.35vw, 19px);
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: 0.16em;
 }
 

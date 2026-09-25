@@ -375,16 +375,18 @@ function parsePublishChannels(answer) {
   return channels;
 }
 
-async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
+async function askPublishChannels({ currentBranch, shouldCommit, shouldPackage }, readline) {
   const webDescription = currentBranch === "main"
     ? "push main 和版本 Tag"
     : `合并 ${currentBranch} 到 main 并 push main 和版本 Tag`;
+  const vsCodeStatus = skipVsCode ? "（已禁用）" : !shouldPackage ? "（需要打包 VSIX）" : "";
+  const openVsxStatus = skipOpenVsx ? "（已禁用）" : !shouldPackage ? "（需要打包 VSIX）" : "";
   console.log("\n请选择发布渠道（可多选，使用逗号分隔；直接回车表示不发布）：");
   console.log(
     `  1. Web${shouldCommit && !skipPush ? `（${webDescription}）` : "（当前不可用）"}`,
   );
-  console.log(`  2. VS Code Marketplace${skipVsCode ? "（已禁用）" : ""}`);
-  console.log(`  3. Open VSX（Cursor）${skipOpenVsx ? "（已禁用）" : ""}`);
+  console.log(`  2. VS Code Marketplace${vsCodeStatus}`);
+  console.log(`  3. Open VSX（Cursor）${openVsxStatus}`);
   console.log("方向键移动，Space 勾选/取消，Enter 确认；也支持输入 1,2,3");
 
   const webDisabled = !shouldCommit || skipPush || currentBranch === "HEAD";
@@ -397,12 +399,12 @@ async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
     {
       label: "VS Code Marketplace",
       value: "vscode",
-      disabled: skipVsCode,
+      disabled: skipVsCode || !shouldPackage,
     },
     {
       label: "Open VSX（Cursor）",
       value: "openvsx",
-      disabled: skipOpenVsx,
+      disabled: skipOpenVsx || !shouldPackage,
     },
   ];
 
@@ -442,8 +444,14 @@ async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
       if (channels.has("vscode") && skipVsCode) {
         throw new Error("VS Code 发布已被 --skip-vscode 禁用。");
       }
+      if (channels.has("vscode") && !shouldPackage) {
+        throw new Error("VS Code 发布需要先构建并打包 VSIX。");
+      }
       if (channels.has("openvsx") && skipOpenVsx) {
         throw new Error("Open VSX 发布已被 --skip-openvsx 禁用。");
+      }
+      if (channels.has("openvsx") && !shouldPackage) {
+        throw new Error("Open VSX 发布需要先构建并打包 VSIX。");
       }
 
       return {
@@ -570,9 +578,6 @@ async function createInteractivePlan() {
     }
 
     const shouldPackage = await askYesNo("是否构建并打包 VSIX？", readline, true);
-    if (!shouldPackage) {
-      return null;
-    }
 
     const shouldCommit = await askYesNo(
       "打包成功后，是否创建版本提交和 Git Tag？",
@@ -584,7 +589,10 @@ async function createInteractivePlan() {
       "--abbrev-ref",
       "HEAD",
     ]);
-    const publishChannels = await askPublishChannels({ currentBranch, shouldCommit }, readline);
+    const publishChannels = await askPublishChannels(
+      { currentBranch, shouldCommit, shouldPackage },
+      readline,
+    );
     if (!publishChannels) {
       return null;
     }
@@ -812,6 +820,7 @@ async function main() {
     `${packageJson.publisher}.${packageJson.name}-${packageJson.version}.vsix`,
   );
   mkdirSync(artifactsDirectory, { recursive: true });
+  const shouldPublishVsix = plan.shouldPublishVsCode || plan.shouldPublishOpenVsx;
 
   if (plan.shouldPackage) {
     await runCommand("构建并打包 VSIX", npxCommand, [
@@ -821,13 +830,16 @@ async function main() {
       "--out",
       vsixPath,
     ]);
-  }
+    if (!existsSync(vsixPath)) {
+      throw new Error(`VSIX 未生成：${vsixPath}`);
+    }
 
-  if (!existsSync(vsixPath)) {
-    throw new Error(`VSIX 未生成：${vsixPath}`);
+    console.log(`\nVSIX 已生成：${vsixPath}`);
+  } else if (shouldPublishVsix) {
+    throw new Error("选择了 VS Code 或 Open VSX，但没有构建 VSIX。请返回并确认打包 VSIX。");
+  } else {
+    console.log("\n已跳过 VSIX 构建，将继续处理 Web 发布流程。");
   }
-
-  console.log(`\nVSIX 已生成：${vsixPath}`);
 
   if (dryRun) {
     console.log("试运行完成：没有调用任何发布接口。");

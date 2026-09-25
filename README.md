@@ -60,7 +60,7 @@ npm run release -- --version 1.0.0  # 手动指定版本，适合首次发布
 npm run release -- --skip-push  # 只提交并创建本地 Tag，不合并、不推送
 ```
 
-向导中的版本选项对应 SemVer：修复问题使用 `patch`，新增功能使用 `minor`，重大不兼容变更使用 `major`。首次发布可以选择“保持当前版本号”或手动输入当前版本；如果只想生成 VSIX，发布问题选择“否”即可。
+向导中的版本选项对应 SemVer：修复问题使用 `patch`，新增功能使用 `minor`，重大不兼容变更使用 `major`。首次发布可以选择“保持当前版本号”或手动输入当前版本。不打包 VSIX 仍可继续发布 Web；如果选择 VS Code Marketplace 或 Open VSX，则必须先打包 VSIX。
 
 发布渠道会统一询问一次。交互式终端中，版本选项和发布渠道都可以用 ↑/↓ 移动；版本菜单按 Enter 确认，发布渠道按 Space 勾选/取消、按 Enter 确认。非交互终端仍支持用逗号输入多个渠道：
 

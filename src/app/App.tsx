@@ -1254,7 +1254,7 @@ export default function App() {
   }, []);
   const saveFreshnessCheck = useRef<Promise<boolean> | null>(null);
   const confirmExternalSave = useCallback(() => {
-    if (vscodeEnvironment) return Promise.resolve(true);
+    if (vscodeEnvironment) return Promise.resolve(false);
     if (saveFreshnessCheck.current) return saveFreshnessCheck.current;
 
     const check = (async () => {

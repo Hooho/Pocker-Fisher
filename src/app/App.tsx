@@ -1467,29 +1467,50 @@ export default function App() {
   userPlayerRef.current = userPlayer;
   useEffect(() => {
     cleanupLegacyTimerStorage();
-    Promise.all([loadSave(), fetch(publicAsset("characters.json")).then((r) => r.json())])
-      .then(([loaded, chars]) => {
-        const saved = loaded.save;
-        if (loaded.recoveryNotice) setToast(loaded.recoveryNotice);
-        const restored = ensureMatchMetadata(
-          saved.tournament?.out && !saved.tournament.complete && !saved.tournament.simulationComplete
-            ? { ...saved, tournament: { ...saved.tournament, autoSimulating: true } }
-            : saved,
-        );
-        setData(restored);
-        setProfileNameDraft(restored.playerProfile.name);
-        setProfileAvatarDraft(restored.playerProfile.avatar);
-        setCharacters(chars);
-        setReady(true);
-      })
-      .catch(() => {
-        setToast("本地存档读取失败，可导入备份；未覆盖原存档");
+    void Promise.allSettled([
+      loadSave(),
+      fetch(publicAsset("characters.json")).then((response) => {
+        if (!response.ok) throw new Error(`人物数据请求失败（${response.status}）`);
+        return response.json();
+      }),
+    ]).then(([saveResult, charactersResult]) => {
+      if (saveResult.status === "rejected") {
         setSaveError(true);
-        fetch(publicAsset("characters.json"))
-          .then((r) => r.json())
-          .then(setCharacters);
+        setSaveLoadIssue({
+          title: "本地存档读取失败",
+          message: `${describeSaveReadFailure(saveResult.reason)}原存档未被覆盖，请导入备份后继续。`,
+          recoverable: false,
+        });
+        if (charactersResult.status === "fulfilled") setCharacters(charactersResult.value);
         setReady(true);
-      });
+        return;
+      }
+
+      const loaded = saveResult.value;
+      if (loaded.recoveryNotice) {
+        setSaveError(true);
+        setSaveLoadIssue({
+          title: "检测到存档损坏",
+          message: loaded.recoveryNotice,
+          recoverable: true,
+        });
+      }
+      const saved = loaded.save;
+      const restored = ensureMatchMetadata(
+        saved.tournament?.out && !saved.tournament.complete && !saved.tournament.simulationComplete
+          ? { ...saved, tournament: { ...saved.tournament, autoSimulating: true } }
+          : saved,
+      );
+      setData(restored);
+      setProfileNameDraft(restored.playerProfile.name);
+      setProfileAvatarDraft(restored.playerProfile.avatar);
+      if (charactersResult.status === "fulfilled") {
+        setCharacters(charactersResult.value);
+      } else {
+        setToast("人物数据加载失败，但存档已恢复");
+      }
+      setReady(true);
+    });
   }, []);
   useEffect(() => {
     if (!ready) return;
@@ -2162,6 +2183,7 @@ export default function App() {
     setProfileAvatarDraft(restored.playerProfile.avatar);
     setImported(null);
     setSaveError(false);
+    setSaveLoadIssue(null);
     setPaused(true);
     setPage(restored.game ? "table" : "lobby");
     setToast(
@@ -2405,7 +2427,7 @@ export default function App() {
     }
     commit(act(g, { type: "raise", amount: raise }));
   };
-  const overlayOpen = !!(modal || selected || batchOpen || imported || confirmDialog || resetConfirmOpen || saveStale);
+  const overlayOpen = !!(modal || selected || batchOpen || imported || confirmDialog || resetConfirmOpen || saveStale || saveLoadIssue);
   useEffect(() => {
     if (!active || !g || overlayOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -3523,6 +3545,58 @@ export default function App() {
       {toast ? (
         <div className="toast" role="status">
           {toast}
+        </div>
+      ) : null}
+      {saveLoadIssue ? (
+        <div className="modal-backdrop storage-issue-backdrop">
+          <section
+            className="modal storage-issue-modal"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="storage-issue-title"
+          >
+            <p className="eyebrow">LOCAL SAVE CHECK</p>
+            <h2 id="storage-issue-title">{saveLoadIssue.title}</h2>
+            <div className="notice import-warning">{saveLoadIssue.message}</div>
+            <p className="muted">
+              {saveLoadIssue.recoverable
+                ? "系统已暂时使用可读取的版本。确认后才会继续正常自动保存。"
+                : "当前数据未覆盖。你可以导入之前导出的 JSON 存档。"}
+            </p>
+            <div className="modal-actions">
+              {saveLoadIssue.recoverable ? (
+                <button
+                  type="button"
+                  className="gold-button full"
+                  onClick={() => {
+                    setSaveLoadIssue(null);
+                    setSaveError(false);
+                  }}
+                >
+                  确认并继续
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSaveLoadIssue(null);
+                      file.current?.click();
+                    }}
+                  >
+                    导入备份
+                  </button>
+                  <button
+                    type="button"
+                    className="gold-button"
+                    onClick={() => setSaveLoadIssue(null)}
+                  >
+                    知道了
+                  </button>
+                </>
+              )}
+            </div>
+          </section>
         </div>
       ) : null}
       {modal ? (

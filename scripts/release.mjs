@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { stdin as input, stdout as output } from "node:process";
+import { emitKeypressEvents } from "node:readline";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
@@ -231,6 +232,125 @@ async function askYesNo(prompt, readline, defaultValue) {
   return answer === "y" || answer === "yes" || answer === "是";
 }
 
+function canUseKeyboardSelector() {
+  return Boolean(input.isTTY && typeof input.setRawMode === "function");
+}
+
+function selectWithKeyboard(title, options, readline, multiple = false) {
+  return new Promise((resolve, reject) => {
+    readline.pause();
+    input.resume();
+    input.setRawMode(true);
+    emitKeypressEvents(input);
+
+    let activeIndex = 0;
+    const selected = new Set();
+    let renderedLineCount = 0;
+
+    const render = () => {
+      if (renderedLineCount > 0) {
+        output.write(`\u001b[${renderedLineCount}A`);
+      }
+
+      const lines = [
+        title,
+        ...options.map((option, index) => {
+          const pointer = index === activeIndex ? "❯" : " ";
+          const marker = multiple ? (selected.has(index) ? "[x]" : "[ ]") : "";
+          const disabled = option.disabled ? "（不可用）" : "";
+          return `${pointer} ${marker} ${option.label}${disabled}`.trimEnd();
+        }),
+      ];
+
+      for (const line of lines) {
+        output.write(`\u001b[2K\r${line}\n`);
+      }
+      renderedLineCount = lines.length;
+    };
+
+    const cleanup = () => {
+      input.removeListener("keypress", onKeypress);
+      input.setRawMode(false);
+      readline.resume();
+      output.write("\u001b[?25h");
+    };
+
+    const finish = (value) => {
+      cleanup();
+      output.write("\n");
+      resolve(value);
+    };
+
+    const onKeypress = (_character, key = {}) => {
+      if (key.ctrl && key.name === "c") {
+        finish(null);
+        return;
+      }
+
+      if (key.name === "escape") {
+        finish(null);
+        return;
+      }
+
+      if (key.name === "up") {
+        activeIndex = (activeIndex - 1 + options.length) % options.length;
+        render();
+        return;
+      }
+
+      if (key.name === "down") {
+        activeIndex = (activeIndex + 1) % options.length;
+        render();
+        return;
+      }
+
+      if (multiple && (key.name === "space" || key.sequence === " ")) {
+        if (!options[activeIndex].disabled) {
+          if (selected.has(activeIndex)) {
+            selected.delete(activeIndex);
+          } else {
+            selected.add(activeIndex);
+          }
+          render();
+        }
+        return;
+      }
+
+      if (key.name === "return") {
+        if (multiple) {
+          finish(options.filter((_option, index) => selected.has(index)));
+        } else if (!options[activeIndex].disabled) {
+          finish(options[activeIndex]);
+        }
+      }
+    };
+
+    input.on("keypress", onKeypress);
+    output.write("\u001b[?25l");
+    render();
+  }).catch((error) => {
+    input.setRawMode(false);
+    readline.resume();
+    throw error;
+  });
+}
+
+async function selectOne(title, options, readline) {
+  if (canUseKeyboardSelector()) {
+    return selectWithKeyboard(title, options, readline);
+  }
+
+  while (true) {
+    const answer = await ask(`${title}\n请输入选项编号：`, readline);
+    const index = Number.parseInt(answer, 10) - 1;
+    if (Number.isInteger(index) && options[index] && !options[index].disabled) {
+      return options[index];
+    }
+
+    console.log("选项无效，请重新输入。\n");
+  }
+}
+
 function parsePublishChannels(answer) {
   const channels = new Set();
   const aliases = new Map([
@@ -265,7 +385,44 @@ async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
   );
   console.log(`  2. VS Code Marketplace${skipVsCode ? "（已禁用）" : ""}`);
   console.log(`  3. Open VSX（Cursor）${skipOpenVsx ? "（已禁用）" : ""}`);
-  console.log("例如：1,2,3 或 1,3");
+  console.log("方向键移动，Space 勾选/取消，Enter 确认；也支持输入 1,2,3");
+
+  const webDisabled = !shouldCommit || skipPush || currentBranch === "HEAD";
+  const options = [
+    {
+      label: "Web",
+      value: "web",
+      disabled: webDisabled,
+    },
+    {
+      label: "VS Code Marketplace",
+      value: "vscode",
+      disabled: skipVsCode,
+    },
+    {
+      label: "Open VSX（Cursor）",
+      value: "openvsx",
+      disabled: skipOpenVsx,
+    },
+  ];
+
+  if (canUseKeyboardSelector()) {
+    const selectedOptions = await selectWithKeyboard(
+      "发布渠道（Space 多选，Enter 确认）",
+      options,
+      readline,
+      true,
+    );
+    if (!selectedOptions) {
+      return null;
+    }
+
+    return {
+      shouldPublishWeb: selectedOptions.some((option) => option.value === "web"),
+      shouldPublishVsCode: selectedOptions.some((option) => option.value === "vscode"),
+      shouldPublishOpenVsx: selectedOptions.some((option) => option.value === "openvsx"),
+    };
+  }
 
   while (true) {
     const answer = await ask("发布渠道：", readline);
@@ -279,7 +436,7 @@ async function askPublishChannels({ currentBranch, shouldCommit }, readline) {
 
     try {
       const channels = parsePublishChannels(answer);
-      if (channels.has("web") && (!shouldCommit || skipPush || currentBranch === "HEAD")) {
+      if (channels.has("web") && webDisabled) {
         throw new Error("Web 发布需要创建版本提交，且当前分支必须能合并到 main。请移除 Web 选项后重试。");
       }
       if (channels.has("vscode") && skipVsCode) {
@@ -333,27 +490,33 @@ async function askVersionPlan(currentVersion, readline) {
   }
 
   console.log(`\n当前版本：${currentVersion}`);
-  console.log("请选择这次发布的版本变化：");
-  console.log("  1. 修复问题（patch）");
-  console.log("  2. 新增功能（minor）");
-  console.log("  3. 重大不兼容变更（major）");
-  console.log("  4. 手动指定版本号");
-  console.log("  5. 保持当前版本号（首次发布或重试发布）");
+  const selectedOption = await selectOne(
+    "请选择这次发布的版本变化（↑↓移动，Enter确认）",
+    [
+      { label: "修复问题（patch）", value: "patch" },
+      { label: "新增功能（minor）", value: "minor" },
+      { label: "重大不兼容变更（major）", value: "major" },
+      { label: "手动指定版本号", value: "exact" },
+      { label: "保持当前版本号（首次发布或重试发布）", value: "no-bump" },
+    ],
+    readline,
+  );
 
-  while (true) {
-    const choice = await ask("请输入选项 [1-5]：", readline);
+  if (!selectedOption) {
+    return null;
+  }
 
-    if (choice === "1" || choice === "2" || choice === "3") {
-      const selectedReleaseType = { "1": "patch", "2": "minor", "3": "major" }[choice];
-      return {
-        exactVersion: undefined,
-        noBump: false,
-        releaseType: selectedReleaseType,
-        targetVersion: incrementVersion(currentVersion, selectedReleaseType),
-      };
-    }
+  if (["patch", "minor", "major"].includes(selectedOption.value)) {
+    return {
+      exactVersion: undefined,
+      noBump: false,
+      releaseType: selectedOption.value,
+      targetVersion: incrementVersion(currentVersion, selectedOption.value),
+    };
+  }
 
-    if (choice === "4") {
+  if (selectedOption.value === "exact") {
+    while (true) {
       const selectedVersion = await ask("请输入目标版本号（例如 1.0.1）：", readline);
       if (!semverPattern.test(selectedVersion)) {
         console.log("版本号格式不正确，请使用 x.y.z 或带预发布/构建标识的 SemVer。\n");
@@ -371,17 +534,13 @@ async function askVersionPlan(currentVersion, readline) {
         targetVersion: selectedVersion,
       };
     }
+  }
 
-    if (choice === "5") {
-      return {
-        exactVersion: undefined,
-        noBump: true,
-        releaseType: undefined,
-        targetVersion: currentVersion,
-      };
-    }
-
-    console.log("请输入 1、2、3、4 或 5。\n");
+  return {
+    exactVersion: undefined,
+    noBump: true,
+    releaseType: undefined,
+    targetVersion: currentVersion,
   }
 }
 
@@ -391,6 +550,10 @@ async function createInteractivePlan() {
 
   try {
     const versionPlan = await askVersionPlan(packageJson.version, readline);
+    if (!versionPlan) {
+      return null;
+    }
+
     const confirmedVersion = await askYesNo(
       `目标版本为 ${versionPlan.targetVersion}，确认继续？`,
       readline,
@@ -422,6 +585,9 @@ async function createInteractivePlan() {
       "HEAD",
     ]);
     const publishChannels = await askPublishChannels({ currentBranch, shouldCommit }, readline);
+    if (!publishChannels) {
+      return null;
+    }
 
     return {
       ...versionPlan,

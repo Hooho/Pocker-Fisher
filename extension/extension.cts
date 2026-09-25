@@ -546,18 +546,23 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const openGame = (): void => {
     if (panel) {
+      const existingPanel = panel;
       try {
-        panel.reveal(vscode.ViewColumn.Beside);
+        existingPanel.reveal(vscode.ViewColumn.Beside);
         return;
       } catch {
         // Cursor can retain a disposed panel object briefly after its Webview is closed.
-        saveWebviews.delete(panel.webview);
         panel = undefined;
+        try {
+          saveWebviews.delete(existingPanel.webview);
+        } catch {
+          // The Webview getter can also fail after Cursor has disposed it.
+        }
       }
     }
 
     const distUri = vscode.Uri.joinPath(context.extensionUri, "dist");
-    panel = vscode.window.createWebviewPanel(
+    const gamePanel = vscode.window.createWebviewPanel(
       "riverClub.game",
       "摸鱼德州",
       vscode.ViewColumn.One,
@@ -567,23 +572,24 @@ export function activate(context: vscode.ExtensionContext): void {
         localResourceRoots: [distUri],
       },
     );
-    const gamePanel = panel;
+    panel = gamePanel;
+    const gameWebview = gamePanel.webview;
     try {
-      gamePanel.webview.html = createWebviewHtml(gamePanel.webview, context.extensionUri);
+      gameWebview.html = createWebviewHtml(gameWebview, context.extensionUri);
     } catch (error) {
-      gamePanel.webview.html = showBuildHint(error);
+      gameWebview.html = showBuildHint(error);
     }
-    saveWebviews.add(gamePanel.webview);
-    const storageSubscription = gamePanel.webview.onDidReceiveMessage(
+    saveWebviews.add(gameWebview);
+    const storageSubscription = gameWebview.onDidReceiveMessage(
       (message: unknown) => {
         if (isSaveStorageRequest(message)) {
-          void handleStorageMessage(gamePanel.webview, message);
+          void handleStorageMessage(gameWebview, message);
         }
       },
     );
     gamePanel.onDidDispose(() => {
       storageSubscription.dispose();
-      saveWebviews.delete(gamePanel.webview);
+      saveWebviews.delete(gameWebview);
       if (panel === gamePanel) panel = undefined;
     });
   };

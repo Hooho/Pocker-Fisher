@@ -70,6 +70,7 @@ import {
   suit,
   pot,
   evaluate,
+  currentHandName,
   previewBoard,
   type Character,
   type Game,
@@ -1574,6 +1575,9 @@ export default function App() {
     g && g.board.length >= 3
       ? evaluate([...g.players[0].cards, ...g.board]).best
       : [];
+  const localHandName = g
+    ? currentHandName([...g.players[0].cards, ...g.board])
+    : "等待发牌";
   const userPlayer = { ...hero, name: data.playerProfile.name.trim() || "本地玩家" };
   const userPlayerRef = useRef(userPlayer);
   userPlayerRef.current = userPlayer;
@@ -3315,23 +3319,26 @@ export default function App() {
                           <b>{p.chips.toLocaleString()}</b>
                         </div>
                       </div>
-                      {!p.last && !g.done && g.turn === i ? (
+                      {!g.done && i === 0 && !p.folded ? (
+                        <div className="seat-action current-hand-action" aria-live="polite">
+                          <span className="current-hand-hint">
+                            <span>当前牌型</span>
+                            <b>{localHandName}</b>
+                          </span>
+                        </div>
+                      ) : !p.last && !g.done && g.turn === i ? (
                         <div className="seat-action">
-                          {i === 0
-                            ? "轮到你行动"
-                            : (
-                              <span className="thinking">
-                                正在思考
-                                <span
-                                  className="thinking-bar"
-                                  style={
-                                    {
-                                      "--think-ms": `${Math.round(data.settings.speed * 1.07)}ms`,
-                                    } as CSSProperties
-                                  }
-                                />
-                              </span>
-                            )}
+                          <span className="thinking">
+                            正在思考
+                            <span
+                              className="thinking-bar"
+                              style={
+                                {
+                                  "--think-ms": `${Math.round(data.settings.speed * 1.07)}ms`,
+                                } as CSSProperties
+                              }
+                            />
+                          </span>
                         </div>
                       ) : null}
                       {g.done && show && g.board.length === 5 ? (

@@ -1476,6 +1476,12 @@ footer>span:last-child {
   box-shadow: inset 0 0 14px #d7b8670a;
 }
 
+.current-hand-action .current-hand-hint {
+  margin-top: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
 .current-hand-hint span {
   color: #899783;
   font-size: 8px;

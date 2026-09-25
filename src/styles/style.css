@@ -7705,12 +7705,12 @@ footer {
 }
 
 .reset-settings {
-  max-width: 720px;
+  max-width: 920px;
 }
 
-.reset-settings h1 {
+.reset-settings h2 {
   margin: 0 0 8px;
-  font-size: 27px;
+  font-size: 20px;
 }
 
 .reset-settings .muted {
@@ -7718,7 +7718,7 @@ footer {
 }
 
 .reset-danger-panel {
-  margin-top: 22px;
+  margin-top: 0;
   padding: 20px;
   border: 1px solid #8f654f;
   border-radius: 10px;
@@ -7953,7 +7953,7 @@ footer {
   .settings-menu {
     position: static;
     display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0;
     padding: 0;
     border-right: 0;

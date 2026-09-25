@@ -1,7 +1,7 @@
-import { Info, RotateCcw, Sparkles, UserRound, Users } from "lucide-react";
+import { Info, Sparkles, UserRound, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
-export type SettingsSection = "ai" | "players" | "profile" | "info" | "reset";
+export type SettingsSection = "ai" | "players" | "profile" | "info";
 
 type SettingsPageProps = {
   section: SettingsSection;
@@ -10,7 +10,6 @@ type SettingsPageProps = {
   playersContent: ReactNode;
   profileContent: ReactNode;
   infoContent: ReactNode;
-  resetContent: ReactNode;
 };
 
 export function SettingsPage({
@@ -20,7 +19,6 @@ export function SettingsPage({
   playersContent,
   profileContent,
   infoContent,
-  resetContent,
 }: SettingsPageProps) {
   return (
     <div className="content-page settings-page">
@@ -52,14 +50,7 @@ export function SettingsPage({
           aria-current={section === "info" ? "page" : undefined}
           onClick={() => onSectionChange("info")}
         >
-          <Info size={17} /> 说明
-        </button>
-        <button
-          className={section === "reset" ? "active" : ""}
-          aria-current={section === "reset" ? "page" : undefined}
-          onClick={() => onSectionChange("reset")}
-        >
-          <RotateCcw size={17} /> 重置
+          <Info size={17} /> 关于
         </button>
       </aside>
       <section className="settings-panel">
@@ -69,9 +60,7 @@ export function SettingsPage({
             ? playersContent
             : section === "profile"
               ? profileContent
-              : section === "info"
-                ? infoContent
-              : resetContent}
+              : infoContent}
       </section>
     </div>
   );

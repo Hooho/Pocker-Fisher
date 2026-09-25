@@ -7,7 +7,7 @@ import {
   type SimulationPlayerStatsMap,
   type SimulatedTablePerformance,
 } from "../domain/tournament/tournament";
-import { pathForPage, useAppRouter } from "./router";
+import { isVscodeWebview, pathForPage, useAppRouter } from "./router";
 import { publicAsset } from "./assets";
 import { appMetadata, formatAppUpdatedAt } from "./appMetadata";
 import { LobbyPage } from "../pages/LobbyPage";
@@ -1045,11 +1045,22 @@ function SimulationProgressPanel({
     </section>
   );
 }
+function describeSaveReadFailure(error: unknown) {
+  const errorName =
+    error && typeof error === "object" && "name" in error
+      ? String((error as { name?: unknown }).name)
+      : "";
+  if (error instanceof SyntaxError) return "存档内容不是有效的 JSON。";
+  if (errorName === "QuotaExceededError") return "浏览器存储空间不足，无法完成存档迁移。";
+  return "存档结构校验失败，或迁移到新版时写入失败。";
+}
+
 export default function App() {
   const [data, setData] = useState<Save>(blank);
   const [ready, setReady] = useState(false);
   const [characters, setCharacters] = useState<Character[]>([]);
   const [page, setPage] = useAppRouter();
+  const vscodeEnvironment = isVscodeWebview();
   const [settingsSection, setSettingsSection] = useState<SettingsSection>("ai");
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [modal, setModal] = useState<
@@ -1087,6 +1098,11 @@ export default function App() {
   const [eliminatedProgress, setEliminatedProgress] = useState<ChampionshipSimulationProgress | null>(null);
   const [imported, setImported] = useState<Save | null>(null);
   const [saveError, setSaveError] = useState(false);
+  const [saveLoadIssue, setSaveLoadIssue] = useState<{
+    title: string;
+    message: string;
+    recoverable: boolean;
+  } | null>(null);
   const [saveStale, setSaveStale] = useState(false);
   const [confirmDialog, setConfirmDialog] = useState<{
     title: string;
@@ -2705,8 +2721,8 @@ export default function App() {
   const infoSettingsContent = (
     <section className="info-settings" aria-labelledby="info-settings-title">
       <div className="settings-section-heading">
-        <h1 id="info-settings-title">说明</h1>
-        <p className="muted">了解游戏存档的保存位置、读取时机和备份方式。</p>
+        <h1 id="info-settings-title">关于</h1>
+        <p className="muted">了解游戏版本、存档保存位置、读取时机和备份方式。</p>
       </div>
       <div className="info-settings-highlight" role="note">
         <span className="info-settings-highlight-mark"><Check size={18} /></span>
@@ -2724,7 +2740,7 @@ export default function App() {
               <h2>应用信息</h2>
             </div>
           </div>
-          <p>当前运行的 Web 应用和 VS Code Webview 共用同一份构建信息。</p>
+          <p>当前运行的游戏使用以下构建信息。</p>
           <dl className="info-settings-list">
             <div>
               <dt>当前版本</dt>
@@ -2736,54 +2752,41 @@ export default function App() {
             </div>
           </dl>
         </article>
-        <article className="info-settings-card info-settings-card-primary">
-          <div className="info-settings-card-heading">
-            <span className="info-settings-icon"><Info size={17} /></span>
-            <div>
-              <p className="eyebrow">VSCODE EXTENSION</p>
-              <h2>VS Code 扩展存档</h2>
+        {vscodeEnvironment ? (
+          <article className="info-settings-card info-settings-card-wide info-settings-card-primary">
+            <div className="info-settings-card-heading">
+              <span className="info-settings-icon"><Info size={17} /></span>
+              <div>
+                <p className="eyebrow">VSCODE EXTENSION</p>
+                <h2>VS Code 扩展存档</h2>
+              </div>
             </div>
-          </div>
-          <p>
-            保存前会先校验完整存档；校验失败时不会覆盖已有存档。通过校验后，游戏会快速保存到本地，并在后台备份为多个分片 JSON 文件。存档只保存在本地，不会自动上传到云端。
-          </p>
-          <dl className="info-settings-list">
-            <div>
-              <dt>文件结构</dt>
-              <dd><code>manifest + profile/active/history/characters + snapshots.json</code></dd>
+            <p>
+              保存前会先校验完整存档；校验失败时不会覆盖已有存档。通过校验后，游戏会快速保存到本地，并在后台备份为多个分片 JSON 文件。存档只保存在本地，不会自动上传到云端。
+            </p>
+            <dl className="info-settings-list">
+              <div>
+                <dt>文件结构</dt>
+                <dd><code>manifest + profile/active/history/characters + snapshots.json</code></dd>
+              </div>
+              <div>
+                <dt>旧版本</dt>
+                <dd>有新保存时约每 5 分钟记录一个，最多保留 5 个整档旧版本，发现当前档损坏时自动回退并提示。</dd>
+              </div>
+              <div>
+                <dt>旧格式兼容</dt>
+                <dd>支持读取旧版 river-save 存档，首次读取后自动迁移，不删除原数据。</dd>
+              </div>
+              <div>
+                <dt>读取时机</dt>
+                <dd>打开或重新加载游戏时，自动恢复较新的存档。</dd>
+              </div>
+            </dl>
+            <div className="notice info-settings-note">
+              JSON 备份会在游戏操作停止约 0.75 秒后写入，不会阻塞牌局操作。分片写入完成后才更新 manifest；没有打开工作区时，会保存到扩展专属目录。
             </div>
-            <div>
-              <dt>旧版本</dt>
-              <dd>有新保存时约每 5 分钟记录一个，最多保留 5 个整档旧版本，发现当前档损坏时自动回退并提示。</dd>
-            </div>
-            <div>
-              <dt>旧格式兼容</dt>
-              <dd>支持读取旧版 river-save 存档，首次读取后自动迁移，不删除原数据。</dd>
-            </div>
-            <div>
-              <dt>读取时机</dt>
-              <dd>打开或重新加载游戏时，自动恢复较新的存档。</dd>
-            </div>
-          </dl>
-          <div className="notice info-settings-note">
-            JSON 备份会在游戏操作停止约 0.75 秒后写入，不会阻塞牌局操作。分片写入完成后才更新 manifest；没有打开工作区时，会保存到扩展专属目录。
-          </div>
-        </article>
-        <article className="info-settings-card">
-          <div className="info-settings-card-heading">
-            <span className="info-settings-icon info-settings-icon-muted"><BookOpen size={17} /></span>
-            <div>
-              <p className="eyebrow">BROWSER MODE</p>
-              <h2>浏览器模式</h2>
-            </div>
-          </div>
-          <p>
-            普通浏览器使用 localStorage 自动保存，不会直接写入电脑目录。
-          </p>
-          <div className="info-settings-browser-actions">
-            <span>需要备份或迁移时，请使用游戏中的“导出存档”功能生成 JSON 文件。</span>
-          </div>
-        </article>
+          </article>
+        ) : null}
         <article className="info-settings-card info-settings-card-wide">
           <div className="info-settings-card-heading">
             <span className="info-settings-icon info-settings-icon-muted"><Upload size={17} /></span>
@@ -2803,33 +2806,31 @@ export default function App() {
             支持跨端使用：只要在不同设备之间保持同一份最新存档文件，并在切换设备时导入即可。不同设备之间不会自动同步。
           </div>
         </article>
-      </div>
-    </section>
-  );
-  const resetSettingsContent = (
-    <section className="reset-settings" aria-labelledby="reset-settings-title">
-      <div className="settings-section-heading">
-        <h1 id="reset-settings-title">重置</h1>
-        <p className="muted">清理本机保存的牌局、战绩、人物修改、个人资料和设置。</p>
-      </div>
-      <div className="reset-danger-panel">
-        <h2>重置所有数据</h2>
-        <p>
-          此操作会删除当前浏览器中的全部游戏进度和个性化内容，无法撤销。头像文件和应用资源不会受到影响。
-        </p>
-        <div className="reset-data-summary" aria-label="当前存档摘要">
-          <span>手数 <strong>{currentSaveSummary.hands.toLocaleString()}</strong></span>
-          <span>冠军赛 <strong>{currentSaveSummary.championships.toLocaleString()}</strong></span>
-          <span>选手战绩 <strong>{currentSaveSummary.playerRecords.toLocaleString()}</strong></span>
-        </div>
-        <button
-          type="button"
-          className="reset-button"
-          disabled={resetting}
-          onClick={() => setResetConfirmOpen(true)}
-        >
-          <RotateCcw size={15} /> {resetting ? "正在重置…" : "重置所有数据"}
-        </button>
+        <article className="info-settings-card info-settings-card-wide reset-settings">
+          <div className="settings-section-heading">
+            <h2 id="reset-settings-title">重置</h2>
+            <p className="muted">清理本机保存的牌局、战绩、人物修改、个人资料和设置。</p>
+          </div>
+          <div className="reset-danger-panel">
+            <h2>重置所有数据</h2>
+            <p>
+              此操作会删除当前环境中的全部游戏进度和个性化内容，无法撤销。头像文件和应用资源不会受到影响。
+            </p>
+            <div className="reset-data-summary" aria-label="当前存档摘要">
+              <span>手数 <strong>{currentSaveSummary.hands.toLocaleString()}</strong></span>
+              <span>冠军赛 <strong>{currentSaveSummary.championships.toLocaleString()}</strong></span>
+              <span>选手战绩 <strong>{currentSaveSummary.playerRecords.toLocaleString()}</strong></span>
+            </div>
+            <button
+              type="button"
+              className="reset-button"
+              disabled={resetting}
+              onClick={() => setResetConfirmOpen(true)}
+            >
+              <RotateCcw size={15} /> {resetting ? "正在重置…" : "重置所有数据"}
+            </button>
+          </div>
+        </article>
       </div>
     </section>
   );
@@ -3441,7 +3442,6 @@ export default function App() {
             playersContent={playerDirectoryContent}
             profileContent={profileSettingsContent}
             infoContent={infoSettingsContent}
-            resetContent={resetSettingsContent}
           />
         ) : page === "players" ? (
           <div className="content-page">{playerDirectoryContent}</div>

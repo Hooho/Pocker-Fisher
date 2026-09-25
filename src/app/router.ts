@@ -32,7 +32,7 @@ export function resolvePage(pathname: string, hash = ""): AppPage {
   return pageByPath[normalizePath(pathname)] || "lobby";
 }
 
-function isVscodeWebview() {
+export function isVscodeWebview() {
   return typeof window !== "undefined" && window.location.protocol.startsWith("vscode-webview");
 }
 

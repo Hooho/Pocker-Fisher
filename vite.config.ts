@@ -4,19 +4,11 @@ import { defineConfig } from "vite";
 
 const publicDirectory = resolve("public");
 const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8")) as {
-  name: string;
   displayName: string;
   version: string;
   publisher: string;
   description: string;
   license: string;
-  repository?: unknown;
-  bugs?: unknown;
-  homepage?: string;
-  categories?: string[];
-  engines?: Record<string, string>;
-  activationEvents?: string[];
-  contributes?: Record<string, unknown>;
 };
 const appUpdatedAt = process.env.VITE_APP_UPDATED_AT ?? new Date().toISOString();
 
@@ -28,7 +20,7 @@ function publicFiles(directory: string): string[] {
 }
 
 // Relative asset URLs work in a normal browser and from a VS Code webview.
-export default defineConfig(({ command, mode }) => ({
+export default defineConfig({
   base: "./",
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
@@ -56,31 +48,12 @@ export default defineConfig(({ command, mode }) => ({
         }
 
         const appManifest = {
-          manifestVersion: 1,
-          application: {
-            id: `${packageJson.publisher}.${packageJson.name}`,
-            name: packageJson.name,
-            displayName: packageJson.displayName,
-            version: packageJson.version,
-            publisher: packageJson.publisher,
-            description: packageJson.description,
-            license: packageJson.license,
-            repository: packageJson.repository,
-            bugs: packageJson.bugs,
-            homepage: packageJson.homepage,
-            categories: packageJson.categories ?? [],
-          },
-          extension: {
-            engines: packageJson.engines ?? {},
-            activationEvents: packageJson.activationEvents ?? [],
-            contributes: packageJson.contributes ?? {},
-          },
-          build: {
-            target: "web",
-            command,
-            mode,
-            updatedAt: appUpdatedAt,
-          },
+          name: packageJson.displayName,
+          version: packageJson.version,
+          updatedAt: appUpdatedAt,
+          publisher: packageJson.publisher,
+          description: packageJson.description,
+          license: packageJson.license,
         };
 
         this.emitFile({
@@ -91,4 +64,4 @@ export default defineConfig(({ command, mode }) => ({
       },
     },
   ],
-}));
+});

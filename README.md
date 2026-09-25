@@ -20,7 +20,7 @@ npm run dev
 
 扩展构建命令为 `npm run build:vscode`。它会先构建 React Webview，再编译 VS Code 扩展宿主；`.vscode/tasks.json` 也提供了同名构建任务。扩展开发宿主关闭后，游戏源码不会被安装到当前 VS Code，只会在测试窗口中运行。
 
-每次 Web 构建还会在 `dist/manifest.json` 生成当前应用清单，包含应用版本、更新时间、扩展标识、仓库、许可证和构建信息；VSIX 打包时会将它一并带入扩展资源。
+每次 Web 构建还会在 `dist/manifest.json` 生成当前应用清单，包含应用名称、版本、更新时间、发布者、描述和许可证；VSIX 打包时会将它一并带入扩展资源。
 
 ## 一键发布扩展
 

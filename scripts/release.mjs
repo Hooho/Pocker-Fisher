@@ -222,6 +222,20 @@ async function ask(prompt, readline) {
 }
 
 async function askYesNo(prompt, readline, defaultValue) {
+  if (canUseKeyboardSelector()) {
+    const selectedOption = await selectWithKeyboard(
+      `${prompt}（↑↓移动，Enter确认）`,
+      [
+        { label: "是", value: true },
+        { label: "否", value: false },
+      ],
+      readline,
+      false,
+      defaultValue ? 0 : 1,
+    );
+    return selectedOption?.value ?? false;
+  }
+
   const suffix = defaultValue ? " [Y/n] " : " [y/N] ";
   const answer = (await readline.question(`${prompt}${suffix}`)).trim().toLowerCase();
 
@@ -236,14 +250,14 @@ function canUseKeyboardSelector() {
   return Boolean(input.isTTY && typeof input.setRawMode === "function");
 }
 
-function selectWithKeyboard(title, options, readline, multiple = false) {
+function selectWithKeyboard(title, options, readline, multiple = false, initialIndex = 0) {
   return new Promise((resolve, reject) => {
     readline.pause();
     input.resume();
     input.setRawMode(true);
     emitKeypressEvents(input);
 
-    let activeIndex = 0;
+    let activeIndex = initialIndex;
     const selected = new Set();
     let renderedLineCount = 0;
 

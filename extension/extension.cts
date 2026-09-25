@@ -14,6 +14,8 @@ type PersistedSave = {
   revision: number;
   save: unknown;
   snapshotArchive?: unknown;
+  appVersion?: string;
+  appUpdatedAt?: string;
 };
 
 type ShardedStoragePayload = {
@@ -30,6 +32,8 @@ type SaveStorageRequest = {
   expectedRevision?: number;
   save?: unknown;
   snapshotArchive?: unknown;
+  appVersion?: string;
+  appUpdatedAt?: string;
 };
 
 type SaveStorageResponse =
@@ -272,6 +276,10 @@ async function writeShardedJsonBackup(
     getManifestBackupFile(context),
     new TextEncoder().encode(JSON.stringify({
       version: 1,
+      app: {
+        version: value.appVersion ?? "legacy",
+        updatedAt: value.appUpdatedAt ?? "",
+      },
       revision: value.revision,
       savedAt: typeof source.savedAt === "string" ? source.savedAt : "",
       checksums,
@@ -474,6 +482,8 @@ export function activate(context: vscode.ExtensionContext): void {
           revision: message.expectedRevision!,
           save: message.save,
           snapshotArchive: message.snapshotArchive,
+          appVersion: message.appVersion,
+          appUpdatedAt: message.appUpdatedAt,
         };
         await writeShardedJsonBackup(context, next);
         return { conflict: false as const, revision: next.revision };

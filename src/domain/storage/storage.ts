@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { Game, Character } from "../game/engine";
 import type { ChampionshipSimulationCheckpoint } from "../tournament/tournament";
+import { appMetadata } from "../../app/appMetadata";
 
 const SAVE_STORAGE_KEY = "river-save";
 const SHARDED_STORAGE_PREFIX = "river-save";
@@ -23,6 +24,10 @@ type PersistedShard = {
 
 type SaveManifest = {
   version: 1;
+  app: {
+    version: string;
+    updatedAt: string;
+  };
   revision: number;
   savedAt: string;
   checksums: Record<SaveShardName, string>;
@@ -39,6 +44,7 @@ export type StoredSave = {
   revision: number;
   save: Save;
   snapshots?: SaveSnapshot[];
+  appVersion?: string;
 };
 
 type SaveChangeMessage = {
@@ -53,6 +59,8 @@ type VsCodeStorageRequest = {
   expectedRevision?: number;
   save?: Save;
   snapshotArchive?: unknown;
+  appVersion?: string;
+  appUpdatedAt?: string;
 };
 
 type VsCodeStorageResponse =
@@ -499,6 +507,10 @@ export type Save = {
   stats: { hands: number; wins: number; tournaments: number; titles: number };
 };
 export type SaveSnapshot = {
+  reason: "interval" | "app-update" | "legacy-migration";
+  appVersion?: string;
+  fromAppVersion?: string;
+  toAppVersion?: string;
   revision: number;
   savedAt: string;
   checksum: string;
@@ -791,8 +803,13 @@ const persistedShardSchema = z.object({
   checksum: z.string().min(1),
   data: z.unknown(),
 });
+const appManifestSchema = z.object({
+  version: z.string().min(1),
+  updatedAt: z.string().optional(),
+}).default({ version: "legacy" });
 const saveManifestSchema = z.object({
   version: z.literal(1),
+  app: appManifestSchema,
   revision: z.number().int().nonnegative(),
   savedAt: z.string(),
   checksums: z.object({
@@ -811,6 +828,10 @@ const shardedStorageSchema = z.object({
 const snapshotArchiveSchema = z.object({
   version: z.literal(1),
   snapshots: z.array(z.object({
+    reason: z.enum(["interval", "app-update", "legacy-migration"]).default("interval"),
+    appVersion: z.string().optional(),
+    fromAppVersion: z.string().optional(),
+    toAppVersion: z.string().optional(),
     revision: z.number().int().nonnegative(),
     savedAt: z.string(),
     checksum: z.string().min(1),
@@ -865,6 +886,36 @@ function serializeSnapshotArchive(snapshots: SaveSnapshot[]) {
   };
 }
 
+function createSaveSnapshot(
+  current: StoredSave,
+  reason: SaveSnapshot["reason"],
+  versionChange?: { from: string; to: string },
+): SaveSnapshot {
+  return {
+    reason,
+    appVersion: current.appVersion ?? "legacy",
+    ...(versionChange
+      ? {
+        fromAppVersion: versionChange.from,
+        toAppVersion: versionChange.to,
+      }
+      : {}),
+    revision: current.revision,
+    savedAt: current.save.savedAt,
+    checksum: checksumValue(current.save),
+    save: current.save,
+  };
+}
+
+function appendSnapshotArchive(
+  snapshots: SaveSnapshot[],
+  snapshot: SaveSnapshot,
+): SaveSnapshot[] {
+  return [snapshot, ...snapshots.filter((candidate) => candidate.revision !== snapshot.revision)]
+    .sort((left, right) => right.revision - left.revision)
+    .slice(0, SNAPSHOT_LIMIT);
+}
+
 function updateSnapshotArchive(current: StoredSave): SaveSnapshot[] {
   const snapshots = current.snapshots ?? [];
   if (current.revision <= 0 || current.save.savedAt === "") return snapshots;
@@ -874,15 +925,10 @@ function updateSnapshotArchive(current: StoredSave): SaveSnapshot[] {
   const latestTime = latest ? Date.parse(latest.savedAt) || 0 : 0;
   if (latest && currentTime - latestTime < SNAPSHOT_INTERVAL_MS) return snapshots;
 
-  const next: SaveSnapshot = {
-    revision: current.revision,
-    savedAt: current.save.savedAt,
-    checksum: checksumValue(current.save),
-    save: current.save,
-  };
-  return [next, ...snapshots.filter((snapshot) => snapshot.revision !== next.revision)]
-    .sort((left, right) => right.revision - left.revision)
-    .slice(0, SNAPSHOT_LIMIT);
+  return appendSnapshotArchive(
+    snapshots,
+    createSaveSnapshot(current, "interval"),
+  );
 }
 
 function saveFingerprint(save: Save) {
@@ -937,6 +983,10 @@ function createShardedPayload(stored: StoredSave): ShardedStoragePayload {
     version: 1,
     manifest: {
       version: 1,
+      app: {
+        version: appMetadata.version,
+        updatedAt: appMetadata.updatedAt,
+      },
       revision: stored.revision,
       savedAt: stored.save.savedAt,
       checksums,
@@ -1000,6 +1050,7 @@ function readCurrentShardedStoragePayload(payload: unknown): ReadStoredSave | nu
     save: mergeSaveShards(manifest, shards as Partial<SaveShardData>),
     source: "sharded",
     snapshots,
+    appVersion: manifest.app.version,
   };
   if (complete) return stored;
 
@@ -1010,6 +1061,7 @@ function readCurrentShardedStoragePayload(payload: unknown): ReadStoredSave | nu
       save: snapshot.save,
       source: "sharded",
       snapshots,
+      appVersion: manifest.app.version,
       recoveryNotice: `当前存档（版本 ${manifest.revision}）损坏，已自动回退到历史版本（版本 ${snapshot.revision}）。`,
     };
   }
@@ -1151,6 +1203,8 @@ async function writeVsCodeSave(stored: StoredSave) {
     expectedRevision: stored.revision,
     save: stored.save,
     snapshotArchive: serializeSnapshotArchive(stored.snapshots ?? []),
+    appVersion: appMetadata.version,
+    appUpdatedAt: appMetadata.updatedAt,
   });
   if (!Number.isInteger(result.revision) || result.revision !== stored.revision) {
     throw new Error("VS Code 返回了无效的存档版本");
@@ -1176,27 +1230,65 @@ function scheduleVscodeBackup(stored: StoredSave) {
   }, 750);
 }
 
+function hasLegacySaveData(stored: ReadStoredSave) {
+  return stored.source === "legacy" && (
+    stored.revision > 0 ||
+    stored.save.savedAt !== "" ||
+    summarizeSaveRecords(stored.save).hasExistingData
+  );
+}
+
 export const loadSave = async (): Promise<SaveLoadResult> => {
   const browserSave = readBrowserStoredSave();
   let stored = browserSave;
+  let needsBrowserSync = false;
   if (getVsCodeApi()) {
     try {
       const vscodeSave = await readVsCodeStoredSave();
       if (isStoredSaveNewer(vscodeSave, browserSave)) {
         stored = vscodeSave;
-        writeBrowserSnapshotArchive(stored.snapshots ?? []);
-        writeBrowserStoredSave(stored);
+        needsBrowserSync = true;
       }
     } catch {
       // The localStorage save remains the primary recovery path when the
       // optional VS Code JSON backup is unavailable.
     }
   }
-  if (stored.source === "legacy") {
-    writeBrowserSnapshotArchive(stored.snapshots ?? []);
-    writeBrowserStoredSave(stored);
+
+  const appVersionChanged = stored.source === "sharded" &&
+    stored.appVersion !== undefined &&
+    stored.appVersion !== appMetadata.version;
+  const shouldArchiveBeforeMigration = !stored.recoveryNotice && (
+    appVersionChanged || hasLegacySaveData(stored)
+  );
+  if (shouldArchiveBeforeMigration) {
+    const reason: SaveSnapshot["reason"] = hasLegacySaveData(stored)
+      ? "legacy-migration"
+      : "app-update";
+    const fromVersion = stored.appVersion ?? "legacy";
+    const snapshots = appendSnapshotArchive(
+      stored.snapshots ?? [],
+      createSaveSnapshot(stored, reason, {
+        from: fromVersion,
+        to: appMetadata.version,
+      }),
+    );
+    writeBrowserSnapshotArchive(snapshots);
+    stored = { ...stored, snapshots };
+    needsBrowserSync = true;
   }
+
+  if (!stored.recoveryNotice && (stored.source === "legacy" || needsBrowserSync)) {
+    writeBrowserStoredSave(stored);
+    stored = {
+      ...stored,
+      source: "sharded",
+      appVersion: appMetadata.version,
+    };
+  }
+
   if (stored.recoveryNotice) {
+    writeBrowserSnapshotArchive(stored.snapshots ?? []);
     const repairedSave = validateSaveForStorage({
       ...stored.save,
       savedAt: new Date().toISOString(),
@@ -1206,6 +1298,7 @@ export const loadSave = async (): Promise<SaveLoadResult> => {
       revision: stored.revision + 1,
       save: repairedSave,
       source: "sharded",
+      appVersion: appMetadata.version,
     };
     writeBrowserStoredSave(repairedStored);
     stored = repairedStored;

@@ -1,6 +1,9 @@
+const appVersion = typeof __APP_VERSION__ === "string" ? __APP_VERSION__ : "dev";
+const appUpdatedAt = typeof __APP_UPDATED_AT__ === "string" ? __APP_UPDATED_AT__ : "";
+
 export const appMetadata = Object.freeze({
-  version: __APP_VERSION__,
-  updatedAt: __APP_UPDATED_AT__,
+  version: appVersion,
+  updatedAt: appUpdatedAt,
 });
 
 export function formatAppUpdatedAt(value: string): string {

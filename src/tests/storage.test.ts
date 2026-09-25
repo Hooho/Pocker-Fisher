@@ -197,7 +197,53 @@ test("legacy river-save data is migrated to the sharded format", async () => {
 
     const loaded = await loadSave();
     assert.equal(loaded.save.stats.hands, 7);
-    assert.equal(JSON.parse(values.get("river-save:manifest")!).revision, 4);
+    const manifest = JSON.parse(values.get("river-save:manifest")!);
+    assert.equal(manifest.revision, 4);
+    assert.equal(manifest.app.version, "dev");
+    const snapshots = JSON.parse(values.get("river-save:snapshots")!);
+    assert.equal(snapshots.snapshots[0].reason, "legacy-migration");
+  } finally {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: previousStorage,
+    });
+  }
+});
+
+test("an application update archives the previous complete save first", async () => {
+  const previousStorage = globalThis.localStorage;
+  const values = new Map<string, string>();
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+    removeItem: (key: string) => values.delete(key),
+    clear: () => values.clear(),
+    key: (index: number) => [...values.keys()][index] ?? null,
+    get length() {
+      return values.size;
+    },
+  } satisfies Storage;
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, value: storage });
+
+  try {
+    await loadSave();
+    await saveData({
+      ...blank,
+      stats: { ...blank.stats, hands: 3 },
+    });
+    const manifest = JSON.parse(values.get("river-save:manifest")!);
+    values.set(
+      "river-save:manifest",
+      JSON.stringify({ ...manifest, app: { ...manifest.app, version: "0.9.0" } }),
+    );
+
+    const loaded = await loadSave();
+    assert.equal(loaded.save.stats.hands, 3);
+    const snapshots = JSON.parse(values.get("river-save:snapshots")!);
+    assert.equal(snapshots.snapshots[0].reason, "app-update");
+    assert.equal(snapshots.snapshots[0].fromAppVersion, "0.9.0");
+    assert.equal(snapshots.snapshots[0].toAppVersion, "dev");
+    assert.equal(JSON.parse(values.get("river-save:manifest")!).app.version, "dev");
   } finally {
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,

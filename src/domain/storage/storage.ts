@@ -361,7 +361,7 @@ export const defaults: Settings = {
   mode: "local",
   endpoint: "",
   model: "",
-  sound: true,
+  sound: false,
   soundConfigured: false,
   pace: 10,
 };
@@ -844,7 +844,7 @@ export function parseSave(value: unknown): Save {
     }
   }
   const raw = value as { settings?: { soundConfigured?: boolean } };
-  if (raw.settings?.soundConfigured !== true) data.settings.sound = true;
+  if (raw.settings?.soundConfigured !== true) data.settings.sound = false;
   return data;
 }
 const storedSaveSchema = z.object({

@@ -1402,7 +1402,7 @@ export function downloadSave(data: Save) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `river-fisher-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `摸鱼德州-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

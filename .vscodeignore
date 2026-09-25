@@ -9,6 +9,7 @@ artifacts/**
 **/*.tsbuildinfo
 src/**
 public/**
+dist/avatars-png/**
 scripts/**
 extension/**
 tests/**

@@ -85,6 +85,8 @@ import {
   subscribeToSaveChanges,
   type Save,
   type Tournament,
+  type MatchMode,
+  type MatchSession,
   type ChampionshipRecord,
   type PlayerCareerStats,
 } from "../domain/storage/storage";
@@ -358,6 +360,7 @@ function renameLocalPlayer(save: Save, name: string): Save {
       pausedTournament: {
         game: renameGame(save.pausedTournament.game),
         tournament: renameTournament(save.pausedTournament.tournament),
+        ...(save.pausedTournament.match ? { match: save.pausedTournament.match } : {}),
       },
     } : {}),
     tournamentRecords: save.tournamentRecords.map((record) => ({
@@ -520,26 +523,136 @@ function recordPlacements(save: Save, players: Character[]): Save {
   });
   return { ...save, playerStats };
 }
-const TABLE_TIMER_STORAGE_KEY = "moyu-dezhou-table-timer";
-type TableTimerState = { accumulatedMs: number; runningSinceMs: number | null };
-function loadTableTimer(): TableTimerState {
+const TABLE_TIMER_STORAGE_KEY = "river-save:timer";
+const LEGACY_TABLE_TIMER_STORAGE_KEY = "moyu-dezhou-match-timer-v2";
+type StoredTimer = { matchId: string; elapsedMs: number };
+type TimerStorage = {
+  cash: StoredTimer | null;
+  championship: StoredTimer | null;
+};
+let legacyTimerStorageCleaned = false;
+type TableTimerState = {
+  matchId: string;
+  mode: MatchMode;
+  accumulatedMs: number;
+  runningSinceMs: number | null;
+};
+function createMatchSession(mode: MatchMode): MatchSession {
+  const randomId = typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return { id: randomId, mode };
+}
+function emptyTimerStorage(): TimerStorage {
+  return { cash: null, championship: null };
+}
+function emptyTableTimer(session: MatchSession): TableTimerState {
+  return { matchId: session.id, mode: session.mode, accumulatedMs: 0, runningSinceMs: null };
+}
+function cleanupLegacyTimerStorage() {
+  if (legacyTimerStorageCleaned) return;
+  legacyTimerStorageCleaned = true;
+  if (typeof localStorage === "undefined") return;
+  const keys: string[] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (!key) continue;
+    if (
+      key === LEGACY_TABLE_TIMER_STORAGE_KEY ||
+      key.startsWith(`${LEGACY_TABLE_TIMER_STORAGE_KEY}:`)
+    ) {
+      keys.push(key);
+    }
+  }
+  keys.forEach((key) => localStorage.removeItem(key));
+}
+function parseStoredTimer(value: unknown): StoredTimer | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const timer = value as Record<string, unknown>;
+  return typeof timer.matchId === "string" &&
+    timer.matchId.length > 0 &&
+    typeof timer.elapsedMs === "number" &&
+    Number.isFinite(timer.elapsedMs) &&
+    timer.elapsedMs >= 0
+    ? { matchId: timer.matchId, elapsedMs: timer.elapsedMs }
+    : null;
+}
+function readTimerStorage(): TimerStorage {
+  cleanupLegacyTimerStorage();
+  if (typeof localStorage === "undefined") return emptyTimerStorage();
   try {
     const raw = localStorage.getItem(TABLE_TIMER_STORAGE_KEY);
-    if (!raw) return { accumulatedMs: 0, runningSinceMs: null };
+    if (!raw) return emptyTimerStorage();
     const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return emptyTimerStorage();
+    }
+    const value = parsed as Record<string, unknown>;
     return {
-      accumulatedMs: typeof parsed.accumulatedMs === "number" ? parsed.accumulatedMs : 0,
-      runningSinceMs: typeof parsed.runningSinceMs === "number" ? parsed.runningSinceMs : null,
+      cash: parseStoredTimer(value.cash),
+      championship: parseStoredTimer(value.championship),
     };
   } catch {
-    return { accumulatedMs: 0, runningSinceMs: null };
+    return emptyTimerStorage();
   }
+}
+function writeTimerStorage(value: TimerStorage) {
+  if (typeof localStorage === "undefined") return;
+  if (!value.cash && !value.championship) {
+    localStorage.removeItem(TABLE_TIMER_STORAGE_KEY);
+    return;
+  }
+  localStorage.setItem(TABLE_TIMER_STORAGE_KEY, JSON.stringify(value));
+}
+function loadTableTimer(session: MatchSession | null, savedElapsedMs = 0): TableTimerState | null {
+  if (!session) return null;
+  const stored = readTimerStorage()[session.mode];
+  const storedElapsedMs = stored?.matchId === session.id ? stored.elapsedMs : 0;
+  return {
+    matchId: session.id,
+    mode: session.mode,
+    accumulatedMs: Math.max(savedElapsedMs, storedElapsedMs),
+    runningSinceMs: null,
+  };
+}
+function ensureMatchMetadata(save: Save): Save {
+  let next = save;
+  if ((save.game || save.tournament) && !save.activeMatch) {
+    const mode: MatchMode = save.tournament ? "championship" : "cash";
+    next = { ...next, activeMatch: createMatchSession(mode) };
+  }
+  if (next.pausedTournament && !next.pausedTournament.match) {
+    next = {
+      ...next,
+      pausedTournament: {
+        ...next.pausedTournament,
+        match: createMatchSession("championship"),
+      },
+    };
+  }
+  return next;
 }
 function saveTableTimer(state: TableTimerState) {
   try {
-    localStorage.setItem(TABLE_TIMER_STORAGE_KEY, JSON.stringify(state));
+    const timers = readTimerStorage();
+    timers[state.mode] = {
+      matchId: state.matchId,
+      elapsedMs: state.accumulatedMs,
+    };
+    writeTimerStorage(timers);
   } catch {
     // best-effort only; the timer just won't survive a refresh if storage is unavailable
+  }
+}
+function removeTableTimer(matchId?: string) {
+  try {
+    const timers = readTimerStorage();
+    (Object.keys(timers) as MatchMode[]).forEach((mode) => {
+      if (!matchId || timers[mode]?.matchId === matchId) timers[mode] = null;
+    });
+    writeTimerStorage(timers);
+  } catch {
+    // best-effort only
   }
 }
 function elapsedTableMs(state: TableTimerState) {
@@ -761,9 +874,12 @@ const LeaderboardRows = memo(function LeaderboardRows({
     </>
   );
 });
-function Fireworks({ active }: { active: boolean }) {
+type FireworksVariant = "championship" | "cash";
+
+function Fireworks({ active, variant = "championship" }: { active: boolean; variant?: FireworksVariant }) {
+  const isCashVictory = variant === "cash";
   const bursts = useMemo(() => {
-    if (!active) return [];
+    if (!active || isCashVictory) return [];
     const colors = ["#f4d67f", "#ff7a6b", "#6bc8ff", "#7ee787", "#ffb86b", "#d68bff", "#ff9ecf", "#ffffff"];
     return Array.from({ length: 22 }, (_, i) => {
       const particles = 30 + Math.floor(Math.random() * 16);
@@ -777,11 +893,11 @@ function Fireworks({ active }: { active: boolean }) {
         distance: 170 + Math.random() * 170,
       };
     });
-  }, [active]);
+  }, [active, isCashVictory]);
   const confetti = useMemo(() => {
     if (!active) return [];
     const colors = ["#f4d67f", "#ff7a6b", "#6bc8ff", "#7ee787", "#ffb86b", "#d68bff", "#ff9ecf", "#f7f0d0"];
-    return Array.from({ length: 220 }, (_, i) => ({
+    return Array.from({ length: isCashVictory ? 140 : 220 }, (_, i) => ({
       id: i,
       left: Math.random() * 100,
       delay: Math.random() * 1.8,
@@ -792,19 +908,25 @@ function Fireworks({ active }: { active: boolean }) {
       height: 10 + Math.round(Math.random() * 11),
       color: colors[i % colors.length],
     }));
-  }, [active]);
+  }, [active, isCashVictory]);
   if (!active) return null;
   return (
-    <div className="fireworks-overlay" aria-hidden="true">
+    <div className={`fireworks-overlay ${isCashVictory ? "cash-victory-overlay" : ""}`} aria-hidden="true">
       <div className="champion-celebration-flash" />
       <div className="champion-celebration-copy">
-        <div className="champion-plaque">
-          <span className="champion-plaque-emblem champion-plaque-emblem-left"><Trophy size={36} strokeWidth={2.4} /></span>
-          <span className="champion-plaque-emblem champion-plaque-emblem-right"><Trophy size={36} strokeWidth={2.4} /></span>
-          <span className="champion-plaque-kicker">CHAMPIONSHIP WON</span>
-          <strong>恭喜您 <em>赢得总冠军</em></strong>
+        <div className={`champion-plaque ${isCashVictory ? "cash-victory-plaque" : ""}`}>
+          {isCashVictory ? (
+            <span className="cash-victory-trophy"><Trophy size={34} strokeWidth={2.4} /></span>
+          ) : (
+            <>
+              <span className="champion-plaque-emblem champion-plaque-emblem-left"><Trophy size={36} strokeWidth={2.4} /></span>
+              <span className="champion-plaque-emblem champion-plaque-emblem-right"><Trophy size={36} strokeWidth={2.4} /></span>
+            </>
+          )}
+          {!isCashVictory ? <span className="champion-plaque-kicker">CHAMPIONSHIP WON</span> : null}
+          <strong>{isCashVictory ? <>恭喜你 <em>赢得比赛</em></> : <>恭喜您 <em>赢得总冠军</em></>}</strong>
           <span className="champion-plaque-rule">✦　✦　✦</span>
-          <small>击败全部对手 · 登上冠军宝座</small>
+          {!isCashVictory ? <small>击败全部对手 · 登上冠军宝座</small> : null}
         </div>
       </div>
       <div className="fireworks-confetti">
@@ -936,7 +1058,7 @@ export default function App() {
   const [seatCount, setSeatCount] = useState(6);
   const [resetTournamentStacks, setResetTournamentStacks] = useState(false);
   const [paused, setPaused] = useState(false);
-  const [tableSeconds, setTableSeconds] = useState(() => Math.floor(elapsedTableMs(loadTableTimer()) / 1000));
+  const [tableSeconds, setTableSeconds] = useState(0);
   const [pageVisible, setPageVisible] = useState(
     () => typeof document === "undefined" || document.visibilityState === "visible",
   );
@@ -1095,13 +1217,53 @@ export default function App() {
     g.done &&
     g.players.filter((player) => player.chips > 0).length === 1,
   );
+  const cashMatchWon = Boolean(
+    cashMatchFinished &&
+    g?.players[0]?.profile.id === -1 &&
+    g.players[0].chips > 0,
+  );
   // Lets openPlayerProfile stay a stable useCallback (see below) while still
   // reading up-to-date page/paused/tournament state at click time.
   const openPlayerProfileState = useRef({ page, paused, t });
+  const activeMatch = data.activeMatch;
+  const singleMatchFinishedForTimer = Boolean(
+    !t &&
+    g?.done &&
+    g.players.filter((player) => player.chips > 0).length <= 1,
+  );
   const tableEliminated = !!t?.out;
   const tableFinished = !!t?.complete;
-  const tableTimerRunning = page === "table" && !tableEliminated && !tableFinished && !championshipWon && pageVisible;
-  const tableTimerState = useRef(loadTableTimer());
+  const tableTimerRunning = Boolean(
+    page === "table" &&
+    activeMatch &&
+    !paused &&
+    !tableEliminated &&
+    !tableFinished &&
+    !singleMatchFinishedForTimer &&
+    !championshipWon &&
+    pageVisible,
+  );
+  const tableTimerState = useRef<TableTimerState | null>(null);
+  const flushTableTimer = useCallback(() => {
+    const state = tableTimerState.current;
+    if (!state) return;
+    const accumulatedMs = Math.max(state.accumulatedMs, Math.floor(elapsedTableMs(state)));
+    const nextState: TableTimerState = { ...state, accumulatedMs, runningSinceMs: null };
+    tableTimerState.current = nextState;
+    saveTableTimer(nextState);
+    setTableSeconds(Math.floor(accumulatedMs / 1000));
+  }, []);
+  const exportCurrentSave = useCallback(() => downloadSave(data), [data]);
+  useEffect(() => {
+    if (!activeMatch) {
+      tableTimerState.current = null;
+      setTableSeconds(0);
+      return;
+    }
+    const nextState = loadTableTimer(activeMatch);
+    tableTimerState.current = nextState;
+    setTableSeconds(nextState ? Math.floor(nextState.accumulatedMs / 1000) : 0);
+  }, [activeMatch?.id, activeMatch?.mode]);
   useEffect(() => {
     if (page !== "table") {
       setTableStageSize({ width: 0, height: 0 });
@@ -1167,59 +1329,65 @@ export default function App() {
     return () => observer.disconnect();
   }, [page, ready, g?.hand, g?.players.length]);
   const resetTableTimer = () => {
-    tableTimerState.current = { accumulatedMs: 0, runningSinceMs: null };
-    saveTableTimer(tableTimerState.current);
+    removeTableTimer(tableTimerState.current?.matchId || data.activeMatch?.id);
+    tableTimerState.current = null;
     setTableSeconds(0);
   };
-  const prevTableEnded = useRef(tableEliminated || tableFinished);
   useEffect(() => {
-    const handleVisibility = () =>
-      setPageVisible(document.visibilityState === "visible");
+    const handleVisibility = () => {
+      const visible = document.visibilityState === "visible";
+      if (!visible) flushTableTimer();
+      setPageVisible(visible);
+    };
+    const handlePageHide = () => {
+      flushTableTimer();
+      setPageVisible(false);
+    };
+    const handlePageShow = () => setPageVisible(document.visibilityState === "visible");
     document.addEventListener("visibilitychange", handleVisibility);
-    window.addEventListener("pagehide", handleVisibility);
-    window.addEventListener("pageshow", handleVisibility);
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("pageshow", handlePageShow);
     return () => {
       document.removeEventListener("visibilitychange", handleVisibility);
-      window.removeEventListener("pagehide", handleVisibility);
-      window.removeEventListener("pageshow", handleVisibility);
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("pageshow", handlePageShow);
     };
-  }, []);
+  }, [flushTableTimer]);
   useEffect(() => {
     setMoreMenuOpen(false);
   }, [page]);
-  // Only elimination or completion of the whole tournament resets the clock.
-  // Starting another hand or a new table keeps the accumulated time.
-  useEffect(() => {
-    const tableEnded = tableEliminated || tableFinished;
-    if (tableEnded && !prevTableEnded.current) resetTableTimer();
-    prevTableEnded.current = tableEnded;
-  }, [tableEliminated, tableFinished]);
   useEffect(() => {
     const st = tableTimerState.current;
     if (tableTimerRunning) {
-      if (st.runningSinceMs == null) {
+      if (st && st.runningSinceMs == null) {
         tableTimerState.current = { ...st, runningSinceMs: Date.now() };
         saveTableTimer(tableTimerState.current);
       }
-    } else if (st.runningSinceMs != null) {
-      const accumulatedMs = st.accumulatedMs + (Date.now() - st.runningSinceMs);
-      tableTimerState.current = { accumulatedMs, runningSinceMs: null };
-      saveTableTimer(tableTimerState.current);
-      setTableSeconds(Math.floor(accumulatedMs / 1000));
+    } else if (st?.runningSinceMs != null) {
+      flushTableTimer();
     }
-  }, [tableTimerRunning]);
+  }, [flushTableTimer, tableTimerRunning]);
   useEffect(() => {
     if (!tableTimerRunning) return;
     const id = setInterval(() => {
-      setTableSeconds(Math.floor(elapsedTableMs(tableTimerState.current) / 1000));
+      const state = tableTimerState.current;
+      if (!state) return;
+      const accumulatedMs = Math.max(state.accumulatedMs, Math.floor(elapsedTableMs(state)));
+      setTableSeconds(Math.floor(accumulatedMs / 1000));
+      saveTableTimer({ ...state, accumulatedMs, runningSinceMs: null });
     }, 1000);
     return () => clearInterval(id);
   }, [tableTimerRunning]);
+  useEffect(() => {
+    if (t?.complete) removeTableTimer(data.activeMatch?.id);
+  }, [data.activeMatch?.id, t?.complete]);
   const [showFireworks, setShowFireworks] = useState(false);
+  const [fireworksVariant, setFireworksVariant] = useState<FireworksVariant>("championship");
   const fireworksTimer = useRef<number | null>(null);
   const championSoundPlayed = useRef(false);
   const championSoundRequest = useRef<Promise<boolean> | null>(null);
-  const triggerFireworks = useCallback((durationMs: number) => {
+  const triggerFireworks = useCallback((durationMs: number, variant: FireworksVariant = "championship") => {
+    setFireworksVariant(variant);
     setShowFireworks(true);
     if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
     fireworksTimer.current = window.setTimeout(() => setShowFireworks(false), durationMs);
@@ -1235,9 +1403,12 @@ export default function App() {
     });
   }, [data.settings.sound]);
   const triggerChampionCelebration = useCallback(() => {
-    triggerFireworks(9500);
+    triggerFireworks(9500, "championship");
     playChampionSound();
   }, [playChampionSound, triggerFireworks]);
+  const triggerCashCelebration = useCallback(() => {
+    triggerFireworks(8500, "cash");
+  }, [triggerFireworks]);
   // Keep the celebration replayable until the player confirms the championship.
   // That means refreshing the unconfirmed final hand can replay the moment too.
   useEffect(() => {
@@ -1260,6 +1431,10 @@ export default function App() {
     };
   }, [championshipWon, playChampionSound]);
   useEffect(() => {
+    if (!cashMatchWon || !ready) return;
+    triggerCashCelebration();
+  }, [cashMatchWon, ready, triggerCashCelebration]);
+  useEffect(() => {
     return () => {
       if (fireworksTimer.current) window.clearTimeout(fireworksTimer.current);
     };
@@ -1274,13 +1449,16 @@ export default function App() {
   const userPlayerRef = useRef(userPlayer);
   userPlayerRef.current = userPlayer;
   useEffect(() => {
+    cleanupLegacyTimerStorage();
     Promise.all([loadSave(), fetch(publicAsset("characters.json")).then((r) => r.json())])
       .then(([loaded, chars]) => {
         const saved = loaded.save;
         if (loaded.recoveryNotice) setToast(loaded.recoveryNotice);
-        const restored = saved.tournament?.out && !saved.tournament.complete && !saved.tournament.simulationComplete
-          ? { ...saved, tournament: { ...saved.tournament, autoSimulating: true } }
-          : saved;
+        const restored = ensureMatchMetadata(
+          saved.tournament?.out && !saved.tournament.complete && !saved.tournament.simulationComplete
+            ? { ...saved, tournament: { ...saved.tournament, autoSimulating: true } }
+            : saved,
+        );
         setData(restored);
         setProfileNameDraft(restored.playerProfile.name);
         setProfileAvatarDraft(restored.playerProfile.avatar);
@@ -1645,6 +1823,7 @@ export default function App() {
   const profile = (p: Character) => data.overrides[p.id] || p;
   const start = () => {
     generation.current++;
+    flushTableTimer();
     if (newMode === "cash" && data.tournament?.autoSimulating) {
       eliminatedWorker.current?.terminate();
       eliminatedWorker.current = null;
@@ -1678,8 +1857,16 @@ export default function App() {
         }
         : null;
     const entrants = tournament ? [userPlayer, ...roster] : game.players.map((player) => player.profile);
+    const currentMatch = data.activeMatch || (data.game
+      ? createMatchSession(data.tournament ? "championship" : "cash")
+      : undefined);
+    const newMatch = createMatchSession(newMode === "tournament" ? "championship" : "cash");
     const pausedTournament = newMode === "cash" && data.tournament && data.game && !data.tournament.complete
-      ? { game: data.game, tournament: { ...data.tournament, paused: true } }
+      ? {
+        game: data.game,
+        tournament: { ...data.tournament, paused: true },
+        ...(currentMatch ? { match: currentMatch } : {}),
+      }
       : newMode === "tournament" ? undefined : data.pausedTournament;
     setData((d) => {
       const registered = registerMatches(d, entrants, tournament ? entrants.length : 0, !!tournament);
@@ -1687,6 +1874,7 @@ export default function App() {
         ...registered,
         game,
         tournament,
+        activeMatch: newMatch,
         chipAnimation: undefined,
         pausedTournament,
         stats: {
@@ -1706,6 +1894,11 @@ export default function App() {
   };
   const finishCashMatch = () => {
     if (!g || !cashMatchFinished) return;
+    if (fireworksTimer.current) {
+      window.clearTimeout(fireworksTimer.current);
+      fireworksTimer.current = null;
+    }
+    setShowFireworks(false);
     const eliminated = [...cashEliminated];
     const recordedIds = new Set(eliminated.map((player) => player.id));
     g.players
@@ -1718,7 +1911,6 @@ export default function App() {
         ...old,
         game: null,
         activeMatch: undefined,
-        matchTimer: undefined,
       };
     });
     setPage("cashResults");
@@ -1945,13 +2137,16 @@ export default function App() {
   }, [g?.done, g?.hand, g?.players[0]?.chips, t?.round, t?.out, t?.complete, t?.background?.done, page, paused]);
   const applyImportedSave = (nextSave: Save, overwroteExisting: boolean) => {
     generation.current++;
-    setData(nextSave);
-    setProfileNameDraft(nextSave.playerProfile.name);
-    setProfileAvatarDraft(nextSave.playerProfile.avatar);
+    resetTableTimer();
+    const restored = ensureMatchMetadata(nextSave);
+    removeTableTimer();
+    setData(restored);
+    setProfileNameDraft(restored.playerProfile.name);
+    setProfileAvatarDraft(restored.playerProfile.avatar);
     setImported(null);
     setSaveError(false);
     setPaused(true);
-    setPage(nextSave.game ? "table" : "lobby");
+    setPage(restored.game ? "table" : "lobby");
     setToast(
       overwroteExisting
         ? "现有记录已覆盖，存档已恢复"
@@ -2043,6 +2238,7 @@ export default function App() {
   const enterChampionship = () => {
     if (data.pausedTournament) {
       const suspended = data.pausedTournament;
+      const resumedMatch = suspended.match || createMatchSession("championship");
       setData((old) => ({
         ...old,
         game: suspended.game,
@@ -2054,6 +2250,7 @@ export default function App() {
               ? true
               : suspended.tournament.autoSimulating,
         },
+        activeMatch: resumedMatch,
         pausedTournament: undefined,
       }));
       if (suspended.tournament.out && !suspended.tournament.simulationComplete) {
@@ -2131,6 +2328,7 @@ export default function App() {
     try {
       await saveData(blank);
       resetTableTimer();
+      removeTableTimer();
       setData(blank);
       setProfileNameDraft(blank.playerProfile.name);
       setProfileAvatarDraft(blank.playerProfile.avatar);
@@ -2650,7 +2848,7 @@ export default function App() {
               aria-label="导出存档"
               title="导出存档"
               onClick={() => {
-                downloadSave(data);
+                exportCurrentSave();
                 setMoreMenuOpen(false);
               }}
             >
@@ -3856,7 +4054,7 @@ export default function App() {
               </div>
             </div>
             <div className="modal-actions">
-              <button onClick={() => downloadSave(data)}>备份当前存档</button>
+              <button onClick={exportCurrentSave}>备份当前存档</button>
               <button onClick={() => setImported(null)}>取消</button>
               <button
                 className="gold-button"
@@ -3930,7 +4128,7 @@ export default function App() {
           </section>
         </div>
       ) : null}
-      <Fireworks active={showFireworks} />
+      <Fireworks active={showFireworks} variant={fireworksVariant} />
     </div>
   );
 }

@@ -312,7 +312,13 @@ export type Tournament = {
   complete: boolean;
   results: string[];
 };
-export type SuspendedTournament = { game: Game; tournament: Tournament };
+export type MatchMode = "cash" | "championship";
+export type MatchSession = { id: string; mode: MatchMode };
+export type SuspendedTournament = {
+  game: Game;
+  tournament: Tournament;
+  match?: MatchSession;
+};
 export type ChampionshipStanding = {
   place: number;
   player: Character;
@@ -392,6 +398,10 @@ const tournamentSchema = z.object({
       complete: z.boolean(),
       results: z.array(z.string().max(500)).max(20),
     });
+const matchSessionSchema = z.object({
+  id: z.string().min(1).max(100),
+  mode: z.enum(["cash", "championship"]),
+});
 const chipAnimationSchema = z.object({
   hand: money,
   settledTotals: z.record(money),
@@ -443,7 +453,12 @@ const profileShardSchema = z.object({
 const activeShardSchema = z.object({
   game: gameSchema.nullable(),
   tournament: tournamentSchema.nullable(),
-  pausedTournament: z.object({ game: gameSchema, tournament: tournamentSchema }).optional(),
+  activeMatch: matchSessionSchema.optional(),
+  pausedTournament: z.object({
+    game: gameSchema,
+    tournament: tournamentSchema,
+    match: matchSessionSchema.optional(),
+  }).optional(),
   chipAnimation: chipAnimationSchema.optional(),
 });
 const historyShardSchema = z.object({
@@ -461,6 +476,7 @@ const schema = z.object({
   playerProfile: profileShardSchema.shape.playerProfile,
   game: activeShardSchema.shape.game,
   tournament: activeShardSchema.shape.tournament,
+  activeMatch: activeShardSchema.shape.activeMatch,
   pausedTournament: activeShardSchema.shape.pausedTournament,
   chipAnimation: activeShardSchema.shape.chipAnimation,
   tournamentRecords: historyShardSchema.shape.tournamentRecords,
@@ -476,6 +492,7 @@ export type Save = {
   playerProfile: PlayerProfile;
   game: Game | null;
   tournament: Tournament | null;
+  activeMatch?: MatchSession;
   pausedTournament?: SuspendedTournament;
   chipAnimation?: {
     hand: number;
@@ -548,6 +565,7 @@ type SaveShardData = {
   active: {
     game: Game | null;
     tournament: Tournament | null;
+    activeMatch?: MatchSession;
     pausedTournament?: SuspendedTournament;
     chipAnimation?: {
       hand: number;
@@ -581,6 +599,7 @@ function splitSave(save: Save): SaveShardData {
     active: {
       game: save.game,
       tournament: save.tournament,
+      ...(save.activeMatch ? { activeMatch: save.activeMatch } : {}),
       ...(save.pausedTournament ? { pausedTournament: save.pausedTournament } : {}),
       ...(save.chipAnimation ? { chipAnimation: save.chipAnimation } : {}),
     },

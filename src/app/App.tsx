@@ -555,7 +555,11 @@ function recordPlacements(save: Save, players: Character[]): Save {
 }
 const TABLE_TIMER_STORAGE_KEY = "river-save:timer";
 const LEGACY_TABLE_TIMER_STORAGE_KEY = "moyu-dezhou-match-timer-v2";
-type StoredTimer = { matchId: string; elapsedMs: number };
+type StoredTimer = {
+  matchId: string;
+  elapsedMs: number;
+  revision: number;
+};
 type TimerStorage = {
   cash: StoredTimer | null;
   championship: StoredTimer | null;
@@ -602,12 +606,16 @@ function cleanupLegacyTimerStorage() {
 function parseStoredTimer(value: unknown): StoredTimer | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const timer = value as Record<string, unknown>;
+  const revision = timer.revision === undefined ? 0 : timer.revision;
   return typeof timer.matchId === "string" &&
     timer.matchId.length > 0 &&
     typeof timer.elapsedMs === "number" &&
     Number.isFinite(timer.elapsedMs) &&
-    timer.elapsedMs >= 0
-    ? { matchId: timer.matchId, elapsedMs: timer.elapsedMs }
+    timer.elapsedMs >= 0 &&
+    typeof revision === "number" &&
+    Number.isInteger(revision) &&
+    revision >= 0
+    ? { matchId: timer.matchId, elapsedMs: timer.elapsedMs, revision }
     : null;
 }
 function readTimerStorage(): TimerStorage {
@@ -677,9 +685,12 @@ function ensureMatchMetadata(save: Save): Save {
 function saveTableTimer(state: TableTimerState) {
   try {
     const timers = readTimerStorage();
+    const current = timers[state.mode];
+    const sameMatch = current?.matchId === state.matchId;
     timers[state.mode] = {
       matchId: state.matchId,
-      elapsedMs: state.accumulatedMs,
+      elapsedMs: Math.max(current?.elapsedMs ?? 0, state.accumulatedMs),
+      revision: sameMatch ? (current?.revision ?? 0) + 1 : 1,
     };
     writeTimerStorage(timers);
   } catch {

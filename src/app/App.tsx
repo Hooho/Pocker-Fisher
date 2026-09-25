@@ -2828,7 +2828,7 @@ export default function App() {
             支持跨端使用：只要在不同设备之间保持同一份最新存档文件，并在切换设备时导入即可。不同设备之间不会自动同步。
           </div>
         </article>
-        <article className="info-settings-card info-settings-card-wide reset-settings">
+        <section className="reset-settings" aria-labelledby="reset-settings-title">
           <div className="settings-section-heading">
             <h2 id="reset-settings-title">重置</h2>
             <p className="muted">清理本机保存的牌局、战绩、人物修改、个人资料和设置。</p>
@@ -2852,7 +2852,7 @@ export default function App() {
               <RotateCcw size={15} /> {resetting ? "正在重置…" : "重置所有数据"}
             </button>
           </div>
-        </article>
+        </section>
       </div>
     </section>
   );

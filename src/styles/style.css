@@ -7705,6 +7705,7 @@ footer {
 }
 
 .reset-settings {
+  grid-column: 1 / -1;
   max-width: 920px;
 }
 

@@ -32,6 +32,7 @@ const dryRun = flags.has("--dry-run");
 const noBump = flags.has("--no-bump");
 const skipVsCode = flags.has("--skip-vscode");
 const skipOpenVsx = flags.has("--skip-openvsx");
+const skipPush = flags.has("--skip-push");
 const semverPattern = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 
 function loadDotEnv() {
@@ -105,6 +106,10 @@ function validateArguments() {
 
   if (dryRun && (skipVsCode || skipOpenVsx)) {
     throw new Error("--dry-run 不需要搭配 --skip-vscode 或 --skip-openvsx");
+  }
+
+  if (dryRun && skipPush) {
+    throw new Error("--dry-run 不需要搭配 --skip-push");
   }
 
   if (versionOptionIndex >= 0 && !exactVersion) {
@@ -342,6 +347,20 @@ async function createInteractivePlan() {
       readline,
       true,
     );
+    const currentBranch = await captureCommand(gitCommand, [
+      "rev-parse",
+      "--abbrev-ref",
+      "HEAD",
+    ]);
+    const shouldSyncMain = shouldCommit && !skipPush
+      ? await askYesNo(
+          currentBranch === "main"
+            ? "是否推送 main，并推送版本 Tag？"
+            : `是否将当前分支 ${currentBranch} 合并到 main，并推送 main 和版本 Tag？`,
+          readline,
+          true,
+        )
+      : false;
     const shouldPublishVsCode = skipVsCode
       ? false
       : await askYesNo("是否发布到 VS Code Marketplace？", readline, false);
@@ -354,6 +373,7 @@ async function createInteractivePlan() {
       shouldTest,
       shouldPackage,
       shouldCommit,
+      shouldSyncMain,
       shouldPublishVsCode,
       shouldPublishOpenVsx,
     };
@@ -372,7 +392,7 @@ function requirePublishTokens(plan) {
   }
 }
 
-async function createReleaseCommitAndTag(version) {
+async function createReleaseCommit(version) {
   const releaseFiles = ["package.json", "package-lock.json"];
   const stagedReleaseFiles = await captureCommand(gitCommand, [
     "diff",
@@ -406,7 +426,9 @@ async function createReleaseCommitAndTag(version) {
   } else {
     console.log("\n版本文件没有变化，跳过空的 Release Commit。");
   }
+}
 
+async function createReleaseTag(version) {
   const tag = `v${version}`;
   const existingTag = await captureCommand(gitCommand, ["tag", "--list", tag]);
   if (existingTag) {
@@ -426,6 +448,63 @@ async function createReleaseCommitAndTag(version) {
     "-m",
     `发布 ${tag}`,
   ]);
+}
+
+async function ensureWorkingTreeClean() {
+  const status = await captureCommand(gitCommand, ["status", "--porcelain"]);
+  if (status) {
+    throw new Error(
+      "当前工作区还有未提交改动，不能安全合并或推送。请先处理这些改动后再发布。",
+    );
+  }
+}
+
+async function syncMainAndPush(version) {
+  const originalBranch = await captureCommand(gitCommand, [
+    "rev-parse",
+    "--abbrev-ref",
+    "HEAD",
+  ]);
+  const tag = `v${version}`;
+  let switchedToMain = false;
+
+  await ensureWorkingTreeClean();
+  await captureCommand(gitCommand, ["remote", "get-url", "origin"]);
+  await captureCommand(gitCommand, ["show-ref", "--verify", "refs/heads/main"]);
+
+  try {
+    if (originalBranch !== "main") {
+      await runCommand("切换到 main", gitCommand, ["switch", "main"]);
+      switchedToMain = true;
+      await runCommand("合并发布分支到 main", gitCommand, [
+        "merge",
+        "--no-ff",
+        originalBranch,
+        "-m",
+        `merge: 发布 ${tag}`,
+      ]);
+    }
+
+    await ensureWorkingTreeClean();
+    await runCommand("推送 main", gitCommand, ["push", "origin", "main"]);
+    await createReleaseTag(version);
+    await runCommand("推送版本 Tag", gitCommand, [
+      "push",
+      "origin",
+      `refs/tags/${tag}`,
+    ]);
+  } finally {
+    if (switchedToMain) {
+      const status = await captureCommand(gitCommand, ["status", "--porcelain"]);
+      if (!status) {
+        await runCommand("切回原分支", gitCommand, ["switch", originalBranch]);
+      } else {
+        console.log(
+          `\n当前 main 工作区存在冲突或未提交改动，暂不自动切回 ${originalBranch}，请先处理后再切换。`,
+        );
+      }
+    }
+  }
 }
 
 async function ensureReleaseFilesClean() {
@@ -464,6 +543,7 @@ async function main() {
         shouldTest: true,
         shouldPackage: true,
         shouldCommit: false,
+        shouldSyncMain: false,
         shouldPublishVsCode: false,
         shouldPublishOpenVsx: false,
       }
@@ -481,6 +561,9 @@ async function main() {
   requirePublishTokens(plan);
   if (!dryRun) {
     await ensureReleaseFilesClean();
+    if (plan.shouldSyncMain) {
+      await ensureWorkingTreeClean();
+    }
   }
 
   if (plan.shouldTest) {
@@ -533,7 +616,13 @@ async function main() {
   }
 
   if (plan.shouldCommit) {
-    await createReleaseCommitAndTag(packageJson.version);
+    await createReleaseCommit(packageJson.version);
+    if (plan.shouldSyncMain) {
+      await syncMainAndPush(packageJson.version);
+    } else {
+      await createReleaseTag(packageJson.version);
+      console.log("\n已跳过合并和推送；Release Commit 与本地 Tag 已创建。\n");
+    }
   } else {
     console.log("\n已跳过 Release Commit 和 Git Tag；版本文件仍保留在工作区中。\n");
   }

@@ -24,7 +24,7 @@ npm run dev
 
 ## 一键发布扩展
 
-`npm run release` 是一个交互式发布向导。它会逐步询问版本类型、是否运行测试、是否打包 VSIX、是否创建 Release Commit / Git Tag，以及是否发布到 VS Code Marketplace 和 Open VSX（Cursor 可使用的第三方扩展注册表）。发布渠道默认选择“否”，脚本不会推送代码。
+`npm run release` 是一个交互式发布向导。它会逐步询问版本类型、是否运行测试、是否打包 VSIX、是否创建 Release Commit、是否将当前分支合并到 `main` 并推送 `main` 与版本 Tag，以及是否发布到 VS Code Marketplace 和 Open VSX（Cursor 可使用的第三方扩展注册表）。合并推送和发布渠道都会单独询问确认。
 
 如果在向导中选择发布，可以使用项目根目录的 `.env` 文件配置令牌；只打包或只做检查时不需要令牌。先复制模板并填写：
 
@@ -57,11 +57,12 @@ npm run release -- minor        # 预选新增功能版本
 npm run release -- major        # 预选重大不兼容版本
 npm run release -- --no-bump    # 保持当前版本，适合重试已打包版本
 npm run release -- --version 1.0.0  # 手动指定版本，适合首次发布
+npm run release -- --skip-push  # 只提交并创建本地 Tag，不合并、不推送
 ```
 
 向导中的版本选项对应 SemVer：修复问题使用 `patch`，新增功能使用 `minor`，重大不兼容变更使用 `major`。首次发布可以选择“保持当前版本号”或手动输入当前版本；如果只想生成 VSIX，发布问题选择“否”即可。
 
-发布成功后会生成类似下面的 Git 历史：
+确认合并推送后，脚本会从当前分支合并到 `main`，依次推送 `main` 和版本 Tag。发布成功后会生成类似下面的 Git 历史：
 
 ```text
 chore(release): v1.0.1
@@ -74,7 +75,7 @@ v1.0.1
 npm run release:check
 ```
 
-如果某一个市场发布失败，可以使用 `--no-bump` 保持当前版本重试，并用 `--skip-vscode` 或 `--skip-openvsx` 跳过已经成功的市场。脚本只暂存版本文件，不会把其他工作区改动提交进去。
+如果某一个市场发布失败，可以使用 `--no-bump` 保持当前版本重试，并用 `--skip-vscode` 或 `--skip-openvsx` 跳过已经成功的市场。脚本只暂存版本文件，不会把其他工作区改动提交进去；如果要禁止合并和推送，可使用 `--skip-push`。
 
 ## 单应用路由
 

@@ -8,7 +8,9 @@ const SHARDED_STORAGE_PREFIX = "river-save";
 const SNAPSHOT_STORAGE_KEY = `${SHARDED_STORAGE_PREFIX}:snapshots`;
 const SAVE_LOCK_NAME = "river-save-write";
 const SAVE_CHANNEL_NAME = "river-save-sync";
-const SAVE_CODE_PREFIX = "RIVER-SAVE-V1.";
+const SAVE_CODE_V1_PREFIX = "RIVER-SAVE-V1.";
+const SAVE_CODE_V2_GZIP_PREFIX = "RIVER-SAVE-V2.G.";
+const SAVE_CODE_V2_PLAIN_PREFIX = "RIVER-SAVE-V2.P.";
 const GAME_LOG_LIMIT = 15;
 const SNAPSHOT_LIMIT = 5;
 const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
@@ -563,6 +565,42 @@ export type PlayerCareerStats = {
   highestChips: number;
   bestPlace: number;
 };
+type CompactSaveContent = {
+  v: 2;
+  savedAt: string;
+  profile?: {
+    name?: string;
+    avatar?: string | null;
+  };
+  settings?: Partial<Save["settings"]>;
+  game?: Game;
+  tournament?: Tournament;
+  activeMatch?: MatchSession;
+  pausedTournament?: SuspendedTournament;
+  chipAnimation?: Save["chipAnimation"];
+  tournamentRecords?: ChampionshipRecord[];
+  overrides?: Record<string, Character>;
+  previous?: Record<string, Character>;
+  playerStats?: Record<string, Partial<PlayerCareerStats>>;
+  stats?: Partial<Save["stats"]>;
+};
+type CompactSavePayload = CompactSaveContent & {
+  checksum: string;
+};
+
+const blankPlayerCareerStats: PlayerCareerStats = {
+  matches: 0,
+  advances: 0,
+  handsWon: 0,
+  handsPlayed: 0,
+  cashMatchesWon: 0,
+  championshipsEntered: 0,
+  tournamentHandsWon: 0,
+  tournamentHandsPlayed: 0,
+  pointsTenths: 0,
+  highestChips: 0,
+  bestPlace: 0,
+};
 export const blank: Save = {
   version: 1,
   savedAt: "",
@@ -854,10 +892,33 @@ const snapshotArchiveSchema = z.object({
     save: z.unknown(),
   })).max(SNAPSHOT_LIMIT),
 });
-const saveCodePayloadSchema = z.object({
+const saveCodeV1PayloadSchema = z.object({
   version: z.literal(1),
   checksum: z.string().regex(/^[0-9a-f]{8}$/),
   save: z.unknown(),
+});
+const compactProfileSchema = z.object({
+  name: z.string().min(1).max(24).optional(),
+  avatar: z.string().max(500_000).nullable().optional(),
+});
+const compactSaveContentSchema = z.object({
+  v: z.literal(2),
+  savedAt: z.string(),
+  profile: compactProfileSchema.optional(),
+  settings: settingsSchema.partial().optional(),
+  game: gameSchema.optional(),
+  tournament: tournamentSchema.optional(),
+  activeMatch: matchSessionSchema.optional(),
+  pausedTournament: activeShardSchema.shape.pausedTournament,
+  chipAnimation: chipAnimationSchema.optional(),
+  tournamentRecords: z.array(tournamentRecordSchema).max(1000).optional(),
+  overrides: z.record(characterSchema).optional(),
+  previous: z.record(characterSchema).optional(),
+  playerStats: z.record(playerStatsSchema.partial()).optional(),
+  stats: statsSchema.partial().optional(),
+});
+const compactSavePayloadSchema = compactSaveContentSchema.extend({
+  checksum: z.string().regex(/^[0-9a-f]{8}$/),
 });
 
 function stableSerialize(value: unknown): string {
@@ -963,8 +1024,7 @@ export function areSaveContentsEqual(left: Save, right: Save) {
   return saveFingerprint(left) === saveFingerprint(right);
 }
 
-function encodeBase64Url(value: string) {
-  const bytes = new TextEncoder().encode(value);
+function encodeBase64Url(bytes: Uint8Array) {
   let binary = "";
   for (let index = 0; index < bytes.length; index += 0x8000) {
     binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
@@ -979,46 +1039,211 @@ function decodeBase64Url(value: string) {
   const padded = value.replace(/-/g, "+").replace(/_/g, "/")
     + "=".repeat((4 - (value.length % 4)) % 4);
   const binary = atob(padded);
-  const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-  return new TextDecoder().decode(bytes);
+  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
-export function createSaveCode(data: Save) {
-  const save = validateSaveForStorage(data);
-  return SAVE_CODE_PREFIX + encodeBase64Url(JSON.stringify({
-    version: 1,
-    checksum: checksumValue(save),
-    save,
-  }));
+function compactNumberRecord<T extends Record<string, number>>(record: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(record).filter(([, value]) => value !== 0),
+  ) as Partial<T>;
 }
 
-export function parseSaveCode(code: string): Save {
+function createCompactSaveContent(data: Save): CompactSaveContent {
+  const profile: CompactSaveContent["profile"] = {};
+  if (data.playerProfile.name !== blank.playerProfile.name) {
+    profile.name = data.playerProfile.name;
+  }
+  if (data.playerProfile.avatar !== null) profile.avatar = data.playerProfile.avatar;
+
+  const settings: Partial<Save["settings"]> = {};
+  for (const key of Object.keys(defaults) as Array<keyof Save["settings"]>) {
+    if (data.settings[key] !== defaults[key]) {
+      Object.assign(settings, { [key]: data.settings[key] });
+    }
+  }
+
+  const stats: Partial<Save["stats"]> = {};
+  for (const key of ["hands", "wins", "tournaments", "titles"] as const) {
+    if (data.stats[key] !== 0) stats[key] = data.stats[key];
+  }
+
+  const playerStats = Object.fromEntries(
+    Object.entries(data.playerStats)
+      .map(([id, value]) => [id, compactNumberRecord(value)] as const)
+      .filter(([, value]) => Object.keys(value).length > 0),
+  ) as Record<string, Partial<PlayerCareerStats>>;
+
+  return {
+    v: 2,
+    savedAt: data.savedAt,
+    ...(Object.keys(profile).length ? { profile } : {}),
+    ...(Object.keys(settings).length ? { settings } : {}),
+    ...(data.game ? { game: data.game } : {}),
+    ...(data.tournament ? { tournament: data.tournament } : {}),
+    ...(data.activeMatch ? { activeMatch: data.activeMatch } : {}),
+    ...(data.pausedTournament ? { pausedTournament: data.pausedTournament } : {}),
+    ...(data.chipAnimation ? { chipAnimation: data.chipAnimation } : {}),
+    ...(data.tournamentRecords.length ? { tournamentRecords: data.tournamentRecords } : {}),
+    ...(Object.keys(data.overrides).length ? { overrides: data.overrides } : {}),
+    ...(Object.keys(data.previous).length ? { previous: data.previous } : {}),
+    ...(Object.keys(playerStats).length ? { playerStats } : {}),
+    ...(Object.keys(stats).length ? { stats } : {}),
+  };
+}
+
+function createCompactSavePayload(data: Save): CompactSavePayload {
+  const content = createCompactSaveContent(validateSaveForStorage(data));
+  return {
+    ...content,
+    checksum: checksumValue(content),
+  };
+}
+
+function expandCompactSave(content: CompactSaveContent): Save {
+  const playerStats = Object.fromEntries(
+    Object.entries(content.playerStats ?? {}).map(([id, value]) => [
+      id,
+      { ...blankPlayerCareerStats, ...value },
+    ]),
+  ) as Save["playerStats"];
+
+  return parseSave({
+    ...blank,
+    savedAt: content.savedAt,
+    playerProfile: { ...blank.playerProfile, ...content.profile },
+    settings: { ...defaults, ...content.settings },
+    game: content.game ?? null,
+    tournament: content.tournament ?? null,
+    tournamentRecords: content.tournamentRecords ?? [],
+    overrides: content.overrides ?? {},
+    previous: content.previous ?? {},
+    playerStats,
+    stats: { ...blank.stats, ...content.stats },
+    ...(content.activeMatch ? { activeMatch: content.activeMatch } : {}),
+    ...(content.pausedTournament ? { pausedTournament: content.pausedTournament } : {}),
+    ...(content.chipAnimation ? { chipAnimation: content.chipAnimation } : {}),
+  });
+}
+
+function parseCompactSave(value: unknown): Save {
+  const result = compactSavePayloadSchema.safeParse(value);
+  if (!result.success) {
+    throw new SaveValidationError(result.error.issues.map(formatValidationIssue));
+  }
+
+  const { checksum, ...content } = result.data;
+  if (checksumValue(content) !== checksum) {
+    throw new SaveValidationError(["导出存档内容不完整，请重新导出"]);
+  }
+  try {
+    return expandCompactSave(content);
+  } catch {
+    throw new SaveValidationError(["导出存档中的游戏进度校验失败"]);
+  }
+}
+
+export function exportSave(data: Save) {
+  return createCompactSavePayload({
+    ...data,
+    savedAt: new Date().toISOString(),
+  });
+}
+
+export function parseSaveImport(value: unknown): Save {
+  if (
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (value as { v?: unknown }).v === 2
+  ) {
+    return parseCompactSave(value);
+  }
+  return parseSave(value);
+}
+
+async function gzipText(value: string): Promise<Uint8Array | null> {
+  if (typeof CompressionStream === "undefined") return null;
+  try {
+    const compressor = new CompressionStream("gzip");
+    const output = new Response(compressor.readable).arrayBuffer();
+    const writer = compressor.writable.getWriter();
+    await writer.write(new TextEncoder().encode(value));
+    await writer.close();
+    return new Uint8Array(await output);
+  } catch {
+    return null;
+  }
+}
+
+async function gunzipText(value: Uint8Array): Promise<string> {
+  if (typeof DecompressionStream === "undefined") {
+    throw new SaveValidationError(["当前浏览器不支持压缩存档码，请使用 JSON 存档"]);
+  }
+  let output: Promise<string> | undefined;
+  try {
+    const decompressor = new DecompressionStream("gzip");
+    output = new Response(decompressor.readable).text();
+    const writer = decompressor.writable.getWriter();
+    await writer.write(value as unknown as BufferSource);
+    await writer.close();
+    return await output;
+  } catch {
+    await output?.catch(() => "");
+    throw new SaveValidationError(["压缩存档码无效或已损坏"]);
+  }
+}
+
+export async function createSaveCode(data: Save) {
+  const payload = exportSave(data);
+  const json = JSON.stringify(payload);
+  const compressed = await gzipText(json);
+  return (compressed ? SAVE_CODE_V2_GZIP_PREFIX : SAVE_CODE_V2_PLAIN_PREFIX) +
+    encodeBase64Url(compressed ?? new TextEncoder().encode(json));
+}
+
+export async function parseSaveCode(code: string): Promise<Save> {
   const normalized = code.trim().replace(/\s+/g, "");
-  if (!normalized.startsWith(SAVE_CODE_PREFIX)) {
+
+  if (normalized.startsWith(SAVE_CODE_V1_PREFIX)) {
+    let payload: z.infer<typeof saveCodeV1PayloadSchema>;
+    try {
+      const decoded = JSON.parse(
+        new TextDecoder().decode(decodeBase64Url(normalized.slice(SAVE_CODE_V1_PREFIX.length))),
+      );
+      const result = saveCodeV1PayloadSchema.safeParse(decoded);
+      if (!result.success) throw new Error("invalid save code payload");
+      payload = result.data;
+    } catch {
+      throw new SaveValidationError(["存档码无效或已损坏"]);
+    }
+
+    if (checksumValue(payload.save) !== payload.checksum) {
+      throw new SaveValidationError(["存档码内容不完整，请重新复制"]);
+    }
+    try {
+      return parseSave(payload.save);
+    } catch {
+      throw new SaveValidationError(["存档码中的游戏进度校验失败"]);
+    }
+  }
+
+  const isGzip = normalized.startsWith(SAVE_CODE_V2_GZIP_PREFIX);
+  const isPlain = normalized.startsWith(SAVE_CODE_V2_PLAIN_PREFIX);
+  if (!isGzip && !isPlain) {
     throw new SaveValidationError(["存档码版本或前缀无效"]);
   }
 
-  let payload: z.infer<typeof saveCodePayloadSchema>;
   try {
-    const decoded = JSON.parse(decodeBase64Url(normalized.slice(SAVE_CODE_PREFIX.length)));
-    const result = saveCodePayloadSchema.safeParse(decoded);
-    if (!result.success) throw new Error("invalid save code payload");
-    payload = result.data;
-  } catch {
+    const prefix = isGzip ? SAVE_CODE_V2_GZIP_PREFIX : SAVE_CODE_V2_PLAIN_PREFIX;
+    const bytes = decodeBase64Url(normalized.slice(prefix.length));
+    const json = isGzip
+      ? await gunzipText(bytes)
+      : new TextDecoder().decode(bytes);
+    return parseCompactSave(JSON.parse(json));
+  } catch (error) {
+    if (error instanceof SaveValidationError) throw error;
     throw new SaveValidationError(["存档码无效或已损坏"]);
   }
-
-  if (checksumValue(payload.save) !== payload.checksum) {
-    throw new SaveValidationError(["存档码内容不完整，请重新复制"]);
-  }
-
-  let save: Save;
-  try {
-    save = parseSave(payload.save);
-  } catch {
-    throw new SaveValidationError(["存档码中的游戏进度校验失败"]);
-  }
-  return save;
 }
 
 function browserManifestKey() {
@@ -1568,7 +1793,7 @@ export function checkSaveState(): Promise<StoredSave> {
 
 export function downloadSave(data: Save) {
   const blob = new Blob(
-    [JSON.stringify({ ...data, savedAt: new Date().toISOString() }, null, 2)],
+    [JSON.stringify(exportSave(data), null, 2)],
     { type: "application/json" },
   );
   const url = URL.createObjectURL(blob);

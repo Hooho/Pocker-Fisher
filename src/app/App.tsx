@@ -85,7 +85,7 @@ import {
   adoptSaveRevision,
   areSaveContentsEqual,
   createSaveCode,
-  parseSave,
+  parseSaveImport,
   parseSaveCode,
   downloadSave,
   getSaveRevision,
@@ -2363,7 +2363,7 @@ export default function App() {
       return;
     }
     try {
-      const nextSave = parseSave(JSON.parse(await f.text()));
+      const nextSave = parseSaveImport(JSON.parse(await f.text()));
       if (summarizeSaveRecords(data).hasExistingData) {
         setImported(nextSave);
       } else {
@@ -2374,11 +2374,16 @@ export default function App() {
     }
     if (file.current) file.current.value = "";
   };
-  const openDownloadSaveModal = () => {
-    setSaveCodeText(createSaveCode(data));
+  const openDownloadSaveModal = async () => {
+    setSaveCodeText("");
     setSaveCodeModal("download");
     setSaveCodePasteOpen(false);
     setMoreMenuOpen(false);
+    try {
+      setSaveCodeText(await createSaveCode(data));
+    } catch {
+      setToast("存档码生成失败，请改用下载 JSON 存档");
+    }
   };
   const openUploadSaveModal = () => {
     setSaveCodeText("");
@@ -2400,6 +2405,10 @@ export default function App() {
     setSaveCodeText("");
   };
   const copySaveCode = async () => {
+    if (!saveCodeText.trim()) {
+      setToast("存档码正在生成，请稍候再试");
+      return;
+    }
     const copied = await copyTextToClipboard(saveCodeText);
     setToast(
       copied
@@ -2407,10 +2416,10 @@ export default function App() {
         : "复制失败，请长按文本框并选择“全选—复制”",
     );
   };
-  const applySaveCode = () => {
+  const applySaveCode = async () => {
     let nextSave: Save;
     try {
-      nextSave = parseSaveCode(saveCodeText);
+      nextSave = await parseSaveCode(saveCodeText);
     } catch (error) {
       setToast(error instanceof Error ? error.message : "存档码无效，现有数据未修改");
       return;
@@ -3104,7 +3113,7 @@ export default function App() {
               className="icon-btn"
               aria-label="导出存档"
               title="导出存档"
-              onClick={openDownloadSaveModal}
+              onClick={() => void openDownloadSaveModal()}
             >
               <Download size={17} />
               <span className="tool-label">导出存档</span>
@@ -4422,7 +4431,7 @@ export default function App() {
                       className="save-code-textarea"
                       value={saveCodeText}
                       onChange={(event) => setSaveCodeText(event.target.value)}
-                      placeholder="请粘贴 RIVER-SAVE-V1. 开头的存档码"
+                      placeholder="请粘贴 RIVER-SAVE-V2. 开头的存档码（兼容 V1）"
                       rows={8}
                       spellCheck={false}
                       autoFocus
@@ -4433,7 +4442,7 @@ export default function App() {
                         type="button"
                         className="gold-button"
                         disabled={!saveCodeText.trim()}
-                        onClick={applySaveCode}
+                        onClick={() => void applySaveCode()}
                       >
                         恢复存档
                       </button>

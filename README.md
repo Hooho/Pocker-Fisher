@@ -24,7 +24,9 @@ npm run dev
 
 ## 一键发布扩展
 
-`npm run release` 是一个交互式发布向导。它会逐步询问版本类型、是否运行测试、是否打包 VSIX、是否创建 Release Commit，以及发布渠道。发布渠道支持多选：Web、VS Code Marketplace、Open VSX（Cursor 可使用的第三方扩展注册表）。
+`npm run release` 是一个交互式发布向导。它会逐步询问版本类型、是否运行测试、是否创建 Release Commit，以及发布渠道；选择 VS Code Marketplace 或 Open VSX 后会自动构建一次 VSIX。发布渠道支持多选：Web、VS Code Marketplace、Open VSX（Cursor 可使用的第三方扩展注册表）。
+
+`@vscode/vsce` 和 `ovsx` 已固定在项目的开发依赖中，发布脚本使用本地依赖运行，不会在发布过程中自动下载工具。首次拉取项目或依赖更新后执行一次 `npm install` 即可；如果依赖缺失，脚本会直接提示安装，而不会静默联网下载。
 
 如果在向导中选择发布，可以使用项目根目录的 `.env` 文件配置令牌；只打包或只做检查时不需要令牌。先复制模板并填写：
 

@@ -946,7 +946,7 @@ async function main() {
 
   if (plan.shouldPackage) {
     await runCommand("构建并打包 VSIX", npxCommand, [
-      "--yes",
+      "--no-install",
       "@vscode/vsce",
       "package",
       "--out",
@@ -1009,7 +1009,7 @@ async function main() {
       "发布到 VS Code Marketplace",
       npxCommand,
       [
-        "--yes",
+        "--no-install",
         "@vscode/vsce",
         "publish",
         "--packagePath",
@@ -1025,7 +1025,7 @@ async function main() {
     await runCommand(
       "发布到 Open VSX（Cursor）",
       npxCommand,
-      ["--yes", "ovsx", "publish", vsixPath, "-p", ovsxToken],
+      ["--no-install", "ovsx", "publish", vsixPath, "-p", ovsxToken],
       [ovsxToken],
     );
   }

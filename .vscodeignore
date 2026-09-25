@@ -6,6 +6,8 @@
 .codex/**
 node_modules/**
 artifacts/**
+.env
+.env.*
 **/*.tsbuildinfo
 src/**
 public/**

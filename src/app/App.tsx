@@ -4444,11 +4444,11 @@ export default function App() {
                     <textarea
                       className="save-code-textarea"
                       value={saveCodeText}
+                      onChange={(event) => setSaveCodeText(event.target.value)}
                       placeholder="请粘贴 RIVER-SAVE-V2. 开头的存档码（兼容 V1）"
                       rows={8}
                       spellCheck={false}
                       autoFocus
-                      readOnly
                       aria-label="粘贴存档码"
                     />
                   </>

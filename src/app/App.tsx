@@ -1186,7 +1186,6 @@ export default function App() {
   const [imported, setImported] = useState<Save | null>(null);
   const [saveCodeModal, setSaveCodeModal] = useState<"download" | "upload" | null>(null);
   const [saveCodeText, setSaveCodeText] = useState("");
-  const [saveCodePasteOpen, setSaveCodePasteOpen] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [saveLoadIssue, setSaveLoadIssue] = useState<{
     title: string;
@@ -1244,7 +1243,6 @@ export default function App() {
     setImported(null);
     setSaveCodeModal(null);
     setSaveCodeText("");
-    setSaveCodePasteOpen(false);
     setConfirmDialog(null);
     setSelected(null);
     setBatchOpen(false);
@@ -2377,7 +2375,6 @@ export default function App() {
   const openDownloadSaveModal = async () => {
     setSaveCodeText("");
     setSaveCodeModal("download");
-    setSaveCodePasteOpen(false);
     setMoreMenuOpen(false);
     try {
       setSaveCodeText(await createSaveCode(data));
@@ -2388,21 +2385,17 @@ export default function App() {
   const openUploadSaveModal = () => {
     setSaveCodeText("");
     setSaveCodeModal("upload");
-    setSaveCodePasteOpen(false);
     setMoreMenuOpen(false);
   };
   const closeSaveCodeModal = () => {
     setSaveCodeModal(null);
     setSaveCodeText("");
-    setSaveCodePasteOpen(false);
   };
   const uploadJsonSave = () => {
     closeSaveCodeModal();
     file.current?.click();
   };
   const openSaveCodePaste = async () => {
-    setSaveCodePasteOpen(true);
-    setSaveCodeText("");
     if (!navigator.clipboard?.readText) {
       setToast("当前环境无法读取剪贴板，请先复制存档码后重试");
       return;
@@ -4433,30 +4426,26 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    className={saveCodePasteOpen ? "gold-button" : undefined}
+                    className="gold-button"
                     onClick={() => void openSaveCodePaste()}
                   >
                     <Copy size={14} /> 粘贴存档码
                   </button>
                 </div>
-                {saveCodePasteOpen ? (
-                  <>
-                    <textarea
-                      className="save-code-textarea"
-                      value={saveCodeText}
-                      onChange={(event) => setSaveCodeText(event.target.value)}
-                      placeholder="请粘贴 RIVER-SAVE-V2. 开头的存档码（兼容 V1）"
-                      rows={8}
-                      spellCheck={false}
-                      autoFocus
-                      aria-label="粘贴存档码"
-                    />
-                  </>
-                ) : null}
+                <textarea
+                  className="save-code-textarea"
+                  value={saveCodeText}
+                  onChange={(event) => setSaveCodeText(event.target.value)}
+                  placeholder="请粘贴 RIVER-SAVE-V2. 开头的存档码（兼容 V1）"
+                  rows={8}
+                  spellCheck={false}
+                  autoFocus
+                  aria-label="粘贴存档码"
+                />
               </>
             )}
             <div className="modal-actions">
-              {saveCodeModal === "upload" && saveCodePasteOpen ? (
+              {saveCodeModal === "upload" ? (
                 <button
                   type="button"
                   className="gold-button"

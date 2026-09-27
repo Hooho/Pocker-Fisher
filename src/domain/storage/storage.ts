@@ -565,6 +565,11 @@ export type PlayerCareerStats = {
   highestChips: number;
   bestPlace: number;
 };
+
+function hasCustomAvatar(avatar: PlayerProfile["avatar"]): avatar is string {
+  return Boolean(avatar);
+}
+
 type CompactSaveContent = {
   v: 2;
   savedAt: string;
@@ -698,7 +703,7 @@ export type SaveRecordSummary = {
 export function summarizeSaveRecords(save: Save): SaveRecordSummary {
   const hasPersonalization =
     save.playerProfile.name !== blank.playerProfile.name ||
-    save.playerProfile.avatar !== null ||
+    hasCustomAvatar(save.playerProfile.avatar) ||
     Object.keys(save.overrides).length > 0 ||
     Object.keys(save.previous).length > 0 ||
     Object.entries(defaults).some(
@@ -1053,7 +1058,9 @@ function createCompactSaveContent(data: Save): CompactSaveContent {
   if (data.playerProfile.name !== blank.playerProfile.name) {
     profile.name = data.playerProfile.name;
   }
-  if (data.playerProfile.avatar !== null) profile.avatar = data.playerProfile.avatar;
+  if (hasCustomAvatar(data.playerProfile.avatar)) {
+    profile.avatar = data.playerProfile.avatar;
+  }
 
   const settings: Partial<Save["settings"]> = {};
   for (const key of Object.keys(defaults) as Array<keyof Save["settings"]>) {

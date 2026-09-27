@@ -146,6 +146,16 @@ test("compact exports omit defaults and restore into a full save", () => {
   assert.equal(restored.game, null);
 });
 
+test("compact exports omit the default avatar", () => {
+  const exported = exportSave({
+    ...blank,
+    playerProfile: { ...blank.playerProfile, avatar: "" },
+  });
+
+  assert.equal("profile" in exported, false);
+  assert.equal(parseSaveImport(exported).playerProfile.avatar, null);
+});
+
 test("save codes round-trip UTF-8 progress and tolerate copied whitespace", async () => {
   const save = {
     ...blank,

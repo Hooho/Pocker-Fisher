@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { defineConfig } from "vite";
@@ -11,6 +12,12 @@ const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8")) as
   license: string;
 };
 const appUpdatedAt = process.env.VITE_APP_UPDATED_AT ?? new Date().toISOString();
+const charactersFile = resolve(publicDirectory, "characters.json");
+const charactersHash = createHash("sha256")
+  .update(readFileSync(charactersFile))
+  .digest("hex")
+  .slice(0, 12);
+const hashedCharactersFileName = `characters-${charactersHash}.json`;
 
 function publicFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -20,11 +27,14 @@ function publicFiles(directory: string): string[] {
 }
 
 // Relative asset URLs work in a normal browser and from a VS Code webview.
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   base: "./",
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
     __APP_UPDATED_AT__: JSON.stringify(appUpdatedAt),
+    __CHARACTERS_ASSET__: JSON.stringify(
+      command === "build" ? hashedCharactersFileName : "characters.json",
+    ),
   },
   build: {
     copyPublicDir: false,
@@ -42,7 +52,7 @@ export default defineConfig({
 
           this.emitFile({
             type: "asset",
-            fileName: relativePath,
+            fileName: relativePath === "characters.json" ? hashedCharactersFileName : relativePath,
             source: readFileSync(filePath),
           });
         }
@@ -64,4 +74,4 @@ export default defineConfig({
       },
     },
   ],
-});
+}));

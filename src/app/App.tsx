@@ -1626,7 +1626,7 @@ export default function App() {
     cleanupLegacyTimerStorage();
     void Promise.allSettled([
       loadSave(),
-      fetch(publicAsset("characters.json")).then((response) => {
+      fetch(publicAsset(__CHARACTERS_ASSET__)).then((response) => {
         if (!response.ok) throw new Error(`人物数据请求失败（${response.status}）`);
         return response.json();
       }),

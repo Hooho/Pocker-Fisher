@@ -76,8 +76,8 @@ export function LobbyPage({
         <div className="ambient-loose-chip chip-red">100</div>
       </div>
       <div className="lobby-save-note">
-        <div>随时退出！随时关闭！实时保存！</div>
-        <div>只保存本地，可下载存档，上传恢复</div>
+        <div>随时退出！实时保存！无注册！无联机！单人本地！</div>
+        <div>只保存本地！可下载存档，上传恢复</div>
       </div>
       <div className="mode-grid">
         <div className="mode-card-wrap">

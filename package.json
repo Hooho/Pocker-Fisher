@@ -53,6 +53,10 @@
     }
   },
   "scripts": {
+    "prepare:players": "node scripts/prepare-players.mjs",
+    "predev": "npm run prepare:players",
+    "prebuild:web": "npm run prepare:players",
+    "pretest": "npm run prepare:players",
     "dev": "vite --host 0.0.0.0",
     "build:web": "tsc -b && vite build",
     "build:extension": "tsc -p tsconfig.extension.json",

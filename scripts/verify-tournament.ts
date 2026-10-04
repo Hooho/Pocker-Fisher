@@ -3,7 +3,7 @@ import { simulateTable } from "../src/tournament";
 import { hero, type Character } from "../src/engine";
 let field: Character[] = [
   hero,
-  ...JSON.parse(readFileSync("public/characters.json", "utf8")).slice(0, 63),
+  ...JSON.parse(readFileSync("public/shared-players/characters.json", "utf8")).slice(0, 63),
 ];
 const stages: number[] = [field.length];
 const start = Date.now();

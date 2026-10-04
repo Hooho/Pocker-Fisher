@@ -24,3 +24,10 @@
 想换设备时，在“更多”中导出存档；打开新设备上的游戏后，选择“导入存档”即可继续。
 
 祝你摸鱼愉快！！
+# 公共选手资源
+
+本游戏通过 `vendor/game-common` Git 子模块固定公共选手版本；克隆后先执行 `git submodule update --init --recursive`。选手 ID、姓名、原始头像由公共仓库维护，德扑打法、水平、侵略性、诈唬概率和简介继续保存在 `public/characters.json`，按稳定 ID 关联。
+
+`npm run dev`、`npm run build:web` 和 `npm test` 自动执行 `prepare:players`，在忽略版本管理的 `public/shared-players/` 生成合并后的运行名单和头像。构建将名单输出为带内容哈希的文件，并将公共头像打包进站点；浏览器和 VS Code webview 都从自己的静态资源加载。独立运行赛事验证脚本前，先执行 `npm run prepare:players`。
+
+旧 `public/avatars-webp/` 和 `public/avatars-png/` 暂保留用于迁移核对，构建和游戏已不引用；后续公共头像只在 common 中维护。

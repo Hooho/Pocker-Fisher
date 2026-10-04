@@ -9,3 +9,4 @@ artifacts/
 .DS_Store
 .vscode/*-save.json
 .vscode/river-fisher-save-*.json
+public/shared-players/

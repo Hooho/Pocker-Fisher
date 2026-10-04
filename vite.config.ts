@@ -12,7 +12,7 @@ const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8")) as
   license: string;
 };
 const appUpdatedAt = process.env.VITE_APP_UPDATED_AT ?? new Date().toISOString();
-const charactersFile = resolve(publicDirectory, "characters.json");
+const charactersFile = resolve(publicDirectory, "shared-players/characters.json");
 const charactersHash = createHash("sha256")
   .update(readFileSync(charactersFile))
   .digest("hex")
@@ -33,7 +33,7 @@ export default defineConfig(({ command }) => ({
     __APP_VERSION__: JSON.stringify(packageJson.version),
     __APP_UPDATED_AT__: JSON.stringify(appUpdatedAt),
     __CHARACTERS_ASSET__: JSON.stringify(
-      command === "build" ? hashedCharactersFileName : "characters.json",
+      command === "build" ? hashedCharactersFileName : "shared-players/characters.json",
     ),
   },
   build: {
@@ -46,13 +46,13 @@ export default defineConfig(({ command }) => ({
       generateBundle() {
         for (const filePath of publicFiles(publicDirectory)) {
           const relativePath = relative(publicDirectory, filePath).split(sep).join("/");
-          if (relativePath.startsWith("avatars-png/")) {
+          if (relativePath.startsWith("avatars-png/") || relativePath.startsWith("avatars-webp/") || relativePath === "characters.json") {
             continue;
           }
 
           this.emitFile({
             type: "asset",
-            fileName: relativePath === "characters.json" ? hashedCharactersFileName : relativePath,
+            fileName: relativePath === "shared-players/characters.json" ? hashedCharactersFileName : relativePath,
             source: readFileSync(filePath),
           });
         }

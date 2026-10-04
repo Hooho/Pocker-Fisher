@@ -897,7 +897,7 @@ function Avatar({
   playerAvatar?: string | null;
   className?: string;
 }) {
-  const avatarSrc = publicAsset(`avatars-webp/${String(p.id).padStart(3, "0")}.webp`);
+  const avatarSrc = publicAsset(`shared-players/avatars/${String(p.id).padStart(3, "0")}.webp`);
 
   return p.id === -1 ? (
     <div className={`hero-avatar ${className}`.trim()}>

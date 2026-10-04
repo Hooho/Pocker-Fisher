@@ -1,0 +1,3 @@
+[submodule "vendor/game-common"]
+	path = vendor/game-common
+	url = https://github.com/Hooho/game-common.git

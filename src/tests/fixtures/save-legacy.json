@@ -1,0 +1,50 @@
+{
+  "source": "bda2f8f storage.ts, before common extraction",
+  "save": {
+    "version": 1,
+    "savedAt": "2026-01-01T00:00:00.000Z",
+    "playerProfile": {
+      "name": "女娲的牌局",
+      "avatar": null
+    },
+    "game": null,
+    "tournament": null,
+    "tournamentRecords": [],
+    "overrides": {},
+    "previous": {},
+    "playerStats": {},
+    "settings": {
+      "difficulty": 2,
+      "speed": 1000,
+      "mode": "local",
+      "endpoint": "",
+      "model": "",
+      "sound": false,
+      "soundConfigured": false,
+      "pace": 10
+    },
+    "stats": {
+      "hands": 17,
+      "wins": 4,
+      "tournaments": 2,
+      "titles": 1
+    }
+  },
+  "v1": "RIVER-SAVE-V1.eyJ2ZXJzaW9uIjoxLCJjaGVja3N1bSI6IjcwNTc1NWM2Iiwic2F2ZSI6eyJ2ZXJzaW9uIjoxLCJzYXZlZEF0IjoiMjAyNi0wMS0wMVQwMDowMDowMC4wMDBaIiwicGxheWVyUHJvZmlsZSI6eyJuYW1lIjoi5aWz5aiy55qE54mM5bGAIiwiYXZhdGFyIjpudWxsfSwiZ2FtZSI6bnVsbCwidG91cm5hbWVudCI6bnVsbCwidG91cm5hbWVudFJlY29yZHMiOltdLCJvdmVycmlkZXMiOnt9LCJwcmV2aW91cyI6e30sInBsYXllclN0YXRzIjp7fSwic2V0dGluZ3MiOnsiZGlmZmljdWx0eSI6Miwic3BlZWQiOjEwMDAsIm1vZGUiOiJsb2NhbCIsImVuZHBvaW50IjoiIiwibW9kZWwiOiIiLCJzb3VuZCI6ZmFsc2UsInNvdW5kQ29uZmlndXJlZCI6ZmFsc2UsInBhY2UiOjEwfSwic3RhdHMiOnsiaGFuZHMiOjE3LCJ3aW5zIjo0LCJ0b3VybmFtZW50cyI6MiwidGl0bGVzIjoxfX19",
+  "v2plain": "RIVER-SAVE-V2.P.eyJ2IjoyLCJzYXZlZEF0IjoiMjAyNi0xMC0wNFQxODo0ODo1OS44NzBaIiwicHJvZmlsZSI6eyJuYW1lIjoi5aWz5aiy55qE54mM5bGAIn0sInN0YXRzIjp7ImhhbmRzIjoxNywid2lucyI6NCwidG91cm5hbWVudHMiOjIsInRpdGxlcyI6MX0sImNoZWNrc3VtIjoiYjRiMjg2ZTUifQ",
+  "v2gzip": "RIVER-SAVE-V2.G.H4sIAAAAAAAAExXLMQ6CMBQG4Lv888NALQJv4w5Obg3UQIRiaMGBkDi4mHgCdxNX9UyEa5ju3zdhBAuCVaMucweGCMUuiMIglPsoZZlynG3SRBxAOPfdsW40eIJRrQZjef2W93d93tb7Y_lcMROsU856UilTWnCUEC61sWBJcN3Q-2o8EQRXu0Z7NBOKShcnO7RgZLFIpCy2mP-0e2gwoAAAAA",
+  "json": {
+    "v": 2,
+    "savedAt": "2026-10-04T18:48:59.870Z",
+    "profile": {
+      "name": "女娲的牌局"
+    },
+    "stats": {
+      "hands": 17,
+      "wins": 4,
+      "tournaments": 2,
+      "titles": 1
+    },
+    "checksum": "b4b286e5"
+  }
+}

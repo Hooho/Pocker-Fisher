@@ -1,4 +1,9 @@
 import { z } from "zod";
+import { stableSerialize, checksumValue, SaveValidationError, SaveConflictError as CommonSaveConflictError } from "../../../vendor/game-common/src/storage/integrity";
+import { createSaveTransfer, downloadSaveFile } from "../../../vendor/game-common/src/storage/transfer";
+import { createCoalescedWriter, writeWithRevision } from "../../../vendor/game-common/src/storage/persistence";
+import { createSnapshotArchive, type SaveSnapshot as CommonSaveSnapshot } from "../../../vendor/game-common/src/storage/snapshots";
+export { SaveValidationError } from "../../../vendor/game-common/src/storage/integrity";
 import type { Game, Character } from "../game/engine";
 import type { ChampionshipSimulationCheckpoint } from "../tournament/tournament";
 import { appMetadata } from "../../app/appMetadata";
@@ -12,8 +17,6 @@ const SAVE_CODE_V1_PREFIX = "RIVER-SAVE-V1.";
 const SAVE_CODE_V2_GZIP_PREFIX = "RIVER-SAVE-V2.G.";
 const SAVE_CODE_V2_PLAIN_PREFIX = "RIVER-SAVE-V2.P.";
 const GAME_LOG_LIMIT = 15;
-const SNAPSHOT_LIMIT = 5;
-const SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000;
 const SAVE_COALESCE_MS = 50;
 
 const SAVE_SHARDS = ["profile", "active", "history", "characters"] as const;
@@ -111,25 +114,7 @@ let vscodeBridgeReady = false;
 const pendingStorageRequests = new Map<string, PendingStorageRequest>();
 const saveListeners = new Set<(revision: number) => void>();
 
-export class SaveConflictError extends Error {
-  constructor(
-    public readonly expectedRevision?: number,
-    public readonly actualRevision?: number,
-    public readonly currentSave?: Save,
-  ) {
-    super("本地存档已被另一个标签页更新");
-    this.name = "SaveConflictError";
-  }
-}
-
-export class SaveValidationError extends Error {
-  constructor(public readonly issues: string[]) {
-    const summary = issues.slice(0, 3).join("；");
-    const suffix = issues.length > 3 ? `；另有 ${issues.length - 3} 项问题` : "";
-    super(`存档校验失败，未保存：${summary}${suffix}`);
-    this.name = "SaveValidationError";
-  }
-}
+export class SaveConflictError extends CommonSaveConflictError<Save> {}
 
 export function isSaveConflictError(error: unknown): error is SaveConflictError {
   return error instanceof SaveConflictError;
@@ -522,16 +507,7 @@ export type Save = {
   settings: Settings;
   stats: { hands: number; wins: number; tournaments: number; titles: number };
 };
-export type SaveSnapshot = {
-  reason: "interval" | "app-update" | "legacy-migration";
-  appVersion?: string;
-  fromAppVersion?: string;
-  toAppVersion?: string;
-  revision: number;
-  savedAt: string;
-  checksum: string;
-  save: Save;
-};
+export type SaveSnapshot = CommonSaveSnapshot<Save>;
 export type SaveLoadResult = {
   save: Save;
   recoveryNotice?: string;
@@ -884,19 +860,6 @@ const shardedStorageSchema = z.object({
   shards: z.record(z.unknown()),
   snapshots: z.unknown().optional(),
 });
-const snapshotArchiveSchema = z.object({
-  version: z.literal(1),
-  snapshots: z.array(z.object({
-    reason: z.enum(["interval", "app-update", "legacy-migration"]).default("interval"),
-    appVersion: z.string().optional(),
-    fromAppVersion: z.string().optional(),
-    toAppVersion: z.string().optional(),
-    revision: z.number().int().nonnegative(),
-    savedAt: z.string(),
-    checksum: z.string().min(1),
-    save: z.unknown(),
-  })).max(SNAPSHOT_LIMIT),
-});
 const saveCodeV1PayloadSchema = z.object({
   version: z.literal(1),
   checksum: z.string().regex(/^[0-9a-f]{8}$/),
@@ -926,99 +889,12 @@ const compactSavePayloadSchema = compactSaveContentSchema.extend({
   checksum: z.string().regex(/^[0-9a-f]{8}$/),
 });
 
-function stableSerialize(value: unknown): string {
-  if (value === undefined) return "null";
-  if (value === null || typeof value !== "object") {
-    return JSON.stringify(value) ?? "null";
-  }
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableSerialize(item === undefined ? null : item)).join(",")}]`;
-  }
-
-  const record = value as Record<string, unknown>;
-  return `{${Object.keys(record)
-    .filter((key) => record[key] !== undefined)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${stableSerialize(record[key])}`)
-    .join(",")}}`;
-}
-
-function checksumValue(value: unknown): string {
-  let hash = 2166136261;
-  for (const character of stableSerialize(value)) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return (hash >>> 0).toString(16).padStart(8, "0");
-}
-
-function parseSnapshotArchive(value: unknown): SaveSnapshot[] {
-  const result = snapshotArchiveSchema.safeParse(value);
-  if (!result.success) return [];
-
-  return result.data.snapshots
-    .flatMap((snapshot) => {
-      if (checksumValue(snapshot.save) !== snapshot.checksum) return [];
-      try {
-        return [{ ...snapshot, save: parseSave(snapshot.save) }];
-      } catch {
-        return [];
-      }
-    })
-    .sort((left, right) => right.revision - left.revision);
-}
-
-function serializeSnapshotArchive(snapshots: SaveSnapshot[]) {
-  return {
-    version: 1 as const,
-    snapshots: snapshots.slice(0, SNAPSHOT_LIMIT),
-  };
-}
-
-function createSaveSnapshot(
-  current: StoredSave,
-  reason: SaveSnapshot["reason"],
-  versionChange?: { from: string; to: string },
-): SaveSnapshot {
-  return {
-    reason,
-    appVersion: current.appVersion ?? "legacy",
-    ...(versionChange
-      ? {
-        fromAppVersion: versionChange.from,
-        toAppVersion: versionChange.to,
-      }
-      : {}),
-    revision: current.revision,
-    savedAt: current.save.savedAt,
-    checksum: checksumValue(current.save),
-    save: current.save,
-  };
-}
-
-function appendSnapshotArchive(
-  snapshots: SaveSnapshot[],
-  snapshot: SaveSnapshot,
-): SaveSnapshot[] {
-  return [snapshot, ...snapshots.filter((candidate) => candidate.revision !== snapshot.revision)]
-    .sort((left, right) => right.revision - left.revision)
-    .slice(0, SNAPSHOT_LIMIT);
-}
-
-function updateSnapshotArchive(current: StoredSave): SaveSnapshot[] {
-  const snapshots = current.snapshots ?? [];
-  if (current.revision <= 0 || current.save.savedAt === "") return snapshots;
-
-  const currentTime = Date.parse(current.save.savedAt) || 0;
-  const latest = snapshots[0];
-  const latestTime = latest ? Date.parse(latest.savedAt) || 0 : 0;
-  if (latest && currentTime - latestTime < SNAPSHOT_INTERVAL_MS) return snapshots;
-
-  return appendSnapshotArchive(
-    snapshots,
-    createSaveSnapshot(current, "interval"),
-  );
-}
+const snapshotArchive = createSnapshotArchive<Save>(parseSave, save => save.savedAt);
+const parseSnapshotArchive = snapshotArchive.parse;
+const serializeSnapshotArchive = snapshotArchive.serialize;
+const createSaveSnapshot = snapshotArchive.create;
+const appendSnapshotArchive = snapshotArchive.append;
+const updateSnapshotArchive = snapshotArchive.update;
 
 function saveFingerprint(save: Save) {
   const { savedAt: _savedAt, ...content } = save;
@@ -1027,24 +903,6 @@ function saveFingerprint(save: Save) {
 
 export function areSaveContentsEqual(left: Save, right: Save) {
   return saveFingerprint(left) === saveFingerprint(right);
-}
-
-function encodeBase64Url(bytes: Uint8Array) {
-  let binary = "";
-  for (let index = 0; index < bytes.length; index += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
-  }
-  return btoa(binary)
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-function decodeBase64Url(value: string) {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/")
-    + "=".repeat((4 - (value.length % 4)) % 4);
-  const binary = atob(padded);
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
 function compactNumberRecord<T extends Record<string, number>>(record: T): Partial<T> {
@@ -1168,90 +1026,21 @@ export function parseSaveImport(value: unknown): Save {
   return parseSave(value);
 }
 
-async function gzipText(value: string): Promise<Uint8Array | null> {
-  if (typeof CompressionStream === "undefined") return null;
-  try {
-    const compressor = new CompressionStream("gzip");
-    const output = new Response(compressor.readable).arrayBuffer();
-    const writer = compressor.writable.getWriter();
-    await writer.write(new TextEncoder().encode(value));
-    await writer.close();
-    return new Uint8Array(await output);
-  } catch {
-    return null;
-  }
-}
-
-async function gunzipText(value: Uint8Array): Promise<string> {
-  if (typeof DecompressionStream === "undefined") {
-    throw new SaveValidationError(["当前浏览器不支持压缩存档码，请使用 JSON 存档"]);
-  }
-  let output: Promise<string> | undefined;
-  try {
-    const decompressor = new DecompressionStream("gzip");
-    output = new Response(decompressor.readable).text();
-    const writer = decompressor.writable.getWriter();
-    await writer.write(value as unknown as BufferSource);
-    await writer.close();
-    return await output;
-  } catch {
-    await output?.catch(() => "");
-    throw new SaveValidationError(["压缩存档码无效或已损坏"]);
-  }
-}
-
-export async function createSaveCode(data: Save) {
-  const payload = exportSave(data);
-  const json = JSON.stringify(payload);
-  const compressed = await gzipText(json);
-  return (compressed ? SAVE_CODE_V2_GZIP_PREFIX : SAVE_CODE_V2_PLAIN_PREFIX) +
-    encodeBase64Url(compressed ?? new TextEncoder().encode(json));
-}
-
-export async function parseSaveCode(code: string): Promise<Save> {
-  const normalized = code.trim().replace(/\s+/g, "");
-
-  if (normalized.startsWith(SAVE_CODE_V1_PREFIX)) {
-    let payload: z.infer<typeof saveCodeV1PayloadSchema>;
-    try {
-      const decoded = JSON.parse(
-        new TextDecoder().decode(decodeBase64Url(normalized.slice(SAVE_CODE_V1_PREFIX.length))),
-      );
-      const result = saveCodeV1PayloadSchema.safeParse(decoded);
-      if (!result.success) throw new Error("invalid save code payload");
-      payload = result.data;
-    } catch {
-      throw new SaveValidationError(["存档码无效或已损坏"]);
-    }
-
-    if (checksumValue(payload.save) !== payload.checksum) {
-      throw new SaveValidationError(["存档码内容不完整，请重新复制"]);
-    }
-    try {
-      return parseSave(payload.save);
-    } catch {
-      throw new SaveValidationError(["存档码中的游戏进度校验失败"]);
-    }
-  }
-
-  const isGzip = normalized.startsWith(SAVE_CODE_V2_GZIP_PREFIX);
-  const isPlain = normalized.startsWith(SAVE_CODE_V2_PLAIN_PREFIX);
-  if (!isGzip && !isPlain) {
-    throw new SaveValidationError(["存档码版本或前缀无效"]);
-  }
-
-  try {
-    const prefix = isGzip ? SAVE_CODE_V2_GZIP_PREFIX : SAVE_CODE_V2_PLAIN_PREFIX;
-    const bytes = decodeBase64Url(normalized.slice(prefix.length));
-    const json = isGzip
-      ? await gunzipText(bytes)
-      : new TextDecoder().decode(bytes);
-    return parseCompactSave(JSON.parse(json));
-  } catch (error) {
-    if (error instanceof SaveValidationError) throw error;
-    throw new SaveValidationError(["存档码无效或已损坏"]);
-  }
-}
+const saveTransfer = createSaveTransfer<Save, CompactSavePayload>({
+  gzipPrefix: SAVE_CODE_V2_GZIP_PREFIX,
+  plainPrefix: SAVE_CODE_V2_PLAIN_PREFIX,
+  exportPayload: exportSave,
+  parsePayload: parseSaveImport,
+  legacy: [{ prefix: SAVE_CODE_V1_PREFIX, parsePayload(value) {
+    const result = saveCodeV1PayloadSchema.safeParse(value);
+    if (!result.success) throw new SaveValidationError(["存档码无效或已损坏"]);
+    if (checksumValue(result.data.save) !== result.data.checksum) throw new SaveValidationError(["存档码内容不完整，请重新复制"]);
+    try { return parseSave(result.data.save); }
+    catch { throw new SaveValidationError(["存档码中的游戏进度校验失败"]); }
+  } }],
+});
+export const createSaveCode = saveTransfer.createCode;
+export const parseSaveCode = saveTransfer.parseCode;
 
 function browserManifestKey() {
   return `${SHARDED_STORAGE_PREFIX}:manifest`;
@@ -1514,13 +1303,6 @@ function notifySaveChanged(revision: number) {
   } satisfies SaveChangeMessage);
 }
 
-async function withSaveLock<T>(task: () => T | Promise<T>): Promise<T> {
-  if (typeof navigator !== "undefined" && navigator.locks) {
-    return navigator.locks.request(SAVE_LOCK_NAME, task);
-  }
-  return task();
-}
-
 export function getSaveRevision() {
   return localRevision;
 }
@@ -1643,100 +1425,32 @@ export const loadSave = async (): Promise<SaveLoadResult> => {
   return { save: stored.save, recoveryNotice: stored.recoveryNotice };
 };
 
-type SaveWaiter = {
-  resolve: (value: StoredSave) => void;
-  reject: (reason: unknown) => void;
-};
-
-type PendingSave = {
-  data: Save;
-  waiters: SaveWaiter[];
-};
-
-let pendingSave: PendingSave | null = null;
-let saveDrainPromise: Promise<void> | null = null;
-let saveDrainTimer: ReturnType<typeof setTimeout> | null = null;
-
 async function writeSaveData(validated: Save): Promise<StoredSave> {
-  const stored = await withSaveLock(() => {
-    const current = readBrowserStoredSave();
-    if (current.revision !== localRevision) {
-      throw new SaveConflictError(localRevision, current.revision, current.save);
-    }
+  const stored = await writeWithRevision({
+    lockName: SAVE_LOCK_NAME,
+    expectedRevision: () => localRevision,
+    read: readBrowserStoredSave,
+    conflict: (expected, current) => new SaveConflictError(expected, current.revision, current.save),
+    write: (current) => {
+      if (areSaveContentsEqual(current.save, validated)) {
+        return current;
+      }
 
-    if (areSaveContentsEqual(current.save, validated)) {
-      return current;
-    }
-
-    const revision = current.revision + 1;
-    const save = { ...validated, savedAt: new Date().toISOString() };
-    const snapshots = updateSnapshotArchive(current);
-    writeBrowserSnapshotArchive(snapshots);
-    writeBrowserStoredSave({ revision, save, snapshots });
-    localRevision = revision;
-    notifySaveChanged(revision);
-    return { revision, save, snapshots };
+      const revision = current.revision + 1;
+      const save = { ...validated, savedAt: new Date().toISOString() };
+      const snapshots = updateSnapshotArchive(current);
+      writeBrowserSnapshotArchive(snapshots);
+      writeBrowserStoredSave({ revision, save, snapshots });
+      localRevision = revision;
+      notifySaveChanged(revision);
+      return { revision, save, snapshots };
+    },
   });
   scheduleVscodeBackup(stored);
   return stored;
 }
 
-async function drainSaveQueue(): Promise<void> {
-  if (saveDrainPromise) return saveDrainPromise;
-
-  saveDrainPromise = (async () => {
-    while (pendingSave) {
-      const batch = pendingSave;
-      pendingSave = null;
-      try {
-        const stored = await writeSaveData(batch.data);
-        batch.waiters.forEach(({ resolve }) => resolve(stored));
-      } catch (error) {
-        batch.waiters.forEach(({ reject }) => reject(error));
-      }
-    }
-  })().finally(() => {
-    saveDrainPromise = null;
-    if (pendingSave && saveDrainTimer === null) {
-      saveDrainTimer = setTimeout(() => {
-        saveDrainTimer = null;
-        void drainSaveQueue();
-      }, SAVE_COALESCE_MS);
-    }
-  });
-
-  return saveDrainPromise;
-}
-
-export function saveData(data: Save): Promise<StoredSave> {
-  let validated: Save;
-  try {
-    validated = validateSaveForStorage(data);
-  } catch (error) {
-    return Promise.reject(error);
-  }
-
-  const promise = new Promise<StoredSave>((resolve, reject) => {
-    if (pendingSave) {
-      pendingSave.data = validated;
-      pendingSave.waiters.push({ resolve, reject });
-    } else {
-      pendingSave = {
-        data: validated,
-        waiters: [{ resolve, reject }],
-      };
-    }
-  });
-
-  if (!saveDrainPromise && saveDrainTimer === null) {
-    saveDrainTimer = setTimeout(() => {
-      saveDrainTimer = null;
-      void drainSaveQueue();
-    }, SAVE_COALESCE_MS);
-  }
-
-  return promise;
-}
+export const saveData = createCoalescedWriter(validateSaveForStorage, writeSaveData, SAVE_COALESCE_MS);
 
 export function subscribeToSaveChanges(listener: (revision: number) => void) {
   if (typeof window === "undefined") return () => undefined;
@@ -1799,14 +1513,5 @@ export function checkSaveState(): Promise<StoredSave> {
 }
 
 export function downloadSave(data: Save) {
-  const blob = new Blob(
-    [JSON.stringify(exportSave(data), null, 2)],
-    { type: "application/json" },
-  );
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `摸鱼德州-${new Date().toISOString().slice(0, 10)}.json`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  downloadSaveFile(saveTransfer.exportJSON(data), `摸鱼德州-${new Date().toISOString().slice(0, 10)}.json`);
 }

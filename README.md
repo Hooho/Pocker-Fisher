@@ -31,3 +31,9 @@
 `npm run dev`、`npm run build:web` 和 `npm test` 自动执行 `prepare:players`，在忽略版本管理的 `public/shared-players/` 生成合并后的运行名单和头像。构建将名单输出为带内容哈希的文件，并将公共头像打包进站点；浏览器和 VS Code webview 都从自己的静态资源加载。独立运行赛事验证脚本前，先执行 `npm run prepare:players`。
 
 旧 `public/avatars-webp/` 和 `public/avatars-png/` 暂保留用于迁移核对，构建和游戏已不引用；后续公共头像只在 common 中维护。
+
+### 公共存档核心
+
+`vendor/game-common/src/storage/` 提供从德扑提取的校验、JSON 文件/压缩存档码传输、版本锁、合并保存队列和历史快照，泡泡堂依赖同一固定版本。德扑的数据结构、字段压缩、旧版本迁移、分片布局与 VS Code 备份桥接仍留在 `src/domain/storage/storage.ts`；UI 没有复用或改版。
+
+既有 `river-save` 存储键、分片、JSON 文件、V1 与 V2（gzip/plain）存档码保持兼容。`npm test` 同时运行固定公共版本的存档测试，以及重构前真实生成的存档样本回归；不需要额外在线服务。

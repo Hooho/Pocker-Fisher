@@ -16,6 +16,20 @@ import {
   summarizeSaveRecords,
 } from "../domain/storage/storage";
 import { newGame, hero } from "../domain/game/engine";
+import legacyFixture from "./fixtures/save-legacy.json";
+
+test("pre-common V1/V2 gzip/plain codes and JSON files remain compatible", async () => {
+  const expected = parseSave(legacyFixture.save);
+  for (const code of [legacyFixture.v1, legacyFixture.v2plain, legacyFixture.v2gzip]) {
+    assert.equal(areSaveContentsEqual(await parseSaveCode(code), expected), true);
+  }
+  assert.equal(areSaveContentsEqual(parseSaveImport(legacyFixture.json), expected), true);
+  assert.equal(areSaveContentsEqual(parseSaveImport(legacyFixture.save), expected), true);
+});
+
+test("poker rejects another game's save code without touching storage", async () => {
+  await assert.rejects(() => parseSaveCode("BUBBLE-SAVE-V1.P.eyJ2IjoxfQ"), /前缀/);
+});
 test("a tournament export can be imported unchanged", () => {
   const save = {
     ...blank,

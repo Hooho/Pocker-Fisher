@@ -38,7 +38,11 @@ export function isVscodeWebview() {
 
 export function pathForPage(page: AppPage) {
   const path = APP_ROUTES[page];
-  return isVscodeWebview() ? `#${path}` : path;
+  return usesHashRouting() ? `#${path}` : path;
+}
+
+export function usesHashRouting(base = import.meta.env?.BASE_URL) {
+  return isVscodeWebview() || Boolean(base?.startsWith("/") && base !== "/");
 }
 
 function currentPage() {
@@ -61,7 +65,7 @@ export function useAppRouter() {
   const navigate = useCallback((nextPage: AppPage, options: NavigateOptions = {}) => {
     if (currentPage() === nextPage) return;
 
-    if (isVscodeWebview()) {
+    if (usesHashRouting()) {
       const nextHash = `#${APP_ROUTES[nextPage]}`;
       if (options.replace) {
         window.history.replaceState({}, "", nextHash);

@@ -1,9 +1,9 @@
 import { z } from "zod";
-import { stableSerialize, checksumValue, SaveValidationError, SaveConflictError as CommonSaveConflictError } from "../../../vendor/game-common/src/storage/integrity";
-import { createSaveTransfer, downloadSaveFile } from "../../../vendor/game-common/src/storage/transfer";
-import { createCoalescedWriter, writeWithRevision } from "../../../vendor/game-common/src/storage/persistence";
-import { createSnapshotArchive, type SaveSnapshot as CommonSaveSnapshot } from "../../../vendor/game-common/src/storage/snapshots";
-export { SaveValidationError } from "../../../vendor/game-common/src/storage/integrity";
+import { stableSerialize, checksumValue, SaveValidationError, SaveConflictError as CommonSaveConflictError } from "../../../../../packages/game-common/src/storage/integrity";
+import { createSaveTransfer, downloadSaveFile } from "../../../../../packages/game-common/src/storage/transfer";
+import { createCoalescedWriter, writeWithRevision } from "../../../../../packages/game-common/src/storage/persistence";
+import { createSnapshotArchive, type SaveSnapshot as CommonSaveSnapshot } from "../../../../../packages/game-common/src/storage/snapshots";
+export { SaveValidationError } from "../../../../../packages/game-common/src/storage/integrity";
 import type { Game, Character } from "../game/engine";
 import type { ChampionshipSimulationCheckpoint } from "../tournament/tournament";
 import { appMetadata } from "../../app/appMetadata";

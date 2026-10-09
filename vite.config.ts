@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig, searchForWorkspaceRoot } from "vite";
 
 const publicDirectory = resolve("public");
 const packageJson = JSON.parse(readFileSync(resolve("package.json"), "utf8")) as {
@@ -29,6 +29,7 @@ function publicFiles(directory: string): string[] {
 // Relative asset URLs work in a normal browser and from a VS Code webview.
 export default defineConfig(({ command }) => ({
   base: "./",
+  server: { fs: { allow: [searchForWorkspaceRoot(process.cwd()), resolve("../../packages/game-common")] } },
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),
     __APP_UPDATED_AT__: JSON.stringify(appUpdatedAt),

@@ -125,7 +125,7 @@ npm run release:check
 
 ## 数据与资源
 
-选手身份与头像由固定版本的 `vendor/game-common/players/` 提供；`public/characters.json` 只维护本游戏的选手打法参数，按 ID 关联。开发、测试和构建前的 `prepare:players` 自动生成 `public/shared-players/characters.json` 与公共头像，构建时打包到站点并保留名单内容哈希。旧 `public/avatars-webp/` 和 `public/avatars-png/` 暂保留核对，已不参与运行时加载。`scripts/characters.mjs` 现只刷新公共身份与本地参数合并后的运行资源。
+选手身份与头像由固定版本的 `../../packages/game-common/players/` 提供；`public/characters.json` 只维护本游戏的选手打法参数，按 ID 关联。开发、测试和构建前的 `prepare:players` 自动生成 `public/shared-players/characters.json` 与公共头像，构建时打包到站点并保留名单内容哈希。旧 `public/avatars-webp/` 和 `public/avatars-png/` 暂保留核对，已不参与运行时加载。`scripts/characters.mjs` 现只刷新公共身份与本地参数合并后的运行资源。
 
 ## 目录约定
 

@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { copyPlayers } from '../vendor/game-common/src/publishing/copy-players.mjs';
+import { copyPlayers } from '../../../packages/game-common/src/publishing/copy-players.mjs';
 
 export function buildCharacters() {
-  const identities = JSON.parse(readFileSync(new URL('../vendor/game-common/players/identities.json', import.meta.url), 'utf8'));
+  const identities = JSON.parse(readFileSync(new URL('../../../packages/game-common/players/identities.json', import.meta.url), 'utf8'));
   const profiles = new Map(JSON.parse(readFileSync(new URL('../public/characters.json', import.meta.url), 'utf8')).map(p => [p.id, p]));
   return identities.map(identity => {
     const profile = profiles.get(identity.id);

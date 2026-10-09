@@ -63,7 +63,7 @@
     "build:vscode": "npm run build:web && npm run build:extension",
     "build": "npm run build:vscode",
     "vscode:prepublish": "npm run build:vscode",
-    "test": "node --import tsx --test src/tests/*.test.ts vendor/game-common/tests/storage.test.ts",
+    "test": "node --import tsx --test src/tests/*.test.ts ../../packages/game-common/tests/storage.test.ts",
     "release": "node scripts/release.mjs",
     "release:check": "node scripts/release.mjs --dry-run"
   },

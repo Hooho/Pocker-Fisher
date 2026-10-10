@@ -9,7 +9,3 @@ artifacts/
 .DS_Store
 .vscode/*-save.json
 .vscode/river-fisher-save-*.json
-public/shared-players/
-
-# Retired nested checkout, retained locally during workspace migration
-/vendor/game-common/

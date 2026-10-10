@@ -53,17 +53,13 @@
     }
   },
   "scripts": {
-    "prepare:players": "node scripts/prepare-players.mjs",
-    "predev": "npm run prepare:players",
-    "prebuild:web": "npm run prepare:players",
-    "pretest": "npm run prepare:players",
     "dev": "vite --host 0.0.0.0",
     "build:web": "tsc -b && vite build",
     "build:extension": "tsc -p tsconfig.extension.json",
     "build:vscode": "npm run build:web && npm run build:extension",
     "build": "npm run build:vscode",
     "vscode:prepublish": "npm run build:vscode",
-    "test": "node --import tsx --test src/tests/*.test.ts ../../packages/game-common/tests/storage.test.ts",
+    "test": "node --import tsx --test src/tests/*.test.ts",
     "release": "node scripts/release.mjs",
     "release:check": "node scripts/release.mjs --dry-run"
   },

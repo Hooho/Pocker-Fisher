@@ -23,5 +23,3 @@ index.html
 roster.html
 package-lock.json
 AGENTS.md
-vendor/**
-.gitmodules
